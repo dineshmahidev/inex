@@ -1,4 +1,4 @@
-workflow:
+workflows:
   android-release:
     name: INEX Android Release
     max_build_duration: 60
