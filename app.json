@@ -13,9 +13,11 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.dineshmahidev.flowledger"
     },
     "android": {
+      "package": "com.dineshmahidev.flowledger",
       "adaptiveIcon": {
         "backgroundColor": "#000000",
         "foregroundImage": "./assets/images/logo.png",
