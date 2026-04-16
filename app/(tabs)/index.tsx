@@ -39,6 +39,7 @@ export default function DashboardScreen() {
     reminders,
     settings,
     addTransaction,
+    updateTransaction,
     deleteTransaction,
     habits,
     Colors,
@@ -46,6 +47,7 @@ export default function DashboardScreen() {
   const [viewDate, setViewDate] = useState(new Date());
   const { insights } = useAI(transactions, categories);
   const [isModalVisible, setIsModalVisible] = useState(false);
+  const [editingTx, setEditingTx] = useState<any>(null);
   const [isLocked, setIsLocked] = useState(settings.isLocked);
 
   const currentMonthLabel = useMemo(() => {
@@ -101,6 +103,32 @@ export default function DashboardScreen() {
     if (totalMonthlyLogs < 100) return { stage: 'Master', icon: '🏆', msg: 'Exceptional' };
     return { stage: 'Legend', icon: '👑', msg: 'Elite' };
   }, [totalMonthlyLogs]);
+
+  const handleTxPress = (tx: any) => {
+    Alert.alert(
+      "Options",
+      "Manage this transaction",
+      [
+        { text: "Edit", onPress: () => { setEditingTx(tx); setIsModalVisible(true); } },
+        { text: "Delete", style: "destructive", onPress: () => confirmDelete(tx.id) },
+        { text: "Cancel", style: "cancel" }
+      ]
+    );
+  };
+
+  const confirmDelete = (id: string) => {
+    Alert.alert(
+      "Delete Record?",
+      "This action cannot be undone.",
+      [
+        { text: "Keep" },
+        { text: "Delete", style: "destructive", onPress: () => {
+            deleteTransaction(id);
+            Haptics.notificationAsync(Haptics.notificationFeedbackType.Warning);
+        }}
+      ]
+    );
+  };
 
   return (
     <SafeAreaView
@@ -273,7 +301,11 @@ export default function DashboardScreen() {
           filteredTransactions.slice(0, 3).map((t) => {
             const cat = categories.find((c) => c.id === t.categoryId);
             return (
-              <View key={t.id} style={[styles.txCard, { backgroundColor: Colors.card, borderColor: Colors.border }]}>
+              <TouchableOpacity 
+                key={t.id} 
+                style={[styles.txCard, { backgroundColor: Colors.card, borderColor: Colors.border }]}
+                onPress={() => handleTxPress(t)}
+              >
                 <View style={[styles.txIndicator, { backgroundColor: t.type === 'income' ? Colors.primary : Colors.secondary }]} />
                 <View style={styles.txMain}>
                   <Text style={[styles.txTitle, { color: Colors.text }]}>{t.note || "Untitled"}</Text>
@@ -284,7 +316,7 @@ export default function DashboardScreen() {
                     {t.type === "income" ? "+" : "-"}{settings.currency}{t.amount.toLocaleString()}
                   </Text>
                 </View>
-              </View>
+              </TouchableOpacity>
             );
           })
         )}
@@ -305,8 +337,13 @@ export default function DashboardScreen() {
 
       <AddTransactionModal
         visible={isModalVisible}
-        onClose={() => setIsModalVisible(false)}
+        onClose={() => {
+            setIsModalVisible(false);
+            setEditingTx(null);
+        }}
         onAdd={addTransaction}
+        initialData={editingTx}
+        onUpdate={updateTransaction}
       />
     </SafeAreaView>
   );

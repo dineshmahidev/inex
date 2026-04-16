@@ -96,6 +96,7 @@ interface DatabaseContextType {
   isLoading: boolean;
   Colors: any;
   addTransaction: (tx: Omit<Transaction, 'id'>) => Promise<void>;
+  updateTransaction: (id: string, tx: Partial<Transaction>) => Promise<void>;
   deleteTransaction: (id: string) => void;
   markReminderPaid: (id: string) => Promise<void>;
   addReminder: (rem: Omit<Reminder, 'id'>) => void;
@@ -104,6 +105,7 @@ interface DatabaseContextType {
   updateNote: (id: string, note: Partial<Note>) => Promise<void>;
   deleteNote: (id: string) => void;
   addTodo: (td: Omit<Todo, 'id'>) => Promise<string>;
+  updateTodo: (id: string, td: Partial<Todo>) => Promise<void>;
   saveTodos: (todos: Todo[]) => Promise<void>;
   addHabit: (h: Omit<Habit, 'id' | 'logs'>) => Promise<void>;
   updateHabit: (id: string, h: Partial<Habit>) => Promise<void>;
@@ -182,6 +184,12 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
     AsyncStorage.setItem(KEYS.DATA, JSON.stringify(updated));
   };
 
+  const updateTransaction = async (id: string, tx: Partial<Transaction>) => {
+    const updated = transactions.map(t => t.id === id ? { ...t, ...tx } : t);
+    setTransactions(updated);
+    await AsyncStorage.setItem(KEYS.DATA, JSON.stringify(updated));
+  };
+
   const markReminderPaid = async (id: string) => {
     const currentMonth = new Date().toISOString().slice(0, 7);
     const rem = reminders.find(r => r.id === id);
@@ -243,6 +251,12 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
     const updated = [newTodo, ...todos];
     await saveTodos(updated);
     return id;
+  };
+
+  const updateTodo = async (id: string, td: Partial<Todo>) => {
+    const updated = todos.map(t => t.id === id ? { ...t, ...td } : t);
+    setTodos(updated);
+    await AsyncStorage.setItem(KEYS.TODOS, JSON.stringify(updated));
   };
 
   const addHabit = async (h: Omit<Habit, 'id' | 'logs'>) => {
@@ -328,8 +342,8 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
   return (
     <DatabaseContext.Provider value={{
       transactions, categories, reminders, settings, notes, todos, habits, isLoading, Colors,
-      addTransaction, deleteTransaction, markReminderPaid, addReminder, deleteReminder, 
-      addNote, updateNote, deleteNote, addTodo, saveTodos, 
+      addTransaction, updateTransaction, deleteTransaction, markReminderPaid, addReminder, deleteReminder, 
+      addNote, updateNote, deleteNote, addTodo, updateTodo, saveTodos, 
       addHabit, updateHabit, deleteHabit,
       setSettings: updateSettings, refresh: load, clearAllData, exportData, importData,
       detectCategory

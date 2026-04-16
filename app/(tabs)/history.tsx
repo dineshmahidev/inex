@@ -27,11 +27,12 @@ import { AddTransactionModal } from '@/components/AddTransactionModal';
 import { exportToPDF } from '@/utils/export'; // Added PDF utility
 
 export default function HistoryScreen() {
-  const { transactions, categories, deleteTransaction, addTransaction, settings, Colors } = useDatabase();
+  const { transactions, categories, deleteTransaction, updateTransaction, addTransaction, settings, Colors } = useDatabase();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'income' | 'expense'>('all');
   const [selectedMonth, setSelectedMonth] = useState(new Date()); // Month selector state
   const [isModalVisible, setIsModalVisible] = useState(false);
+  const [editingTx, setEditingTx] = useState<any>(null);
 
   // Month-wise filtering + Search + Type
   const filteredTransactions = useMemo(() => {
@@ -62,6 +63,31 @@ export default function HistoryScreen() {
     const next = new Date(selectedMonth);
     next.setMonth(next.getMonth() + offset);
     setSelectedMonth(next);
+  };
+
+  const handleTxPress = (tx: any) => {
+    Alert.alert(
+      "Options",
+      "Manage this transaction",
+      [
+        { text: "Edit", onPress: () => { setEditingTx(tx); setIsModalVisible(true); } },
+        { text: "Delete", style: "destructive", onPress: () => confirmDelete(tx.id) },
+        { text: "Cancel", style: "cancel" }
+      ]
+    );
+  };
+
+  const confirmDelete = (id: string) => {
+    Alert.alert(
+      "Delete Record?",
+      "This action cannot be undone.",
+      [
+        { text: "Keep" },
+        { text: "Delete", style: "destructive", onPress: () => {
+            deleteTransaction(id);
+        }}
+      ]
+    );
   };
 
   return (
@@ -139,7 +165,11 @@ export default function HistoryScreen() {
                   const isIncome = t.type === 'income';
                   
                   return (
-                      <View key={t.id} style={[styles.card, { backgroundColor: Colors.card, borderColor: Colors.border }]}>
+                      <TouchableOpacity 
+                        key={t.id} 
+                        style={[styles.card, { backgroundColor: Colors.card, borderColor: Colors.border }]}
+                        onPress={() => handleTxPress(t)}
+                      >
                           <View style={[styles.iconBox, { backgroundColor: (cat?.color || Colors.primary) + '15' }]}>
                               {isIncome ? <ArrowDownCircle color={Colors.primary} size={22} /> : <ArrowUpCircle color={Colors.secondary} size={22} />}
                           </View>
@@ -157,16 +187,8 @@ export default function HistoryScreen() {
                               <Text style={[styles.amount, { color: isIncome ? Colors.primary : Colors.secondary }]}>
                                   {isIncome ? '+' : '-'}{settings.currency}{t.amount.toLocaleString()}
                               </Text>
-                              <TouchableOpacity onPress={() => {
-                                  Alert.alert("Delete", "Permanently remove this entry?", [
-                                      { text: "Cancel" },
-                                      { text: "Delete", onPress: () => deleteTransaction(t.id), style: 'destructive' }
-                                  ]);
-                              }}>
-                                  <Trash2 size={12} color={Colors.textMuted} style={{ marginTop: 6 }} />
-                              </TouchableOpacity>
                           </View>
-                      </View>
+                      </TouchableOpacity>
                   );
               })
           )}
@@ -185,8 +207,13 @@ export default function HistoryScreen() {
 
       <AddTransactionModal
         visible={isModalVisible}
-        onClose={() => setIsModalVisible(false)}
+        onClose={() => {
+            setIsModalVisible(false);
+            setEditingTx(null);
+        }}
         onAdd={addTransaction}
+        initialData={editingTx}
+        onUpdate={updateTransaction}
       />
     </SafeAreaView>
   );

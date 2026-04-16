@@ -20,9 +20,11 @@ interface AddTransactionModalProps {
   visible: boolean;
   onClose: () => void;
   onAdd: (tx: any) => void;
+  initialData?: any;
+  onUpdate?: (id: string, tx: any) => void;
 }
 
-export function AddTransactionModal({ visible, onClose, onAdd }: AddTransactionModalProps) {
+export function AddTransactionModal({ visible, onClose, onAdd, initialData, onUpdate }: AddTransactionModalProps) {
   const { categories, detectCategory, Colors } = useDatabase();
   const [type, setType] = useState<'income' | 'expense'>('expense');
   const [amount, setAmount] = useState('');
@@ -31,7 +33,18 @@ export function AddTransactionModal({ visible, onClose, onAdd }: AddTransactionM
   const [isAiSuggesting, setIsAiSuggesting] = useState(false);
 
   useEffect(() => {
-    if (note.length > 3) {
+    if (visible && initialData) {
+      setType(initialData.type);
+      setAmount(initialData.amount.toString());
+      setCategoryId(initialData.categoryId);
+      setNote(initialData.note);
+    } else if (visible) {
+      reset();
+    }
+  }, [visible, initialData]);
+
+  useEffect(() => {
+    if (!initialData && note.length > 3) {
       const detected = detectCategory(note);
       if (detected && detected !== categoryId) {
         setCategoryId(detected);
@@ -47,14 +60,23 @@ export function AddTransactionModal({ visible, onClose, onAdd }: AddTransactionM
       return;
     }
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    onAdd({
-      amount: parseFloat(amount),
-      type,
-      categoryId,
-      note,
-      date: new Date().toISOString(),
-    });
-    reset();
+    if (initialData && onUpdate) {
+        onUpdate(initialData.id, {
+            amount: parseFloat(amount),
+            type,
+            categoryId,
+            note,
+            date: initialData.date,
+        });
+    } else {
+        onAdd({
+            amount: parseFloat(amount),
+            type,
+            categoryId,
+            note,
+            date: new Date().toISOString(),
+        });
+    }
     onClose();
   };
 
@@ -69,7 +91,7 @@ export function AddTransactionModal({ visible, onClose, onAdd }: AddTransactionM
       <View style={styles.overlay}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={[styles.content, { backgroundColor: Colors.card }]}>
           <View style={styles.header}>
-            <Text style={[styles.title, { color: Colors.text }]}>New Transaction</Text>
+            <Text style={[styles.title, { color: Colors.text }]}>{initialData ? 'Edit Transaction' : 'New Transaction'}</Text>
             <TouchableOpacity onPress={onClose}><X color={Colors.text} size={24} /></TouchableOpacity>
           </View>
 

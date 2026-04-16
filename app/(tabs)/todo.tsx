@@ -124,31 +124,85 @@ export default function TodoScreen() {
   const [hColor, setHColor] = useState("#FF7A00");
   const [hIcon, setHIcon] = useState("Zap");
 
+  const [editingTodoId, setEditingTodoId] = useState<string | null>(null);
+
   const addTodo = async () => {
     if (!task) return;
-    const item: Omit<Todo, "id"> = {
-      text: task,
-      date: todoDate.toLocaleDateString(),
-      time: todoDate.toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
-      category: cat,
-      starred: isStarred,
-      completed: false,
-    };
-    const todoId = await addTodoToDb(item);
     
-    // Schedule Notification
-    const hasPermission = await requestNotificationPermissions();
-    if (hasPermission) {
-        await scheduleTodoNotification(todoId, task, todoDate);
+    if (editingTodoId) {
+        await updateTodo(editingTodoId, {
+            text: task,
+            date: todoDate.toLocaleDateString(),
+            time: todoDate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+            category: cat,
+            starred: isStarred
+        });
+        // Reschedule notification
+        const hasPermission = await requestNotificationPermissions();
+        if (hasPermission) {
+            await cancelReminderNotification(editingTodoId);
+            await scheduleTodoNotification(editingTodoId, task, todoDate);
+        }
+    } else {
+        const item: Omit<Todo, "id"> = {
+          text: task,
+          date: todoDate.toLocaleDateString(),
+          time: todoDate.toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+          category: cat,
+          starred: isStarred,
+          completed: false,
+        };
+        const todoId = await addTodoToDb(item);
+        
+        // Schedule Notification
+        const hasPermission = await requestNotificationPermissions();
+        if (hasPermission) {
+            await scheduleTodoNotification(todoId, task, todoDate);
+        }
     }
 
     setTask("");
     setTodoDate(new Date());
     setIsStarred(false);
+    setEditingTodoId(null);
     setIsModalVisible(false);
+  };
+
+  const handleTodoPress = (todo: Todo) => {
+    Alert.alert(
+        "Manage Task",
+        todo.text,
+        [
+            { text: "Edit", onPress: () => {
+                setEditingTodoId(todo.id);
+                setTask(todo.text);
+                setCat(todo.category);
+                setIsStarred(todo.starred);
+                setIsModalVisible(true);
+            }},
+            { text: "Delete", style: "destructive", onPress: () => confirmDeleteTodo(todo.id) },
+            { text: "Cancel", style: "cancel" }
+        ]
+    );
+  };
+
+  const confirmDeleteTodo = (id: string) => {
+      Alert.alert(
+          "Delete Task?",
+          "This task and its reminder will be removed.",
+          [
+              { text: "Keep" },
+              { text: "Delete", style: "destructive", onPress: async () => {
+                  const updated = todos.filter(t => t.id !== id);
+                  await saveTodos(updated);
+                  await cancelReminderNotification(id);
+                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+              }}
+          ]
+      );
   };
 
   const handleOpenNote = (note?: any) => {
@@ -490,8 +544,9 @@ export default function TodoScreen() {
                   Colors.primary;
 
                 return (
-                  <View
+                  <TouchableOpacity
                     key={item.id}
+                    onPress={() => handleTodoPress(item)}
                     style={[
                       styles.litCard,
                       {
@@ -580,16 +635,7 @@ export default function TodoScreen() {
                         </Text>
                       </View>
                     </View>
-
-                    <TouchableOpacity
-                      onPress={() =>
-                        saveTodos(todos.filter((t) => t.id !== item.id))
-                      }
-                      style={styles.litDelete}
-                    >
-                      <Trash2 size={16} color={Colors.secondary} />
-                    </TouchableOpacity>
-                  </View>
+                  </TouchableOpacity>
                 );
               })
             )}
@@ -637,7 +683,6 @@ export default function TodoScreen() {
                     ])
                   }
                 >
-                  {/* Decorative Faded Elements */}
                   <View style={styles.cardDecor}>
                     <StickyNote
                       size={120}
@@ -746,7 +791,7 @@ export default function TodoScreen() {
                 new Date().getMonth() + 1,
                 0,
               ).getDate();
-              const currentMonthPrefix = new Date().toISOString().slice(0, 8); // "YYYY-MM-"
+              const currentMonthPrefix = new Date().toISOString().slice(0, 8);
               const Icon = HABIT_ICONS[habit.icon] || Zap;
 
               return (
@@ -856,7 +901,6 @@ export default function TodoScreen() {
         </ScrollView>
       )}
 
-      {/* Todo Modal */}
       <Modal visible={isModalVisible} animationType="slide" transparent>
         <View
           style={[styles.modalOverlay, { backgroundColor: "rgba(0,0,0,0.85)" }]}
@@ -871,9 +915,13 @@ export default function TodoScreen() {
               <Text
                 style={{ color: Colors.text, fontSize: 24, fontWeight: "900" }}
               >
-                New Task
+                {editingTodoId ? "Edit Task" : "New Task"}
               </Text>
-              <TouchableOpacity onPress={() => setIsModalVisible(false)}>
+              <TouchableOpacity onPress={() => {
+                setIsModalVisible(false);
+                setEditingTodoId(null);
+                setTask("");
+              }}>
                 <X color={Colors.text} size={24} />
               </TouchableOpacity>
             </View>
