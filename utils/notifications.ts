@@ -25,6 +25,7 @@ export async function requestNotificationPermissions() {
 }
 
 export async function scheduleReminderNotification(id: string, name: string, amount: number, date: Date) {
+  if (date <= new Date()) return;
   await Notifications.scheduleNotificationAsync({
     identifier: id,
     content: {
@@ -41,6 +42,7 @@ export async function scheduleReminderNotification(id: string, name: string, amo
 }
 
 export async function scheduleTodoNotification(id: string, text: string, date: Date) {
+  if (date <= new Date()) return;
   await Notifications.scheduleNotificationAsync({
     identifier: id,
     content: {

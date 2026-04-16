@@ -16,6 +16,7 @@ import * as Haptics from 'expo-haptics';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { requestNotificationPermissions, scheduleReminderNotification } from '@/utils/notifications';
 import LottieView from 'lottie-react-native';
+import { FlowBannerAd } from '@/components/FlowBannerAd';
 
 export default function RemindersScreen() {
   const { reminders, addReminder, deleteReminder, markReminderPaid, settings, Colors } = useDatabase();
@@ -228,6 +229,8 @@ export default function RemindersScreen() {
             <TouchableOpacity style={[styles.saveBtn, { backgroundColor: Colors.primary }]} onPress={handleAdd}>
               <Text style={{ color: '#fff', fontSize: 18, fontWeight: 'bold' }}>Save Goal</Text>
             </TouchableOpacity>
+
+            <FlowBannerAd />
           </View>
         </View>
       </Modal>
@@ -266,4 +269,21 @@ const styles = StyleSheet.create({
   input: { padding: 20, borderRadius: 20, borderWidth: 1, fontSize: 16 },
   pickerBtn: { flex: 1, height: 56, borderRadius: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, borderWidth: 1 },
   saveBtn: { height: 64, borderRadius: 22, padding: 18, alignItems: 'center', marginTop: 25 },
+  adPlaceholder: {
+    height: 60,
+    width: '100%',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 20,
+    marginBottom: 5,
+    opacity: 0.6
+  },
+  adLabel: {
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 1
+  }
 });

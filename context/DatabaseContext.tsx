@@ -193,17 +193,19 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
   const markReminderPaid = async (id: string) => {
     const currentMonth = new Date().toISOString().slice(0, 7);
     const rem = reminders.find(r => r.id === id);
+    if (!rem || rem.lastPaidMonth === currentMonth) return;
     
     const updatedReminders = reminders.map(r => r.id === id ? { ...r, lastPaidMonth: currentMonth } : r);
     setReminders(updatedReminders);
     await AsyncStorage.setItem(KEYS.REMINDERS, JSON.stringify(updatedReminders));
 
     if (rem) {
+        const catId = rem.type === 'bill' ? '3' : '4';
         await addTransaction({ 
             amount: rem.amount, 
             type: 'expense', 
-            categoryId: '4', 
-            note: `Auto-Paid EMI: ${rem.name}`, 
+            categoryId: catId, 
+            note: `Auto-Paid ${rem.type.toUpperCase()}: ${rem.name}`, 
             date: new Date().toISOString() 
         });
     }

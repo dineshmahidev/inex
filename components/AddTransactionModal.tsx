@@ -15,6 +15,7 @@ import { Colors } from '@/constants/theme';
 import { useDatabase } from '@/hooks/useDatabase';
 import { X, Mic, Sparkles } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
+import { FlowBannerAd } from './FlowBannerAd';
 
 interface AddTransactionModalProps {
   visible: boolean;
@@ -150,10 +151,7 @@ export function AddTransactionModal({ visible, onClose, onAdd, initialData, onUp
             </Text>
           </TouchableOpacity>
 
-          {/* Ad Banner Placeholder */}
-          <View style={[styles.adPlaceholder, { backgroundColor: Colors.background, borderColor: Colors.border }]}>
-            <Text style={[styles.adLabel, { color: Colors.textMuted }]}>SPONSORED AD SPOT</Text>
-          </View>
+          <FlowBannerAd />
         </KeyboardAvoidingView>
       </View>
     </Modal>

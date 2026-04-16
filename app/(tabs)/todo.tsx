@@ -44,6 +44,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { requestNotificationPermissions, scheduleTodoNotification } from "@/utils/notifications";
+import { FlowBannerAd } from "@/components/FlowBannerAd";
 
 const TODO_KEY = "@productivity_todos_v5";
 const NOTE_COLORS = ["#FEFF9C", "#7AFEC6", "#FF7EB9", "#7AFBFF", "#FFF3B0"];
@@ -59,10 +60,10 @@ interface Todo {
 }
 
 const CATEGORIES = [
-  { id: "work", label: "Work", icon: Briefcase, color: "#FF7A00" },
-  { id: "personal", label: "Personal", icon: User, color: "#FFFFFF" },
-  { id: "shopping", label: "Shopping", icon: ShoppingCart, color: "#888888" },
-  { id: "finance", label: "Finance", icon: Wallet, color: "#FF4500" },
+  { id: "work", label: "Work", icon: Briefcase, color: "#EF4444" },
+  { id: "personal", label: "Personal", icon: User, color: "#F87171" },
+  { id: "shopping", label: "Shopping", icon: ShoppingCart, color: "#DC2626" },
+  { id: "finance", label: "Finance", icon: Wallet, color: "#991B1B" },
 ];
 
 const HABIT_ICONS: any = {
@@ -1060,14 +1061,13 @@ export default function TodoScreen() {
               </Text>
             </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[styles.saveBtn, { backgroundColor: Colors.primary }]}
-              onPress={addTodo}
-            >
-              <Text style={{ color: "black", fontWeight: "900", fontSize: 18 }}>
-                Confirm Task
+            <TouchableOpacity style={[styles.saveBtn, { backgroundColor: Colors.primary }]} onPress={addTodo}>
+              <Text style={{ color: Colors.background, fontSize: 18, fontWeight: '900' }}>
+                {editingTodoId ? 'Update Task' : 'Save Task'}
               </Text>
             </TouchableOpacity>
+
+            <FlowBannerAd />
           </View>
         </View>
       </Modal>
@@ -1275,6 +1275,9 @@ export default function TodoScreen() {
                   </Text>
                 </TouchableOpacity>
               )}
+              
+              {/* Ad Banner Placeholder */}
+              <FlowBannerAd />
             </ScrollView>
           </SafeAreaView>
         </View>
@@ -1366,14 +1369,11 @@ export default function TodoScreen() {
                 })}
             </View>
 
-            <TouchableOpacity
-              style={[styles.saveBtn, { backgroundColor: Colors.primary }]}
-              onPress={handleCreateHabit}
-            >
-              <Text style={{ color: "black", fontWeight: "900", fontSize: 18 }}>
-                Start Habit
-              </Text>
+            <TouchableOpacity style={[styles.saveBtn, { backgroundColor: Colors.primary, marginTop: 30 }]} onPress={handleCreateHabit}>
+              <Text style={{ color: Colors.background, fontSize: 18, fontWeight: '900' }}>Start Evolution</Text>
             </TouchableOpacity>
+
+            <FlowBannerAd />
           </View>
         </View>
       </Modal>
@@ -1603,12 +1603,23 @@ const styles = StyleSheet.create({
     gap: 15,
     marginTop: 25,
   },
-  saveBtn: {
-    height: 68,
-    borderRadius: 24,
-    marginTop: 30,
-    justifyContent: "center",
-    alignItems: "center",
+  saveBtn: { height: 60, borderRadius: 20, justifyContent: "center", alignItems: "center" },
+  adPlaceholder: {
+    height: 60,
+    width: '100%',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 20,
+    marginBottom: 5,
+    opacity: 0.6
+  },
+  adLabel: {
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 1
   },
   noteTitleInput: {
     fontSize: 24,
