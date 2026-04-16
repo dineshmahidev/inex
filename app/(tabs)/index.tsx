@@ -14,7 +14,8 @@ import {
     Zap,
     TrendingUp
 } from "lucide-react-native";
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
+import { initNotifications } from "@/utils/notifications";
 import {
     Alert,
     Dimensions,
@@ -49,6 +50,10 @@ export default function DashboardScreen() {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editingTx, setEditingTx] = useState<any>(null);
   const [isLocked, setIsLocked] = useState(settings.isLocked);
+
+  useEffect(() => {
+    initNotifications();
+  }, []);
 
   const currentMonthLabel = useMemo(() => {
     return new Intl.DateTimeFormat("en-US", { month: "long" }).format(viewDate);

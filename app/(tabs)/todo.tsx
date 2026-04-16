@@ -57,6 +57,7 @@ interface Todo {
   category: "work" | "personal" | "shopping" | "finance";
   starred: boolean;
   completed: boolean;
+  reminderDate?: string;
 }
 
 const CATEGORIES = [
@@ -105,7 +106,11 @@ export default function TodoScreen() {
 
   // Todo Form State
   const [task, setTask] = useState("");
-  const [todoDate, setTodoDate] = useState(new Date());
+  const [todoDate, setTodoDate] = useState(() => {
+    const d = new Date();
+    d.setMinutes(d.getMinutes() + 5); // Default to 5 mins in future
+    return d;
+  });
   const [showDate, setShowDate] = useState(false);
   const [showTime, setShowTime] = useState(false);
   const [cat, setCat] = useState<"work" | "personal" | "shopping" | "finance">(
@@ -136,13 +141,16 @@ export default function TodoScreen() {
             date: todoDate.toLocaleDateString(),
             time: todoDate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
             category: cat,
-            starred: isStarred
+            starred: isStarred,
+            reminderDate: todoDate.toISOString()
         });
         // Reschedule notification
         const hasPermission = await requestNotificationPermissions();
         if (hasPermission) {
             await cancelReminderNotification(editingTodoId);
-            await scheduleTodoNotification(editingTodoId, task, todoDate);
+            if (todoDate > new Date()) {
+                await scheduleTodoNotification(editingTodoId, task, todoDate);
+            }
         }
     } else {
         const item: Omit<Todo, "id"> = {
@@ -155,12 +163,13 @@ export default function TodoScreen() {
           category: cat,
           starred: isStarred,
           completed: false,
+          reminderDate: todoDate.toISOString()
         };
         const todoId = await addTodoToDb(item);
         
-        // Schedule Notification
+        // Schedule notification
         const hasPermission = await requestNotificationPermissions();
-        if (hasPermission) {
+        if (hasPermission && todoDate > new Date()) {
             await scheduleTodoNotification(todoId, task, todoDate);
         }
     }
@@ -180,8 +189,11 @@ export default function TodoScreen() {
             { text: "Edit", onPress: () => {
                 setEditingTodoId(todo.id);
                 setTask(todo.text);
-                setCat(todo.category);
+                setCat(todo.category as any);
                 setIsStarred(todo.starred);
+                if (todo.reminderDate) {
+                    setTodoDate(new Date(todo.reminderDate));
+                }
                 setIsModalVisible(true);
             }},
             { text: "Delete", style: "destructive", onPress: () => confirmDeleteTodo(todo.id) },
@@ -996,7 +1008,13 @@ export default function TodoScreen() {
                 mode="date"
                 onChange={(e, d) => {
                   setShowDate(false);
-                  if (d) setTodoDate(d);
+                  if (d) {
+                    const next = new Date(todoDate);
+                    next.setFullYear(d.getFullYear());
+                    next.setMonth(d.getMonth());
+                    next.setDate(d.getDate());
+                    setTodoDate(next);
+                  }
                 }}
               />
             )}
@@ -1006,7 +1024,13 @@ export default function TodoScreen() {
                 mode="time"
                 onChange={(e, d) => {
                   setShowTime(false);
-                  if (d) setTodoDate(d);
+                  if (d) {
+                    const next = new Date(todoDate);
+                    next.setHours(d.getHours());
+                    next.setMinutes(d.getMinutes());
+                    next.setSeconds(0);
+                    setTodoDate(next);
+                  }
                 }}
               />
             )}

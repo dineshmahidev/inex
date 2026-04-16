@@ -66,6 +66,7 @@ export interface Todo {
   completed: boolean;
   date: string;
   time?: string;
+  reminderDate?: string;
 }
 
 export interface Habit {

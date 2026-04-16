@@ -1,6 +1,18 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
+export async function initNotifications() {
+  if (Platform.OS === 'android') {
+    await Notifications.setNotificationChannelAsync('default', {
+      name: 'Default',
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: '#FF7A00',
+      sound: 'mixkit_bell_notification_933', // No extension for Android resource
+    });
+  }
+}
+
 export async function requestNotificationPermissions() {
   const { status: existingStatus } = await Notifications.getPermissionsAsync();
   let finalStatus = existingStatus;
@@ -8,51 +20,42 @@ export async function requestNotificationPermissions() {
     const { status } = await Notifications.requestPermissionsAsync();
     finalStatus = status;
   }
-  if (finalStatus !== 'granted') {
-    return false;
-  }
-
-  if (Platform.OS === 'android') {
-    Notifications.setNotificationChannelAsync('default', {
-      name: 'default',
-      importance: Notifications.AndroidImportance.MAX,
-      vibrationPattern: [0, 250, 250, 250],
-      lightColor: '#FF7A00',
-    });
-  }
-
-  return true;
+  return finalStatus === 'granted';
 }
 
 export async function scheduleReminderNotification(id: string, name: string, amount: number, date: Date) {
-  if (date <= new Date()) return;
+  const diff = Math.floor((date.getTime() - Date.now()) / 1000);
+  if (diff < 0) return;
+
   await Notifications.scheduleNotificationAsync({
     identifier: id,
     content: {
       title: 'Payment Reminder 🅾️',
       body: `It's time to pay ${name} amount of ${amount.toLocaleString()}. Keep your credit score elite!`,
       data: { id },
-      sound: true,
+      sound: Platform.OS === 'ios' ? 'mixkit-bell-notification-933.wav' : 'mixkit_bell_notification_933',
     },
     trigger: {
-      date: date,
+      seconds: Math.max(10, diff), // Use 10s minimum for better UX during testing
       channelId: 'default',
     },
   });
 }
 
 export async function scheduleTodoNotification(id: string, text: string, date: Date) {
-  if (date <= new Date()) return;
+  const diff = Math.floor((date.getTime() - Date.now()) / 1000);
+  if (diff < 0) return;
+
   await Notifications.scheduleNotificationAsync({
     identifier: id,
     content: {
       title: 'Task Reminder ⚡',
       body: `Don't forget: ${text}. Stay in the flow!`,
       data: { id, type: 'todo' },
-      sound: true,
+      sound: Platform.OS === 'ios' ? 'mixkit-bell-notification-933.wav' : 'mixkit_bell_notification_933',
     },
     trigger: {
-      date: date,
+      seconds: Math.max(10, diff),
       channelId: 'default',
     },
   });
