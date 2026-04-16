@@ -116,7 +116,7 @@ export default function DashboardScreen() {
           <View style={styles.brandLeft}>
               <View style={styles.logoContainer}>
                 <Image 
-                    source={require('@/assets/images/logo.png')} 
+                    source={require('@/assets/images/icon.png')} 
                     style={styles.brandLogo} 
                 />
               </View>
