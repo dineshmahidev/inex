@@ -33,7 +33,10 @@ export async function scheduleReminderNotification(id: string, name: string, amo
       data: { id },
       sound: true,
     },
-    trigger: date,
+    trigger: {
+      date: date,
+      channelId: 'default',
+    },
   });
 }
 
@@ -46,7 +49,10 @@ export async function scheduleTodoNotification(id: string, text: string, date: D
       data: { id, type: 'todo' },
       sound: true,
     },
-    trigger: date,
+    trigger: {
+      date: date,
+      channelId: 'default',
+    },
   });
 }
 
