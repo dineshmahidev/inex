@@ -24,7 +24,7 @@ export default function PrivacyScreen() {
     {
       icon: ServerOff,
       title: "Offline First",
-      content: "INEX operates fully offline. Your data never leaves your device unless you explicitly choose to export a backup file for your own use."
+      content: "Flow Ledger operates fully offline. Your data never leaves your device unless you explicitly choose to export a backup file for your own use."
     },
     {
       icon: ShieldCheck,
@@ -51,7 +51,7 @@ export default function PrivacyScreen() {
           <View style={[styles.hero, { backgroundColor: Colors.primary + '10' }]}>
               <ShieldCheck size={50} color={Colors.primary} />
               <Text style={[styles.heroTitle, { color: Colors.text }]}>Your Data, Your Control</Text>
-              <Text style={[styles.heroSub, { color: Colors.textMuted }]}>Read how INEX protects your financial independence.</Text>
+              <Text style={[styles.heroSub, { color: Colors.textMuted }]}>Read how Flow Ledger protects your financial independence.</Text>
           </View>
 
           {sections.map((sec, i) => (

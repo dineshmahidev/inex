@@ -246,7 +246,7 @@ export default function SettingsScreen() {
             </View>
 
             <View style={styles.footer}>
-                <Text style={[styles.versionText, { color: Colors.text }]}>INEX SMART FINANCE</Text>
+                <Text style={[styles.versionText, { color: Colors.text }]}>FLOW LEDGER PRO</Text>
                 <Text style={[styles.footerInfo, { color: Colors.textMuted }]}>V 1.0.5 • SECURE & OFFLINE</Text>
             </View>
         </ScrollView>

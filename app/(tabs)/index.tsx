@@ -121,7 +121,7 @@ export default function DashboardScreen() {
                 />
               </View>
               <View>
-                  <Text style={[styles.brandName, { color: Colors.text }]}>INEX</Text>
+                  <Text style={[styles.brandName, { color: Colors.text }]}>Flow Ledger</Text>
                   <Text style={[styles.brandElite, { color: Colors.primary }]}>FINANCE & PRODUCTIVITY</Text>
               </View>
           </View>

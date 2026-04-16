@@ -1,11 +1,10 @@
-{
   "expo": {
-    "name": "INEX",
-    "slug": "inex",
+    "name": "Flow Ledger",
+    "slug": "flow-ledger",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "incomeexpense",
+    "scheme": "flowledger",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {

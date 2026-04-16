@@ -50,7 +50,7 @@ export default function OnboardingScreen() {
         <View style={styles.content}>
           <View style={styles.header}>
             <Text style={[styles.title, { color: Colors.text }]}>Welcome to</Text>
-            <Text style={[styles.brand, { color: Colors.primary }]}>INEX</Text>
+            <Text style={[styles.brand, { color: Colors.primary }]}>Flow Ledger</Text>
             <Text style={[styles.subtitle, { color: Colors.textMuted }]}>Let's set up your profile to get started.</Text>
           </View>
 

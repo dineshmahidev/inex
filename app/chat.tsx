@@ -25,7 +25,7 @@ type Message = {
 
 const STRINGS = {
     en: {
-        welcome: "Welcome to INEX Strategic Advisory. Choose your language to begin.",
+        welcome: "Welcome to Flow Ledger Strategic Advisory. Choose your language to begin.",
         focus: "What is your primary financial focus for this month?",
         goals: ['Aggressive Saving', 'Expense Control', 'Debt Clearance'],
         savingQ: "To calculate your path, how much do you want to save per month?",
@@ -33,7 +33,7 @@ const STRINGS = {
         generating: "Calculating Strategic Roadmap...",
         summary: "Strategic Roadmap Generated. For your focus, I've calculated this High-Efficiency breakdown:",
         tiers: ['Essential Bills', 'Variable Spend', 'Saving Target', 'Emergency Buffer'],
-        footer: "INEX Strategic AI uses your history for precise calculations.",
+        footer: "Flow Ledger Strategic AI uses your history for precise calculations.",
         apply: "APPLY",
         lock: "Lock Strategy",
         recalc: "Recalculate",
@@ -41,7 +41,7 @@ const STRINGS = {
         placeholder: "Enter Amount"
     },
     ta: {
-        welcome: "INEX வியூக ஆலோசனைக்கு வரவேற்கிறோம். தொடங்குவதற்கு உங்கள் மொழியைத் தேர்ந்தெடுக்கவும்.",
+        welcome: "Flow Ledger வியூக ஆலோசனைக்கு வரவேற்கிறோம். தொடங்குவதற்கு உங்கள் மொழியைத் தேர்ந்தெடுக்கவும்.",
         focus: "இந்த மாதத்திற்கான உங்கள் முக்கிய நிதி இலக்கு என்ன?",
         goals: ['அதிக சேமிப்பு', 'செலவு கட்டுப்பாடு', 'கடன் தீர்த்தல்'],
         savingQ: "உங்கள் பாதையை கணக்கிட, ஒரு மாதத்திற்கு எவ்வளவு சேமிக்க விரும்புகிறீர்கள்?",
@@ -49,7 +49,7 @@ const STRINGS = {
         generating: "வியூக வரைபடம் கணக்கிடப்படுகிறது...",
         summary: "நிதியியல் வியூகம் உருவாக்கப்பட்டது. உங்கள் கவனத்திற்காக, இந்த உயர் செயல்திறன் முறிவை நான் கணக்கிட்டுள்ளேன்:",
         tiers: ['அத்தியாவசிய செலவுகள்', 'இதர செலவுகள்', 'சேமிப்பு இலக்கு', 'அவசரகால நிதி'],
-        footer: "துல்லியமான கணக்கீடுகளுக்கு INEX AI உங்கள் வரலாற்றைப் பயன்படுத்துகிறது.",
+        footer: "துல்லியமான கணக்கீடுகளுக்கு Flow Ledger AI உங்கள் வரலாற்றைப் பயன்படுத்துக்கிறது.",
         apply: "பயன்படுத்து",
         lock: "வியூகத்தை உறுதிசெய்",
         recalc: "மீண்டும் கணக்கிடு",
@@ -204,7 +204,7 @@ export default function ChatScreen() {
                 <Languages size={18} color={Colors.primary} />
             </View>
             <View>
-                <Text style={[styles.title, { color: Colors.text }]}>INEX STRATEGY</Text>
+                <Text style={[styles.title, { color: Colors.text }]}>Flow Ledger STRATEGY</Text>
                 <Text style={[styles.status, { color: Colors.primary }]}>{lang === 'en' ? 'MULTILINGUAL' : 'தமிழ் பதிப்பு'}</Text>
             </View>
         </View>
