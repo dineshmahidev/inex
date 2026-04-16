@@ -33,7 +33,7 @@ export async function scheduleReminderNotification(id: string, name: string, amo
       title: 'Payment Reminder 🅾️',
       body: `It's time to pay ${name} amount of ${amount.toLocaleString()}. Keep your credit score elite!`,
       data: { id },
-      sound: Platform.OS === 'ios' ? 'mixkit-bell-notification-933.wav' : 'mixkit_bell_notification_933',
+      sound: Platform.OS === 'ios' ? 'mixkit_bell_notification_933.wav' : 'mixkit_bell_notification_933',
     },
     trigger: {
       seconds: Math.max(10, diff), // Use 10s minimum for better UX during testing
@@ -52,7 +52,7 @@ export async function scheduleTodoNotification(id: string, text: string, date: D
       title: 'Task Reminder ⚡',
       body: `Don't forget: ${text}. Stay in the flow!`,
       data: { id, type: 'todo' },
-      sound: Platform.OS === 'ios' ? 'mixkit-bell-notification-933.wav' : 'mixkit_bell_notification_933',
+      sound: Platform.OS === 'ios' ? 'mixkit_bell_notification_933.wav' : 'mixkit_bell_notification_933',
     },
     trigger: {
       seconds: Math.max(10, diff),
