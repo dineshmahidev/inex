@@ -145,8 +145,15 @@ export function AddTransactionModal({ visible, onClose, onAdd, initialData, onUp
           </ScrollView>
 
           <TouchableOpacity style={[styles.saveBtn, { backgroundColor: Colors.primary }]} onPress={handleAdd}>
-            <Text style={[styles.saveBtnText, { color: Colors.background }]}>Record Transaction</Text>
+            <Text style={[styles.saveBtnText, { color: Colors.background }]}>
+              {initialData ? 'Update Transaction' : 'Record Transaction'}
+            </Text>
           </TouchableOpacity>
+
+          {/* Ad Banner Placeholder */}
+          <View style={[styles.adPlaceholder, { backgroundColor: Colors.background, borderColor: Colors.border }]}>
+            <Text style={[styles.adLabel, { color: Colors.textMuted }]}>SPONSORED AD SPOT</Text>
+          </View>
         </KeyboardAvoidingView>
       </View>
     </Modal>
@@ -175,4 +182,20 @@ const styles = StyleSheet.create({
   catText: { fontWeight: '600' },
   saveBtn: { paddingVertical: 18, borderRadius: 16, alignItems: 'center', marginBottom: 20 },
   saveBtnText: { fontSize: 16, fontWeight: 'bold' },
+  adPlaceholder: {
+    height: 60,
+    width: '100%',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 10,
+    opacity: 0.6
+  },
+  adLabel: {
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 1
+  }
 });
