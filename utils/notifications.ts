@@ -37,6 +37,19 @@ export async function scheduleReminderNotification(id: string, name: string, amo
   });
 }
 
+export async function scheduleTodoNotification(id: string, text: string, date: Date) {
+  await Notifications.scheduleNotificationAsync({
+    identifier: id,
+    content: {
+      title: 'Task Reminder ⚡',
+      body: `Don't forget: ${text}. Stay in the flow!`,
+      data: { id, type: 'todo' },
+      sound: true,
+    },
+    trigger: date,
+  });
+}
+
 export async function cancelReminderNotification(id: string) {
   await Notifications.cancelScheduledNotificationAsync(id);
 }

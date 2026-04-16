@@ -103,7 +103,7 @@ interface DatabaseContextType {
   addNote: (note: Omit<Note, 'id'>) => Promise<void>;
   updateNote: (id: string, note: Partial<Note>) => Promise<void>;
   deleteNote: (id: string) => void;
-  addTodo: (todo: Omit<Todo, 'id'>) => Promise<void>;
+  addTodo: (td: Omit<Todo, 'id'>) => Promise<string>;
   saveTodos: (todos: Todo[]) => Promise<void>;
   addHabit: (h: Omit<Habit, 'id' | 'logs'>) => Promise<void>;
   updateHabit: (id: string, h: Partial<Habit>) => Promise<void>;
@@ -238,9 +238,11 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
   };
 
   const addTodo = async (td: Omit<Todo, 'id'>) => {
-    const newTodo = { ...td, id: Date.now().toString() };
+    const id = Date.now().toString();
+    const newTodo = { ...td, id };
     const updated = [newTodo, ...todos];
-    saveTodos(updated);
+    await saveTodos(updated);
+    return id;
   };
 
   const addHabit = async (h: Omit<Habit, 'id' | 'logs'>) => {

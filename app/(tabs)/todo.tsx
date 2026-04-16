@@ -43,6 +43,7 @@ import {
     View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { requestNotificationPermissions, scheduleTodoNotification } from "@/utils/notifications";
 
 const TODO_KEY = "@productivity_todos_v5";
 const NOTE_COLORS = ["#FEFF9C", "#7AFEC6", "#FF7EB9", "#7AFBFF", "#FFF3B0"];
@@ -136,7 +137,14 @@ export default function TodoScreen() {
       starred: isStarred,
       completed: false,
     };
-    await addTodoToDb(item);
+    const todoId = await addTodoToDb(item);
+    
+    // Schedule Notification
+    const hasPermission = await requestNotificationPermissions();
+    if (hasPermission) {
+        await scheduleTodoNotification(todoId, task, todoDate);
+    }
+
     setTask("");
     setTodoDate(new Date());
     setIsStarred(false);
