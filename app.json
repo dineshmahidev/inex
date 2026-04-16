@@ -49,6 +49,7 @@
         "react-native-google-mobile-ads",
         {
           "androidAppId": "ca-app-pub-2141805169615611~4136629708",
+          "delayAppMeasurementInit": true,
           "userTrackingUsageDescription": "This identifier will be used to deliver personalized ads to you."
         }
       ]
