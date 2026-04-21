@@ -11,13 +11,14 @@
     },
     "scheme": "flowledger",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.dineshmahidev.flowledger"
     },
     "android": {
       "package": "com.dineshmahidev.flowledger",
+      "versionCode": 3,
       "adaptiveIcon": {
         "backgroundColor": "#000000",
         "foregroundImage": "./assets/images/logo.png",
