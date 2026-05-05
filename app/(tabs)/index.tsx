@@ -16,6 +16,7 @@ import {
 } from "lucide-react-native";
 import React, { useMemo, useState, useEffect } from "react";
 import { initNotifications } from "@/utils/notifications";
+import * as Haptics from 'expo-haptics';
 import {
     Alert,
     Dimensions,
@@ -129,7 +130,7 @@ export default function DashboardScreen() {
         { text: "Keep" },
         { text: "Delete", style: "destructive", onPress: () => {
             deleteTransaction(id);
-            Haptics.notificationAsync(Haptics.notificationFeedbackType.Warning);
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
         }}
       ]
     );

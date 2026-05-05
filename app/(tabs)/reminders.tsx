@@ -210,7 +210,13 @@ export default function RemindersScreen() {
                     display="default"
                     onChange={(e, d) => {
                         setShowDate(false);
-                        if(d) setDate(d);
+                        if(d) {
+                            const next = new Date(date);
+                            next.setFullYear(d.getFullYear());
+                            next.setMonth(d.getMonth());
+                            next.setDate(d.getDate());
+                            setDate(next);
+                        }
                     }}
                 />
             )}
@@ -221,7 +227,13 @@ export default function RemindersScreen() {
                     display="default"
                     onChange={(e, d) => {
                         setShowTime(false);
-                        if(d) setDate(d);
+                        if(d) {
+                            const next = new Date(date);
+                            next.setHours(d.getHours());
+                            next.setMinutes(d.getMinutes());
+                            next.setSeconds(0);
+                            setDate(next);
+                        }
                     }}
                 />
             )}

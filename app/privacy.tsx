@@ -33,6 +33,11 @@ export default function PrivacyScreen() {
     },
     {
       icon: Eye,
+      title: "Automated Bill Detection",
+      content: "If you grant Notification Access, our app scans incoming messages for bill keywords. This scanning is done entirely ON-DEVICE. We never read personal messages or upload your data to any servers."
+    },
+    {
+      icon: ShieldCheck,
       title: "Transparency",
       content: "We do not track your behavior, we do not use third-party analytics, and we do not sell any information to third parties. Your privacy is our core value."
     }

@@ -24,8 +24,7 @@ export async function requestNotificationPermissions() {
 }
 
 export async function scheduleReminderNotification(id: string, name: string, amount: number, date: Date) {
-  const diff = Math.floor((date.getTime() - Date.now()) / 1000);
-  if (diff < 0) return;
+  if (date <= new Date()) return;
 
   await Notifications.scheduleNotificationAsync({
     identifier: id,
@@ -35,16 +34,12 @@ export async function scheduleReminderNotification(id: string, name: string, amo
       data: { id },
       sound: Platform.OS === 'ios' ? 'mixkit_bell_notification_933.wav' : 'mixkit_bell_notification_933',
     },
-    trigger: {
-      seconds: Math.max(10, diff), // Use 10s minimum for better UX during testing
-      channelId: 'default',
-    },
+    trigger: date,
   });
 }
 
 export async function scheduleTodoNotification(id: string, text: string, date: Date) {
-  const diff = Math.floor((date.getTime() - Date.now()) / 1000);
-  if (diff < 0) return;
+  if (date <= new Date()) return;
 
   await Notifications.scheduleNotificationAsync({
     identifier: id,
@@ -54,10 +49,7 @@ export async function scheduleTodoNotification(id: string, text: string, date: D
       data: { id, type: 'todo' },
       sound: Platform.OS === 'ios' ? 'mixkit_bell_notification_933.wav' : 'mixkit_bell_notification_933',
     },
-    trigger: {
-      seconds: Math.max(10, diff),
-      channelId: 'default',
-    },
+    trigger: date,
   });
 }
 

@@ -43,7 +43,12 @@ import {
     View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { requestNotificationPermissions, scheduleTodoNotification } from "@/utils/notifications";
+import { 
+  requestNotificationPermissions, 
+  scheduleTodoNotification,
+  cancelReminderNotification 
+} from "@/utils/notifications";
+import * as Haptics from 'expo-haptics';
 import { FlowBannerAd } from "@/components/FlowBannerAd";
 
 const TODO_KEY = "@productivity_todos_v5";
