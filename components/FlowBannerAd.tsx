@@ -48,40 +48,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginVertical: 10,
     minHeight: 60
-  },
-  testAdBody: {
-    height: 60,
-    width: '100%',
-    backgroundColor: '#F1F1F1',
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    borderRadius: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 10,
-    overflow: 'hidden',
-    marginVertical: 10
-  },
-  adBadge: {
-    backgroundColor: '#FF7A00',
-    paddingHorizontal: 4,
-    borderRadius: 2,
-    marginRight: 10
-  },
-  adBadgeText: {
-    fontSize: 10,
-    fontWeight: 'bold',
-    color: '#fff'
-  },
-  testAdTitle: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#333',
-    marginRight: 10
-  },
-  testAdDesc: {
-    flex: 1,
-    fontSize: 10,
-    color: '#666'
   }
 });

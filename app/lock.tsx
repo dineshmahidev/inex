@@ -103,32 +103,50 @@ export default function LockScreen() {
                         ))}
                     </View>
                 ))}
-                <View style={styles.row}>
-                    <TouchableOpacity style={styles.key} onPress={handleBiometricAuth}>
-                        <Fingerprint size={32} color={Colors.primary} />
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.key} onPress={() => handleKeyPress('0')}>
-                        <Text style={[styles.keyText, { color: Colors.text }]}>0</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.key} onPress={handleDelete}>
-                        <Delete size={28} color={Colors.textMuted} />
-                    </TouchableOpacity>
-                </View>
-            </View>
+        <View style={styles.row}>
+          <TouchableOpacity style={styles.key} onPress={handleBiometricAuth}>
+            <Fingerprint size={32} color={Colors.primary} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.key} onPress={() => handleKeyPress('0')}>
+            <Text style={[styles.keyText, { color: Colors.text }]}>0</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.key} onPress={handleDelete}>
+            <Delete size={28} color={Colors.textMuted} />
+          </TouchableOpacity>
         </View>
-    );
+
+        <TouchableOpacity 
+          style={styles.forgotBtn} 
+          onPress={() => {
+            Alert.alert(
+              "Forgot PIN?", 
+              "You can unlock using biometrics (FaceID/Fingerprint). If biometrics are not set up, you must reinstall the app to reset access.",
+              [
+                { text: "Try Biometrics", onPress: handleBiometricAuth },
+                { text: "Cancel", style: 'cancel' }
+              ]
+            );
+          }}
+        >
+          <Text style={[styles.forgotText, { color: Colors.textMuted }]}>Forgot PIN?</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-    header: { alignItems: 'center', marginBottom: 50 },
-    iconBox: { width: 80, height: 80, borderRadius: 40, justifyContent: 'center', alignItems: 'center', marginBottom: 20 },
-    title: { fontSize: 24, fontWeight: 'bold', marginBottom: 10 },
-    subtitle: { fontSize: 14 },
-    dotsContainer: { flexDirection: 'row', gap: 20, marginBottom: 60 },
-    dot: { width: 16, height: 16, borderRadius: 8, borderWidth: 2 },
-    pad: { width: width * 0.8, maxWidth: 300 },
-    row: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 },
-    key: { width: 70, height: 70, borderRadius: 35, justifyContent: 'center', alignItems: 'center' },
-    keyText: { fontSize: 28, fontWeight: '500' },
+  container: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  header: { alignItems: 'center', marginBottom: 50 },
+  iconBox: { width: 80, height: 80, borderRadius: 40, justifyContent: 'center', alignItems: 'center', marginBottom: 20 },
+  title: { fontSize: 24, fontWeight: 'bold', marginBottom: 10 },
+  subtitle: { fontSize: 14 },
+  dotsContainer: { flexDirection: 'row', gap: 20, marginBottom: 60 },
+  dot: { width: 16, height: 16, borderRadius: 8, borderWidth: 2 },
+  pad: { width: width * 0.8, maxWidth: 300, alignItems: 'center' },
+  row: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20, width: '100%' },
+  key: { width: 70, height: 70, borderRadius: 35, justifyContent: 'center', alignItems: 'center' },
+  keyText: { fontSize: 28, fontWeight: '500' },
+  forgotBtn: { marginTop: 30, padding: 10 },
+  forgotText: { fontSize: 14, fontWeight: '500', textDecorationLine: 'underline' }
 });
