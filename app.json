@@ -26,7 +26,7 @@
         "monochromeImage": "./assets/app_logo.png"
       },
       "config": {
-        "googleMobileAdsAppId": "ca-app-pub-2141805169615611~4136629708"
+        "googleMobileAdsAppId": "ca-app-pub-2141805169615611~2090173992"
       },
       "permissions": [
         "SCHEDULE_EXACT_ALARM",
@@ -55,7 +55,7 @@
       [
         "react-native-google-mobile-ads",
         {
-          "androidAppId": "ca-app-pub-2141805169615611~4136629708",
+          "androidAppId": "ca-app-pub-2141805169615611~2090173992",
           "iosAppId": "ca-app-pub-3940256099942544~1458002511",
           "delayAppMeasurementInit": true,
           "userTrackingUsageDescription": "This identifier will be used to deliver personalized ads to you."

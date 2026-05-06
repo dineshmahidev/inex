@@ -28,7 +28,7 @@ export const FlowBannerAd = () => {
   return (
     <View style={styles.container}>
       <BannerAd
-        unitId={__DEV__ ? TestIds.BANNER : ADMOB_CONFIG.bannerAdUnitId}
+        unitId={__DEV__ ? TestIds.ADAPTIVE_BANNER : ADMOB_CONFIG.bannerAdUnitId}
         size={BannerAdSize.BANNER}
         requestOptions={{
           requestNonPersonalizedAdsOnly: true,
