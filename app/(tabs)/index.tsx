@@ -12,7 +12,8 @@ import {
     Target,
     Trash2,
     Zap,
-    TrendingUp
+    TrendingUp,
+    User
 } from "lucide-react-native";
 import React, { useMemo, useState, useEffect } from "react";
 import { initNotifications } from "@/utils/notifications";
@@ -45,8 +46,9 @@ export default function DashboardScreen() {
     deleteTransaction,
     habits,
     Colors,
+    globalMonth,
+    setGlobalMonth,
   } = useDatabase();
-  const [viewDate, setViewDate] = useState(new Date());
   const { insights } = useAI(transactions, categories);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editingTx, setEditingTx] = useState<any>(null);
@@ -57,18 +59,18 @@ export default function DashboardScreen() {
   }, []);
 
   const currentMonthLabel = useMemo(() => {
-    return new Intl.DateTimeFormat("en-US", { month: "long" }).format(viewDate);
-  }, [viewDate]);
+    return new Intl.DateTimeFormat("en-US", { month: "long" }).format(globalMonth);
+  }, [globalMonth]);
 
   const filteredTransactions = useMemo(() => {
     return transactions.filter((t) => {
       const d = new Date(t.date);
       return (
-        d.getMonth() === viewDate.getMonth() &&
-        d.getFullYear() === viewDate.getFullYear()
+        d.getMonth() === globalMonth.getMonth() &&
+        d.getFullYear() === globalMonth.getFullYear()
       );
     });
-  }, [transactions, viewDate]);
+  }, [transactions, globalMonth]);
 
   const stats = useMemo(() => {
     const income = filteredTransactions
@@ -148,55 +150,26 @@ export default function DashboardScreen() {
       {/* Brand & Profile Header */}
       <View style={styles.brandHeader}>
           <View style={styles.brandLeft}>
-              <View style={styles.logoContainer}>
-                <Image 
-                    source={require('@/assets/images/logo.png')} 
-                    style={styles.brandLogo} 
-                />
-              </View>
               <View>
-                  <Text style={[styles.brandName, { color: Colors.text }]}>Flow Ledger</Text>
-                  <Text style={[styles.brandElite, { color: Colors.primary }]}>FINANCE & PRODUCTIVITY</Text>
+                  <Text style={[styles.brandName, { color: Colors.text }]}>Tracksy</Text>
+                  <Text style={[styles.brandElite, { color: Colors.primary }]}>YOUR PRODUCTIVITY APP</Text>
               </View>
           </View>
-          <TouchableOpacity style={[styles.profileBtn, { backgroundColor: Colors.card, borderColor: Colors.border }]}>
-             <Text style={[styles.greeting, { color: Colors.textMuted }]}>Hi, {settings.userName}</Text>
+          <TouchableOpacity style={styles.profileContainer}>
+             <View style={[styles.avatar, { backgroundColor: Colors.card, borderColor: Colors.border }]}>
+                {settings.userImage ? (
+                  <Image source={{ uri: settings.userImage }} style={{ width: '100%', height: '100%', borderRadius: 18, resizeMode: 'cover' }} />
+                ) : (
+                  <User size={20} color={Colors.primary} />
+                )}
+             </View>
+             <Text style={[styles.greetingName, { color: Colors.text }]} numberOfLines={1}>
+                {settings.userName}
+             </Text>
           </TouchableOpacity>
       </View>
 
-      {/* Navigation Sub-Header */}
-      <View style={[styles.navBar, { borderBottomColor: Colors.border }]}>
-        <TouchableOpacity
-          style={[
-            styles.navBtn,
-            { backgroundColor: Colors.card, borderColor: Colors.border },
-          ]}
-          onPress={() => {
-            setViewDate(new Date(viewDate.setMonth(viewDate.getMonth() - 1)));
-          }}
-        >
-          <ChevronLeft color={Colors.text} size={20} />
-        </TouchableOpacity>
-        <View style={styles.monthBox}>
-          <Text style={[styles.monthText, { color: Colors.text }]}>
-            {currentMonthLabel}
-          </Text>
-          <Text style={[styles.yearText, { color: Colors.primary }]}>
-            {viewDate.getFullYear()}
-          </Text>
-        </View>
-        <TouchableOpacity
-          style={[
-            styles.navBtn,
-            { backgroundColor: Colors.card, borderColor: Colors.border },
-          ]}
-          onPress={() => {
-            setViewDate(new Date(viewDate.setMonth(viewDate.getMonth() + 1)));
-          }}
-        >
-          <ChevronRight color={Colors.text} size={20} />
-        </TouchableOpacity>
-      </View>
+
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
@@ -207,6 +180,44 @@ export default function DashboardScreen() {
           income={stats.income}
           expense={stats.expense}
         />
+
+      {/* Navigation Sub-Header */}
+      <View style={[styles.navBar, { borderBottomColor: Colors.border, borderBottomWidth: 0, marginBottom: 15, paddingHorizontal: 0 }]}>
+        <TouchableOpacity
+          style={[
+            styles.navBtn,
+            { backgroundColor: Colors.card, borderColor: Colors.border },
+          ]}
+          onPress={() => {
+            const newDate = new Date(globalMonth);
+            newDate.setMonth(newDate.getMonth() - 1);
+            setGlobalMonth(newDate);
+          }}
+        >
+          <ChevronLeft color={Colors.text} size={20} />
+        </TouchableOpacity>
+        <View style={styles.monthBox}>
+          <Text style={[styles.monthText, { color: Colors.text }]}>
+            {currentMonthLabel}
+          </Text>
+          <Text style={[styles.yearText, { color: Colors.primary }]}>
+            {globalMonth.getFullYear()}
+          </Text>
+        </View>
+        <TouchableOpacity
+          style={[
+            styles.navBtn,
+            { backgroundColor: Colors.card, borderColor: Colors.border },
+          ]}
+          onPress={() => {
+            const newDate = new Date(globalMonth);
+            newDate.setMonth(newDate.getMonth() + 1);
+            setGlobalMonth(newDate);
+          }}
+        >
+          <ChevronRight color={Colors.text} size={20} />
+        </TouchableOpacity>
+      </View>
 
         {/* Productivity Hub Quick Access */}
         <TouchableOpacity 
@@ -366,24 +377,37 @@ const styles = StyleSheet.create({
     marginBottom: 5
   },
   brandLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  logoContainer: { 
-    width: 48, 
-    height: 48, 
-    borderRadius: 14, 
-    overflow: 'hidden',
-    justifyContent: 'center', 
+  brandName: { 
+    fontSize: 28, 
+    fontWeight: '900', 
+    letterSpacing: -1.5, 
+    fontStyle: 'italic'
+  },
+  brandElite: { 
+    fontSize: 9, 
+    fontWeight: '800', 
+    letterSpacing: 2.5, 
+    marginTop: -2 
+  },
+  profileContainer: {
     alignItems: 'center',
-    backgroundColor: 'transparent'
+    justifyContent: 'center',
+    maxWidth: 80,
   },
-  brandLogo: { width: '100%', height: '100%', resizeMode: 'cover' },
-  brandName: { fontSize: 16, fontWeight: '900', letterSpacing: -0.5 },
-  brandElite: { fontSize: 10, fontWeight: 'bold', letterSpacing: 2, marginTop: -2 },
-  profileBtn: { 
-    paddingHorizontal: 12, 
-    paddingVertical: 8, 
-    borderRadius: 12 
+  avatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 4,
   },
-  greeting: { fontSize: 11, fontWeight: '700' },
+  greetingName: { 
+    fontSize: 10, 
+    fontWeight: '700',
+    textAlign: 'center'
+  },
   navBar: {
     flexDirection: "row",
     justifyContent: "space-between",

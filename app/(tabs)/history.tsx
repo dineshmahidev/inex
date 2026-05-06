@@ -20,24 +20,47 @@ import {
     ChevronLeft,
     ChevronRight,
     Plus,
-    FileText // Added FileText for PDF
+    FileText, // Added FileText for PDF
+    CheckCircle2,
+    X
 } from 'lucide-react-native';
 import { format, startOfMonth, endOfMonth, isWithinInterval } from 'date-fns';
 import { AddTransactionModal } from '@/components/AddTransactionModal';
 import { exportToPDF } from '@/utils/export'; // Added PDF utility
 
 export default function HistoryScreen() {
-  const { transactions, categories, deleteTransaction, updateTransaction, addTransaction, settings, Colors } = useDatabase();
+  const { transactions, categories, deleteTransaction, updateTransaction, addTransaction, settings, Colors, globalMonth, setGlobalMonth } = useDatabase();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'income' | 'expense'>('all');
-  const [selectedMonth, setSelectedMonth] = useState(new Date()); // Month selector state
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editingTx, setEditingTx] = useState<any>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const isSelectionMode = selectedIds.length > 0;
+
+  const toggleSelection = (id: string) => {
+    setSelectedIds(prev => 
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
+
+  const deleteSelected = () => {
+    Alert.alert(
+      "Delete Selected?",
+      `Remove ${selectedIds.length} transactions?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Delete", style: "destructive", onPress: () => {
+            selectedIds.forEach(id => deleteTransaction(id));
+            setSelectedIds([]);
+        }}
+      ]
+    );
+  };
 
   // Month-wise filtering + Search + Type
   const filteredTransactions = useMemo(() => {
-    const monthStart = startOfMonth(selectedMonth);
-    const monthEnd = endOfMonth(selectedMonth);
+    const monthStart = startOfMonth(globalMonth);
+    const monthEnd = endOfMonth(globalMonth);
 
     return transactions.filter(t => {
       const txDate = new Date(t.date);
@@ -49,7 +72,7 @@ export default function HistoryScreen() {
       
       return isSameMonth && matchesSearch && matchesType;
     });
-  }, [transactions, searchQuery, filterType, categories, selectedMonth]);
+  }, [transactions, searchQuery, filterType, categories, globalMonth]);
 
   const handleExport = async () => {
     if (filteredTransactions.length === 0) {
@@ -60,9 +83,9 @@ export default function HistoryScreen() {
   };
 
   const changeMonth = (offset: number) => {
-    const next = new Date(selectedMonth);
+    const next = new Date(globalMonth);
     next.setMonth(next.getMonth() + offset);
-    setSelectedMonth(next);
+    setGlobalMonth(next);
   };
 
   const handleTxPress = (tx: any) => {
@@ -96,16 +119,34 @@ export default function HistoryScreen() {
         <View>
             <Text style={[styles.title, { color: Colors.text }]}>Reports</Text>
             <Text style={{ color: Colors.primary, fontSize: 10, fontWeight: 'bold', marginTop: 2 }}>
-                {format(selectedMonth, 'MMMM yyyy').toUpperCase()}
+                {format(globalMonth, 'MMMM yyyy').toUpperCase()}
             </Text>
         </View>
         <View style={styles.headerRight}>
-            <TouchableOpacity 
-                style={[styles.actionBtn, { backgroundColor: Colors.card, borderColor: Colors.border }]}
-                onPress={handleExport}
-            >
-                <FileText color={Colors.primary} size={20} />
-            </TouchableOpacity>
+            {isSelectionMode && (
+                <TouchableOpacity 
+                    style={[styles.actionBtn, { backgroundColor: Colors.card, borderColor: '#f43f5e' }]}
+                    onPress={deleteSelected}
+                >
+                    <Trash2 color="#f43f5e" size={20} />
+                </TouchableOpacity>
+            )}
+            {isSelectionMode && (
+                <TouchableOpacity 
+                    style={[styles.actionBtn, { backgroundColor: Colors.card, borderColor: Colors.border }]}
+                    onPress={() => setSelectedIds([])}
+                >
+                    <X color={Colors.text} size={20} />
+                </TouchableOpacity>
+            )}
+            {!isSelectionMode && (
+                <TouchableOpacity 
+                    style={[styles.actionBtn, { backgroundColor: Colors.card, borderColor: Colors.border }]}
+                    onPress={handleExport}
+                >
+                    <FileText color={Colors.primary} size={20} />
+                </TouchableOpacity>
+            )}
         </View>
       </View>
 
@@ -115,7 +156,7 @@ export default function HistoryScreen() {
               <TouchableOpacity onPress={() => changeMonth(-1)} style={styles.arrowBox}>
                   <ChevronLeft size={24} color={Colors.primary} />
               </TouchableOpacity>
-              <Text style={[styles.monthDisplay, { color: Colors.text }]}>{format(selectedMonth, 'MMM yyyy')}</Text>
+              <Text style={[styles.monthDisplay, { color: Colors.text }]}>{format(globalMonth, 'MMM yyyy')}</Text>
               <TouchableOpacity onPress={() => changeMonth(1)} style={styles.arrowBox}>
                   <ChevronRight size={24} color={Colors.primary} />
               </TouchableOpacity>
@@ -163,15 +204,23 @@ export default function HistoryScreen() {
               filteredTransactions.map(t => {
                   const cat = categories.find(c => c.id === t.categoryId);
                   const isIncome = t.type === 'income';
+                  const isSelected = selectedIds.includes(t.id);
                   
                   return (
                       <TouchableOpacity 
                         key={t.id} 
-                        style={[styles.card, { backgroundColor: Colors.card, borderColor: Colors.border }]}
-                        onPress={() => handleTxPress(t)}
+                        style={[styles.card, { backgroundColor: Colors.card, borderColor: isSelected ? Colors.primary : Colors.border }]}
+                        onPress={() => isSelectionMode ? toggleSelection(t.id) : handleTxPress(t)}
+                        onLongPress={() => toggleSelection(t.id)}
                       >
                           <View style={[styles.iconBox, { backgroundColor: (cat?.color || Colors.primary) + '15' }]}>
-                              {isIncome ? <ArrowDownCircle color={Colors.primary} size={22} /> : <ArrowUpCircle color={Colors.secondary} size={22} />}
+                              {isSelected ? (
+                                  <CheckCircle2 color={Colors.primary} size={22} />
+                              ) : isIncome ? (
+                                  <ArrowDownCircle color={Colors.primary} size={22} />
+                              ) : (
+                                  <ArrowUpCircle color={Colors.secondary} size={22} />
+                              )}
                           </View>
                           
                           <View style={styles.cardMain}>

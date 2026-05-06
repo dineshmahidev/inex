@@ -38,19 +38,21 @@ function AppContent() {
           console.warn("Notification init failed:", error);
         }
 
+        // Initialize Google Mobile Ads
+        try {
+          const mobileAds = require('react-native-google-mobile-ads').default;
+          await mobileAds().initialize();
+        } catch (e) {
+          // Ignore if native module isn't built
+        }
+
       } catch (error) {
         console.error("Initialization error:", error);
       } finally {
         // Safety: If database is loaded or we hit an error, hide splash
         if (!isLoading) {
-           // Small delay to ensure navigation is ready
            setTimeout(() => {
              SplashScreen.hideAsync().catch(() => {});
-             
-             // Auto-redirect if onboarded
-             if (settings.hasOnboarded) {
-                router.replace('/(tabs)');
-             }
            }, 500);
         }
       }
@@ -68,10 +70,12 @@ function AppContent() {
 
   return (
     <ThemeProvider value={DarkTheme}>
-      <Stack screenOptions={{ headerShown: false }} initialRouteName="onboarding">
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="index" />
         <Stack.Screen name="onboarding" />
         <Stack.Screen name="chat" />
         <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="lock" />
       </Stack>
       <StatusBar style="auto" />
     </ThemeProvider>

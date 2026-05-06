@@ -1,10 +1,10 @@
-import React from 'react';
-import { View, Text, StyleSheet, Dimensions } from 'react-native';
-import { Colors, Currency } from '@/constants/theme';
-import { LinearGradient } from 'expo-linear-gradient';
-import { CreditCard, TrendingUp, TrendingDown } from 'lucide-react-native';
+import { Colors, Currency } from "@/constants/theme";
+import { LinearGradient } from "expo-linear-gradient";
+import { TrendingDown, TrendingUp } from "lucide-react-native";
+import React from "react";
+import { Dimensions, StyleSheet, Text, View } from "react-native";
 
-import LottieView from 'lottie-react-native';
+import LottieView from "lottie-react-native";
 
 interface BalanceCardProps {
   total: number;
@@ -12,7 +12,7 @@ interface BalanceCardProps {
   expense: number;
 }
 
-const { width } = Dimensions.get('window');
+const { width } = Dimensions.get("window");
 
 export function BalanceCard({ total, income, expense }: BalanceCardProps) {
   return (
@@ -25,19 +25,22 @@ export function BalanceCard({ total, income, expense }: BalanceCardProps) {
       <View style={styles.topRow}>
         <View style={{ flex: 1 }}>
           <Text style={styles.label}>Net Portfolio</Text>
-          <Text style={styles.balance}>{Currency}{total.toLocaleString()}</Text>
+          <Text style={styles.balance}>
+            {Currency}
+            {total.toLocaleString()}
+          </Text>
         </View>
         <View style={styles.lottieHost}>
-            <LottieView 
-                source={
-                    expense > income 
-                    ? require('@/assets/Sad Emoticon.json')
-                    : require('@/assets/Smiley.json')
-                } 
-                style={styles.piggy}
-                autoPlay
-                loop
-            />
+          <LottieView
+            source={
+              expense > income
+                ? require("@/assets/Sad Emoticon.json")
+                : require("@/assets/Smiley.json")
+            }
+            style={styles.piggy}
+            autoPlay
+            loop
+          />
         </View>
       </View>
 
@@ -48,19 +51,30 @@ export function BalanceCard({ total, income, expense }: BalanceCardProps) {
           </View>
           <View>
             <Text style={styles.statLabel}>Income</Text>
-            <Text style={styles.statVal}>+{Currency}{income.toLocaleString()}</Text>
+            <Text style={styles.statVal}>
+              +{Currency}
+              {income.toLocaleString()}
+            </Text>
           </View>
         </View>
 
         <View style={styles.divider} />
 
         <View style={styles.stat}>
-          <View style={[styles.iconCircle, { backgroundColor: 'rgba(244, 63, 94, 0.1)' }]}>
+          <View
+            style={[
+              styles.iconCircle,
+              { backgroundColor: "rgba(244, 63, 94, 0.1)" },
+            ]}
+          >
             <TrendingDown size={14} color="#f43f5e" />
           </View>
           <View>
             <Text style={styles.statLabel}>Expense</Text>
-            <Text style={styles.statVal}>-{Currency}{expense.toLocaleString()}</Text>
+            <Text style={styles.statVal}>
+              -{Currency}
+              {expense.toLocaleString()}
+            </Text>
           </View>
         </View>
       </View>
@@ -69,15 +83,14 @@ export function BalanceCard({ total, income, expense }: BalanceCardProps) {
 }
 
 // Added touchable opacity mock for look
-import { TouchableOpacity } from 'react-native';
 
 const styles = StyleSheet.create({
   container: {
-    width: '100%',
+    width: "100%",
     borderRadius: 32,
     padding: 24,
     height: 200,
-    justifyContent: 'space-between',
+    justifyContent: "space-between",
     shadowColor: Colors.primary,
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.3,
@@ -86,76 +99,76 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   topRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
   },
   label: {
-    color: 'rgba(0,0,0,0.6)',
+    color: "rgba(0,0,0,0.6)",
     fontSize: 14,
-    fontWeight: '700',
-    textTransform: 'uppercase',
+    fontWeight: "700",
+    textTransform: "uppercase",
     letterSpacing: 1.5,
   },
   balance: {
-    color: '#000000',
+    color: "#000000",
     fontSize: 38,
-    fontWeight: '900',
+    fontWeight: "900",
     marginTop: 4,
   },
   lottieHost: {
     width: 140,
     height: 140,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     marginTop: -25,
     marginRight: -20,
-    position: 'absolute',
+    position: "absolute",
     right: 15,
     top: 15,
   },
   piggy: {
-    width: '100%',
-    height: '100%',
+    width: "100%",
+    height: "100%",
   },
   footer: {
-    flexDirection: 'row',
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    flexDirection: "row",
+    backgroundColor: "rgba(0,0,0,0.4)",
     marginHorizontal: -24,
     marginBottom: -24,
     padding: 20,
     borderBottomLeftRadius: 32,
     borderBottomRightRadius: 32,
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   stat: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 12,
   },
   iconCircle: {
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    justifyContent: "center",
+    alignItems: "center",
   },
   statLabel: {
-    color: 'rgba(255,255,255,0.6)',
+    color: "rgba(255,255,255,0.6)",
     fontSize: 10,
-    fontWeight: 'bold',
-    textTransform: 'uppercase',
+    fontWeight: "bold",
+    textTransform: "uppercase",
   },
   statVal: {
-    color: 'white',
+    color: "white",
     fontSize: 14,
-    fontWeight: '800',
+    fontWeight: "800",
   },
   divider: {
     width: 1,
     height: 20,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: "rgba(255,255,255,0.1)",
   },
 });

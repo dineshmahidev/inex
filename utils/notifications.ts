@@ -24,7 +24,7 @@ export async function requestNotificationPermissions() {
 }
 
 export async function scheduleReminderNotification(id: string, name: string, amount: number, date: Date) {
-  if (date <= new Date()) return;
+  if (date.getTime() <= Date.now() + 1000) return;
 
   await Notifications.scheduleNotificationAsync({
     identifier: id,
@@ -34,25 +34,72 @@ export async function scheduleReminderNotification(id: string, name: string, amo
       data: { id },
       sound: Platform.OS === 'ios' ? 'mixkit_bell_notification_933.wav' : 'mixkit_bell_notification_933',
     },
-    trigger: date,
+    trigger: {
+      type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+      seconds: Math.max(1, Math.floor((date.getTime() - Date.now()) / 1000)),
+      channelId: 'default',
+    },
   });
 }
 
+export async function scheduleMonthlyReminderNotification(id: string, name: string, amount: number, dueDay: number, alertType: 'on_day' | '2_days_before' | 'both') {
+  // Cancel previous first just in case
+  await cancelReminderNotification(id);
+  await cancelReminderNotification(id + '_early');
+
+  const schedule = async (dayToTrigger: number, isEarly: boolean) => {
+    let safeDay = dayToTrigger;
+    if (safeDay <= 0) safeDay = 28 + safeDay; // simple wrap around
+    if (safeDay > 31) safeDay = 31;
+    
+    await Notifications.scheduleNotificationAsync({
+      identifier: isEarly ? id + '_early' : id,
+      content: {
+        title: isEarly ? 'Upcoming Payment 🅾️' : 'Payment Due Today! 🅾️',
+        body: isEarly 
+          ? `Your payment for ${name} (${amount.toLocaleString()}) is due in 2 days.`
+          : `It's time to pay ${name} amount of ${amount.toLocaleString()} today.`,
+        data: { id },
+        sound: Platform.OS === 'ios' ? 'mixkit_bell_notification_933.wav' : 'mixkit_bell_notification_933',
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.CALENDAR,
+        repeats: true,
+        day: safeDay,
+        hour: 9,
+        minute: 0,
+      },
+    });
+  };
+
+  if (alertType === 'on_day' || alertType === 'both') {
+    await schedule(dueDay, false);
+  }
+  if (alertType === '2_days_before' || alertType === 'both') {
+    await schedule(dueDay - 2, true);
+  }
+}
+
 export async function scheduleTodoNotification(id: string, text: string, date: Date) {
-  if (date <= new Date()) return;
+  if (date.getTime() <= Date.now() + 1000) return;
 
   await Notifications.scheduleNotificationAsync({
     identifier: id,
     content: {
       title: 'Task Reminder ⚡',
-      body: `Don't forget: ${text}. Stay in the flow!`,
+      body: `Don't forget: ${text}. Stay on track!`,
       data: { id, type: 'todo' },
       sound: Platform.OS === 'ios' ? 'mixkit_bell_notification_933.wav' : 'mixkit_bell_notification_933',
     },
-    trigger: date,
+    trigger: {
+      type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+      seconds: Math.max(1, Math.floor((date.getTime() - Date.now()) / 1000)),
+      channelId: 'default',
+    },
   });
 }
 
 export async function cancelReminderNotification(id: string) {
   await Notifications.cancelScheduledNotificationAsync(id);
+  await Notifications.cancelScheduledNotificationAsync(id + '_early');
 }

@@ -35,9 +35,13 @@ export interface Reminder {
   id: string;
   name: string;
   amount: number;
-  dueDay: number;
+  dueDay: number; // 1-31
   type: 'loan' | 'emi' | 'bill';
-  lastPaidMonth?: string;
+  lastPaidMonth?: string; // YYYY-MM
+  totalMonths?: number;
+  paidMonths?: number;
+  alertType?: 'on_day' | '2_days_before' | 'both' | 'none' | 'custom';
+  customDate?: string; // ISO string for the strict custom date
 }
 
 export interface UserSettings {
@@ -55,7 +59,8 @@ export interface Note {
   title: string;
   text: string;
   date: string;
-  color: string;
+  color?: string;
+  pinned?: boolean;
 }
 
 export interface Todo {
@@ -99,8 +104,9 @@ interface DatabaseContextType {
   addTransaction: (tx: Omit<Transaction, 'id'>) => Promise<void>;
   updateTransaction: (id: string, tx: Partial<Transaction>) => Promise<void>;
   deleteTransaction: (id: string) => void;
-  markReminderPaid: (id: string) => Promise<void>;
+  markReminderPaid: (id: string, trackAsExpense?: boolean) => Promise<void>;
   addReminder: (rem: Omit<Reminder, 'id'>) => void;
+  updateReminder: (id: string, rem: Partial<Reminder>) => Promise<void>;
   deleteReminder: (id: string) => void;
   addNote: (note: Omit<Note, 'id'>) => Promise<void>;
   updateNote: (id: string, note: Partial<Note>) => Promise<void>;
@@ -117,6 +123,10 @@ interface DatabaseContextType {
   exportData: () => Promise<void>;
   importData: (json: string) => Promise<void>;
   detectCategory: (note: string) => string | null;
+  globalMonth: Date;
+  setGlobalMonth: React.Dispatch<React.SetStateAction<Date>>;
+  smsBills: { id: string; name: string; amount: number; dueDay: number; type: 'bill'|'emi'|'loan' }[];
+  setSmsBills: React.Dispatch<React.SetStateAction<{ id: string; name: string; amount: number; dueDay: number; type: 'bill'|'emi'|'loan' }[]>>;
 }
 
 const DatabaseContext = createContext<DatabaseContextType | undefined>(undefined);
@@ -128,6 +138,7 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
   const [notes, setNotes] = useState<Note[]>([]);
   const [todos, setTodos] = useState<Todo[]>([]);
   const [habits, setHabits] = useState<Habit[]>([]);
+  const [smsBills, setSmsBills] = useState<{ id: string; name: string; amount: number; dueDay: number; type: 'bill'|'emi'|'loan' }[]>([]);
   const [settings, setSettings] = useState<UserSettings>({ 
     isLocked: false, 
     pin: null, 
@@ -139,12 +150,13 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
   });
 
   const [isLoading, setIsLoading] = useState(true);
+  const [globalMonth, setGlobalMonth] = useState<Date>(new Date());
 
   const Colors = settings.theme === 'light' ? Theme.light : Theme.dark;
 
   const load = async () => {
     try {
-      const [t, c, r, s, n, td, h] = await Promise.all([
+      const [t, c, r, s, n, td, h, sms] = await Promise.all([
         AsyncStorage.getItem(KEYS.DATA),
         AsyncStorage.getItem(KEYS.CATS),
         AsyncStorage.getItem(KEYS.REMINDERS),
@@ -152,6 +164,7 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
         AsyncStorage.getItem(KEYS.NOTES),
         AsyncStorage.getItem(KEYS.TODOS),
         AsyncStorage.getItem(KEYS.HABITS),
+        AsyncStorage.getItem('tracksy_sms'),
       ]);
       if (t) setTransactions(JSON.parse(t));
       if (c) setCategories(JSON.parse(c));
@@ -159,6 +172,7 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
       if (n) setNotes(JSON.parse(n));
       if (td) setTodos(JSON.parse(td));
       if (h) setHabits(JSON.parse(h));
+      if (sms) setSmsBills(JSON.parse(sms));
       if (s) {
           const loadedSettings = JSON.parse(s);
           setSettings(prev => ({...prev, ...loadedSettings}));
@@ -191,22 +205,26 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
     await AsyncStorage.setItem(KEYS.DATA, JSON.stringify(updated));
   };
 
-  const markReminderPaid = async (id: string) => {
+  const markReminderPaid = async (id: string, trackAsExpense: boolean = true) => {
     const currentMonth = new Date().toISOString().slice(0, 7);
     const rem = reminders.find(r => r.id === id);
     if (!rem || rem.lastPaidMonth === currentMonth) return;
     
-    const updatedReminders = reminders.map(r => r.id === id ? { ...r, lastPaidMonth: currentMonth } : r);
+    const updatedReminders = reminders.map(r => 
+      r.id === id 
+        ? { ...r, lastPaidMonth: currentMonth, paidMonths: (r.paidMonths || 0) + 1 } 
+        : r
+    );
     setReminders(updatedReminders);
     await AsyncStorage.setItem(KEYS.REMINDERS, JSON.stringify(updatedReminders));
 
-    if (rem) {
+    if (rem && trackAsExpense !== false) {
         const catId = rem.type === 'bill' ? '3' : '4';
         await addTransaction({ 
             amount: rem.amount, 
             type: 'expense', 
             categoryId: catId, 
-            note: `Auto-Paid ${rem.type.toUpperCase()}: ${rem.name}`, 
+            note: rem.name, 
             date: new Date().toISOString() 
         });
     }
@@ -216,6 +234,12 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
     const updated = [...reminders, { ...rem, id: Date.now().toString() }];
     setReminders(updated);
     AsyncStorage.setItem(KEYS.REMINDERS, JSON.stringify(updated));
+  };
+
+  const updateReminder = async (id: string, rem: Partial<Reminder>) => {
+    const updated = reminders.map(r => r.id === id ? { ...r, ...rem } : r);
+    setReminders(updated);
+    await AsyncStorage.setItem(KEYS.REMINDERS, JSON.stringify(updated));
   };
 
   const deleteReminder = (id: string) => {
@@ -342,15 +366,27 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
     return null;
   }, []);
 
+  useEffect(() => {
+    if (!isLoading) {
+      AsyncStorage.setItem('tracksy_sms', JSON.stringify(smsBills));
+    }
+  }, [smsBills]);
+
   return (
-    <DatabaseContext.Provider value={{
-      transactions, categories, reminders, settings, notes, todos, habits, isLoading, Colors,
-      addTransaction, updateTransaction, deleteTransaction, markReminderPaid, addReminder, deleteReminder, 
-      addNote, updateNote, deleteNote, addTodo, updateTodo, saveTodos, 
-      addHabit, updateHabit, deleteHabit,
-      setSettings: updateSettings, refresh: load, clearAllData, exportData, importData,
-      detectCategory
-    }}>
+    <DatabaseContext.Provider 
+      value={{ 
+        transactions, categories, reminders, notes, todos, habits, isLoading, Colors,
+        addTransaction, updateTransaction, deleteTransaction,
+        markReminderPaid, addReminder, updateReminder, deleteReminder,
+        addNote, updateNote, deleteNote,
+        addTodo, updateTodo, saveTodos,
+        addHabit, updateHabit, deleteHabit,
+        settings, setSettings: updateSettings, refresh: load,
+        clearAllData, exportData, importData, detectCategory,
+        globalMonth, setGlobalMonth,
+        smsBills, setSmsBills
+      }}
+    >
       {children}
     </DatabaseContext.Provider>
   );

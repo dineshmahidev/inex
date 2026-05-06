@@ -50,7 +50,7 @@ export default function OnboardingScreen() {
         <View style={styles.content}>
           <View style={styles.header}>
             <Text style={[styles.title, { color: Colors.text }]}>Welcome to</Text>
-            <Text style={[styles.brand, { color: Colors.primary }]}>Flow Ledger</Text>
+            <Text style={[styles.brand, { color: Colors.primary }]}>Tracksy</Text>
             <Text style={[styles.subtitle, { color: Colors.textMuted }]}>Let's set up your profile to get started.</Text>
           </View>
 
@@ -82,6 +82,13 @@ export default function OnboardingScreen() {
             <Text style={styles.btnText}>GET STARTED</Text>
             <ArrowRight size={20} color="#000" />
           </TouchableOpacity>
+
+          <TouchableOpacity style={styles.skipBtn} onPress={() => {
+            setSettings({ ...settings, hasOnboarded: true });
+            router.replace('/(tabs)');
+          }}>
+            <Text style={[styles.skipBtnText, { color: Colors.textMuted }]}>SKIP FOR NOW</Text>
+          </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -104,4 +111,6 @@ const styles = StyleSheet.create({
   input: { fontSize: 24, fontWeight: '800', borderBottomWidth: 1, paddingBottom: 10 },
   btn: { height: 64, borderRadius: 20, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 15 },
   btnText: { fontSize: 16, fontWeight: '900', letterSpacing: 1 },
+  skipBtn: { marginTop: 20, alignItems: 'center', padding: 10 },
+  skipBtnText: { fontSize: 12, fontWeight: 'bold', textDecorationLine: 'underline' },
 });

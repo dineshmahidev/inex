@@ -5,11 +5,12 @@ import {
   Text, 
   TouchableOpacity, 
   ScrollView, 
-  Switch, 
+  Switch,
   TextInput,
   Alert,
-  Image,
-  Dimensions
+  Dimensions,
+  Modal,
+  Image
 } from 'react-native';
 import { useDatabase } from '@/hooks/useDatabase';
 import { 
@@ -41,6 +42,13 @@ export default function SettingsScreen() {
   const { settings, setSettings, clearAllData, exportData, importData, refresh, Colors } = useDatabase();
   const [isEditingName, setIsEditingName] = useState(false);
   const [userName, setUserName] = useState(settings.userName);
+  
+  // PIN Setup State
+  const [isPinModalVisible, setIsPinModalVisible] = useState(false);
+  const [setupPin, setSetupPin] = useState('');
+  const [confirmPin, setConfirmPin] = useState('');
+  const [setupStep, setSetupStep] = useState<1|2>(1);
+  const [pinError, setPinError] = useState(false);
 
   const toggleTheme = () => {
     setSettings({ ...settings, theme: settings.theme === 'dark' ? 'light' : 'dark' });
@@ -176,8 +184,15 @@ export default function SettingsScreen() {
                         <Switch 
                             value={settings.isLocked} 
                             onValueChange={(v) => {
-                                if(!settings.pin && v) Alert.alert("PIN required", "Set a PIN in Security first.");
-                                else setSettings({ ...settings, isLocked: v });
+                                if (v) {
+                                    setSetupStep(1);
+                                    setSetupPin('');
+                                    setConfirmPin('');
+                                    setPinError(false);
+                                    setIsPinModalVisible(true);
+                                } else {
+                                    setSettings({ ...settings, isLocked: false, pin: null });
+                                }
                             }}
                             trackColor={{ false: '#333', true: Colors.primary }}
                         />
@@ -246,10 +261,116 @@ export default function SettingsScreen() {
             </View>
 
             <View style={styles.footer}>
-                <Text style={[styles.versionText, { color: Colors.text }]}>FLOW LEDGER PRO</Text>
+                <Text style={[styles.versionText, { color: Colors.text }]}>TRACKSY PRO</Text>
                 <Text style={[styles.footerInfo, { color: Colors.textMuted }]}>V 1.0.5 • SECURE & OFFLINE</Text>
             </View>
         </ScrollView>
+
+        {/* PIN Setup Modal */}
+        <Modal visible={isPinModalVisible} animationType="slide" transparent>
+            <View style={[styles.pinModalContainer, { backgroundColor: Colors.background }]}>
+                <SafeAreaView style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+                    <View style={styles.pinHeader}>
+                        <View style={[styles.iconBox, { backgroundColor: Colors.primary + '15', width: 80, height: 80, borderRadius: 40, marginBottom: 20 }]}>
+                            <Lock size={32} color={Colors.primary} />
+                        </View>
+                        <Text style={[styles.title, { color: Colors.text }]}>
+                            {setupStep === 1 ? 'Set New PIN' : 'Confirm PIN'}
+                        </Text>
+                        <Text style={[styles.subtitle, { color: pinError ? '#ef4444' : Colors.textMuted }]}>
+                            {pinError ? "PINs do not match. Try again." : (setupStep === 1 ? "Enter a 4-digit PIN" : "Re-enter your PIN to confirm")}
+                        </Text>
+                    </View>
+
+                    <View style={styles.dotsContainer}>
+                        {[0, 1, 2, 3].map(i => (
+                            <View 
+                                key={i} 
+                                style={[
+                                    styles.dot, 
+                                    { 
+                                        backgroundColor: i < (setupStep === 1 ? setupPin.length : confirmPin.length) ? Colors.primary : 'transparent',
+                                        borderColor: pinError ? '#ef4444' : Colors.primary
+                                    }
+                                ]} 
+                            />
+                        ))}
+                    </View>
+
+                    <View style={styles.pad}>
+                        {[['1','2','3'], ['4','5','6'], ['7','8','9']].map((row, rIdx) => (
+                            <View key={rIdx} style={styles.row}>
+                                {row.map(num => (
+                                    <TouchableOpacity 
+                                        key={num} 
+                                        style={styles.key} 
+                                        onPress={() => {
+                                            if (setupStep === 1) {
+                                                if (setupPin.length < 4) {
+                                                    const np = setupPin + num;
+                                                    setSetupPin(np);
+                                                    if (np.length === 4) {
+                                                        setTimeout(() => setSetupStep(2), 200);
+                                                    }
+                                                }
+                                            } else {
+                                                if (confirmPin.length < 4) {
+                                                    const np = confirmPin + num;
+                                                    setConfirmPin(np);
+                                                    setPinError(false);
+                                                    if (np.length === 4) {
+                                                        if (np === setupPin) {
+                                                            setSettings({ ...settings, isLocked: true, pin: np });
+                                                            setIsPinModalVisible(false);
+                                                        } else {
+                                                            setPinError(true);
+                                                            setTimeout(() => setConfirmPin(''), 500);
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }}
+                                    >
+                                        <Text style={[styles.keyText, { color: Colors.text }]}>{num}</Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+                        ))}
+                        <View style={styles.row}>
+                            <TouchableOpacity style={styles.key} onPress={() => { setIsPinModalVisible(false); }}>
+                                <Text style={{ color: Colors.textMuted, fontSize: 16 }}>Cancel</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={styles.key} onPress={() => {
+                                if (setupStep === 1 && setupPin.length < 4) {
+                                    setSetupPin(setupPin + '0');
+                                    if (setupPin.length + 1 === 4) setTimeout(() => setSetupStep(2), 200);
+                                } else if (setupStep === 2 && confirmPin.length < 4) {
+                                    const np = confirmPin + '0';
+                                    setConfirmPin(np);
+                                    if (np.length === 4) {
+                                        if (np === setupPin) {
+                                            setSettings({ ...settings, isLocked: true, pin: np });
+                                            setIsPinModalVisible(false);
+                                        } else {
+                                            setPinError(true);
+                                            setTimeout(() => setConfirmPin(''), 500);
+                                        }
+                                    }
+                                }
+                            }}>
+                                <Text style={[styles.keyText, { color: Colors.text }]}>0</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={styles.key} onPress={() => {
+                                if (setupStep === 1) setSetupPin(setupPin.slice(0, -1));
+                                else setConfirmPin(confirmPin.slice(0, -1));
+                            }}>
+                                <Trash2 size={24} color={Colors.textMuted} />
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </SafeAreaView>
+            </View>
+        </Modal>
     </SafeAreaView>
   );
 }
@@ -281,4 +402,14 @@ const styles = StyleSheet.create({
   footer: { alignItems: 'center', padding: 40, gap: 4 },
   versionText: { fontSize: 14, fontWeight: '900', letterSpacing: 1 },
   footerInfo: { fontSize: 9, fontWeight: 'bold', letterSpacing: 2 },
+  
+  pinModalContainer: { flex: 1 },
+  pinHeader: { alignItems: 'center', marginBottom: 40 },
+  subtitle: { fontSize: 14, marginTop: 5 },
+  dotsContainer: { flexDirection: 'row', gap: 20, marginBottom: 50 },
+  dot: { width: 16, height: 16, borderRadius: 8, borderWidth: 2 },
+  pad: { width: width * 0.8, maxWidth: 300 },
+  row: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 15 },
+  key: { width: 70, height: 70, borderRadius: 35, justifyContent: 'center', alignItems: 'center' },
+  keyText: { fontSize: 28, fontWeight: '500' },
 });

@@ -50,9 +50,22 @@ import {
 } from "@/utils/notifications";
 import * as Haptics from 'expo-haptics';
 import { FlowBannerAd } from "@/components/FlowBannerAd";
+import { Colors as ThemeColors } from "@/constants/theme";
 
 const TODO_KEY = "@productivity_todos_v5";
 const NOTE_COLORS = ["#FEFF9C", "#7AFEC6", "#FF7EB9", "#7AFBFF", "#FFF3B0"];
+
+const DAILY_QUOTES = [
+  "We are what we repeatedly do. Excellence, then, is not an act, but a habit. - Aristotle",
+  "Motivation is what gets you started. Habit is what keeps you going. - Jim Ryun",
+  "You do not rise to the level of your goals. You fall to the level of your systems. - James Clear",
+  "Success is the product of daily habits—not once-in-a-lifetime transformations. - James Clear",
+  "The chains of habit are too weak to be felt until they are too strong to be broken. - Samuel Johnson",
+  "Good habits are worth being fanatical about. - John Irving",
+  "Small daily improvements over time lead to stunning results. - Robin Sharma",
+  "First forget inspiration. Habit is more dependable. - Octavia Butler",
+  "Drop by drop is the water pot filled. - Buddha"
+];
 
 interface Todo {
   id: string;
@@ -101,6 +114,12 @@ export default function TodoScreen() {
     updateHabit,
     deleteHabit,
   } = useDatabase();
+
+  const dailyQuote = useMemo(() => {
+    const dayOfYear = Math.floor((new Date().getTime() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 1000 / 60 / 60 / 24);
+    return DAILY_QUOTES[dayOfYear % DAILY_QUOTES.length];
+  }, []);
+
   const [mainTab, setMainTab] = useState<"todos" | "notes" | "habits">("todos");
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isNoteModalVisible, setIsNoteModalVisible] = useState(false);
@@ -128,6 +147,7 @@ export default function TodoScreen() {
   const [noteTitle, setNoteTitle] = useState("");
   const [noteText, setNoteText] = useState("");
   const [noteColor, setNoteColor] = useState(NOTE_COLORS[0]);
+  const [isNotePinned, setIsNotePinned] = useState(false);
 
   // Habit Form State
   const [isHabitModalVisible, setIsHabitModalVisible] = useState(false);
@@ -136,6 +156,34 @@ export default function TodoScreen() {
   const [hIcon, setHIcon] = useState("Zap");
 
   const [editingTodoId, setEditingTodoId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const isSelectionMode = selectedIds.length > 0;
+
+  const toggleSelection = (id: string) => {
+    setSelectedIds(prev => 
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  };
+
+  const deleteSelected = () => {
+    Alert.alert(
+      "Delete Selected?",
+      `Remove ${selectedIds.length} tasks and their reminders?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Delete", style: "destructive", onPress: async () => {
+          const updated = todos.filter(t => !selectedIds.includes(t.id));
+          await saveTodos(updated);
+          for (const id of selectedIds) {
+            await cancelReminderNotification(id);
+          }
+          setSelectedIds([]);
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        }}
+      ]
+    );
+  };
 
   const addTodo = async () => {
     if (!task) return;
@@ -153,7 +201,7 @@ export default function TodoScreen() {
         const hasPermission = await requestNotificationPermissions();
         if (hasPermission) {
             await cancelReminderNotification(editingTodoId);
-            if (todoDate > new Date()) {
+            if (todoDate.getTime() > Date.now()) {
                 await scheduleTodoNotification(editingTodoId, task, todoDate);
             }
         }
@@ -174,19 +222,23 @@ export default function TodoScreen() {
         
         // Schedule notification
         const hasPermission = await requestNotificationPermissions();
-        if (hasPermission && todoDate > new Date()) {
+        if (hasPermission && todoDate.getTime() > Date.now()) {
             await scheduleTodoNotification(todoId, task, todoDate);
         }
     }
 
     setTask("");
-    setTodoDate(new Date());
+    setTodoDate(new Date(Date.now() + 5 * 60000));
     setIsStarred(false);
     setEditingTodoId(null);
     setIsModalVisible(false);
   };
 
   const handleTodoPress = (todo: Todo) => {
+    if (isSelectionMode) {
+      toggleSelection(todo.id);
+      return;
+    }
     Alert.alert(
         "Manage Task",
         todo.text,
@@ -229,11 +281,13 @@ export default function TodoScreen() {
       setNoteTitle(note.title);
       setNoteText(note.text);
       setNoteColor(note.color || NOTE_COLORS[0]);
+      setIsNotePinned(note.pinned || false);
     } else {
       setEditingNoteId(null);
       setNoteTitle("");
       setNoteText("");
       setNoteColor(NOTE_COLORS[0]);
+      setIsNotePinned(false);
     }
     setIsNoteModalVisible(true);
   };
@@ -246,6 +300,7 @@ export default function TodoScreen() {
         title: noteTitle,
         text: noteText,
         color: noteColor,
+        pinned: isNotePinned,
       });
     } else {
       await addNote({
@@ -253,6 +308,7 @@ export default function TodoScreen() {
         text: noteText,
         color: noteColor,
         date: new Date().toLocaleDateString(),
+        pinned: isNotePinned,
       });
     }
 
@@ -292,6 +348,42 @@ export default function TodoScreen() {
     }
     return filtered;
   }, [todos, selectedTab, searchQuery]);
+
+  const filteredNotes = useMemo(() => {
+    let f = notes;
+    if (searchQuery) {
+        f = f.filter(n => n.title.toLowerCase().includes(searchQuery.toLowerCase()) || n.text.toLowerCase().includes(searchQuery.toLowerCase()));
+    }
+    return f.sort((a,b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
+  }, [notes, searchQuery]);
+
+  const filteredHabits = useMemo(() => {
+    let f = habits;
+    if (searchQuery) {
+        f = f.filter(h => h.name.toLowerCase().includes(searchQuery.toLowerCase()));
+    }
+    return f;
+  }, [habits, searchQuery]);
+
+  const getHabitStreak = (logs: string[]) => {
+      if (!logs || logs.length === 0) return 0;
+      const sorted = [...logs].sort((a,b) => new Date(b).getTime() - new Date(a).getTime());
+      let streak = 0;
+      let current = new Date();
+      const formatLocal = (d: Date) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+      if (!sorted.includes(formatLocal(current))) {
+          current.setDate(current.getDate() - 1);
+      }
+      for (const d of sorted) {
+          if (d === formatLocal(current)) {
+              streak++;
+              current.setDate(current.getDate() - 1);
+          } else {
+              break;
+          }
+      }
+      return streak;
+  };
 
   const totalMonthlyLogs = useMemo(() => {
     const prefix = new Date().toISOString().slice(0, 8);
@@ -354,7 +446,7 @@ export default function TodoScreen() {
       <View style={styles.header}>
         <View>
           <Text style={[styles.title, { color: Colors.text }]}>
-            {mainTab === "todos" ? "Focus" : "Notes"}
+            {mainTab === "todos" && isSelectionMode ? `${selectedIds.length} Selected` : (mainTab === "todos" ? "Focus" : "Notes")}
           </Text>
           <View style={styles.scoreRow}>
             {mainTab === "todos" ? (
@@ -386,22 +478,49 @@ export default function TodoScreen() {
             )}
           </View>
         </View>
-        <TouchableOpacity
-          style={[
-            styles.litAddBtn,
-            { backgroundColor: Colors.primary, shadowColor: Colors.primary },
-          ]}
-          onPress={() => {
-            if (mainTab === "todos") setIsModalVisible(true);
-            else if (mainTab === "notes") handleOpenNote();
-            else setIsHabitModalVisible(true);
-          }}
-        >
-          <Plus color="#000" size={28} />
-        </TouchableOpacity>
+        
+        <View style={{ flexDirection: 'row', gap: 10 }}>
+          {mainTab === "todos" && isSelectionMode ? (
+            <>
+              <TouchableOpacity 
+                style={[styles.litAddBtn, { backgroundColor: Colors.card, borderWidth: 1, borderColor: Colors.primary }]} 
+                onPress={() => {
+                  if (selectedIds.length === filteredTodos.length) {
+                    setSelectedIds([]);
+                  } else {
+                    setSelectedIds(filteredTodos.map(t => t.id));
+                  }
+                  Haptics.selectionAsync();
+                }}
+              >
+                <CheckCircle2 color={Colors.primary} size={20} />
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.litAddBtn, { backgroundColor: Colors.card, borderWidth: 1, borderColor: Colors.border }]} 
+                onPress={() => setSelectedIds([])}
+              >
+                <X color={Colors.text} size={20} />
+              </TouchableOpacity>
+            </>
+          ) : (
+            <TouchableOpacity
+              style={[
+                styles.litAddBtn,
+                { backgroundColor: Colors.primary, shadowColor: Colors.primary },
+              ]}
+              onPress={() => {
+                if (mainTab === "todos") setIsModalVisible(true);
+                else if (mainTab === "notes") handleOpenNote();
+                else setIsHabitModalVisible(true);
+              }}
+            >
+              <Plus color="#000" size={28} />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
-      <View style={styles.mainTabContainer}>
+      <View style={[styles.mainTabContainer, { backgroundColor: Colors.background, borderColor: Colors.border }]}>
         <TouchableOpacity
           onPress={() => setMainTab("todos")}
           style={[
@@ -560,47 +679,66 @@ export default function TodoScreen() {
                 const catColor =
                   CATEGORIES.find((c) => c.id === item.category)?.color ||
                   Colors.primary;
+                const isOverdue = item.reminderDate && new Date(item.reminderDate).getTime() < Date.now() && !item.completed;
 
                 return (
                   <TouchableOpacity
                     key={item.id}
                     onPress={() => handleTodoPress(item)}
+                    onLongPress={() => toggleSelection(item.id)}
                     style={[
                       styles.litCard,
                       {
-                        backgroundColor: Colors.card,
-                        borderColor: item.completed
-                          ? Colors.border
-                          : Colors.primary + "30",
-                        opacity: item.completed ? 0.5 : 1,
+                        backgroundColor: isSelectionMode && selectedIds.includes(item.id) 
+                          ? Colors.primary 
+                          : Colors.card,
+                        borderColor: selectedIds.includes(item.id)
+                          ? Colors.primary
+                          : (item.completed ? Colors.border : Colors.primary + "30"),
+                        borderWidth: selectedIds.includes(item.id) ? 2 : 1,
+                        opacity: item.completed && !isSelectionMode ? 0.5 : 1,
+                        overflow: 'hidden',
                       },
                     ]}
                   >
-                    <TouchableOpacity
-                      style={styles.litCheckContainer}
-                      onPress={() =>
-                        saveTodos(
-                          todos.map((t) =>
-                            t.id === item.id
-                              ? { ...t, completed: !t.completed }
-                              : t,
-                          ),
-                        )
-                      }
-                    >
-                      {item.completed ? (
-                        <CheckCircle2 color={Colors.primary} size={28} />
-                      ) : (
-                        <Circle color={Colors.textMuted} size={28} />
-                      )}
-                    </TouchableOpacity>
-
+                    {isSelectionMode ? (
+                      <View style={styles.litCheckContainer}>
+                        <View style={[
+                            styles.selectionCircle, 
+                            { 
+                                backgroundColor: selectedIds.includes(item.id) ? '#000' : 'transparent',
+                                borderColor: selectedIds.includes(item.id) ? '#000' : Colors.border
+                            }
+                        ]}>
+                           {selectedIds.includes(item.id) && <CheckCircle2 color={Colors.primary} size={18} />}
+                        </View>
+                      </View>
+                    ) : (
+                      <TouchableOpacity
+                        style={styles.litCheckContainer}
+                        onPress={() =>
+                          saveTodos(
+                            todos.map((t) =>
+                              t.id === item.id
+                                ? { ...t, completed: !t.completed }
+                                : t,
+                            ),
+                          )
+                        }
+                      >
+                        {item.completed ? (
+                          <CheckCircle2 color={Colors.primary} size={28} />
+                        ) : (
+                          <Circle color={Colors.textMuted} size={28} />
+                        )}
+                      </TouchableOpacity>
+                    )}
                     <View style={styles.litMain}>
                       <View style={styles.litHeaderRow}>
                         <Text
                           style={[
                             styles.litText,
-                            { color: Colors.text },
+                            { color: selectedIds.includes(item.id) ? "#000" : Colors.text },
                             item.completed && styles.litStrike,
                           ]}
                         >
@@ -620,36 +758,36 @@ export default function TodoScreen() {
                           <Star
                             size={16}
                             color={
-                              item.starred ? Colors.primary : Colors.textMuted
+                              item.starred ? (selectedIds.includes(item.id) ? "#000" : Colors.primary) : (selectedIds.includes(item.id) ? "rgba(0,0,0,0.4)" : Colors.textMuted)
                             }
-                            fill={item.starred ? Colors.primary : "transparent"}
+                            fill={item.starred ? (selectedIds.includes(item.id) ? "#000" : Colors.primary) : "transparent"}
                           />
                         </TouchableOpacity>
                       </View>
-
+ 
                       <View style={styles.litMeta}>
                         <View
                           style={[
                             styles.litTag,
-                            { backgroundColor: catColor + "20" },
+                            { backgroundColor: selectedIds.includes(item.id) ? "rgba(0,0,0,0.1)" : catColor + "20" },
                           ]}
                         >
-                          <CategoryIcon size={10} color={catColor} />
+                          <CategoryIcon size={10} color={selectedIds.includes(item.id) ? "#000" : catColor} />
                           <Text
-                            style={[styles.litTagText, { color: catColor }]}
+                            style={[styles.litTagText, { color: selectedIds.includes(item.id) ? "#000" : catColor }]}
                           >
                             {item.category.toUpperCase()}
                           </Text>
                         </View>
-                        <View style={styles.dot} />
+                        <View style={[styles.dot, { backgroundColor: selectedIds.includes(item.id) ? "rgba(0,0,0,0.3)" : "rgba(255,255,255,0.2)" }]} />
                         <Text
                           style={{
-                            color: Colors.textMuted,
+                            color: isOverdue ? '#EF4444' : (selectedIds.includes(item.id) ? "#000" : Colors.textMuted),
                             fontSize: 10,
                             fontWeight: "700",
                           }}
                         >
-                          {item.time || item.date || "Today"}
+                          {isOverdue ? 'OVERDUE' : (item.time || item.date || "Today")}
                         </Text>
                       </View>
                     </View>
@@ -658,17 +796,41 @@ export default function TodoScreen() {
               })
             )}
           </ScrollView>
+
+          {isSelectionMode && (
+            <View style={[styles.bottomActionBar, { backgroundColor: ThemeColors.card, borderTopColor: ThemeColors.border }]}>
+               <TouchableOpacity 
+                  style={[styles.batchBtn, { backgroundColor: Colors.primary }]} 
+                  onPress={() => {
+                      saveTodos(todos.map(t => selectedIds.includes(t.id) ? { ...t, completed: true } : t));
+                      setSelectedIds([]);
+                      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                  }}
+               >
+                  <CheckCircle2 color="#000" size={20} />
+                  <Text style={styles.batchBtnText}>MARK DONE</Text>
+               </TouchableOpacity>
+               
+               <TouchableOpacity 
+                  style={[styles.batchBtn, { backgroundColor: '#EF4444' }]} 
+                  onPress={deleteSelected}
+               >
+                  <Trash2 color="#fff" size={20} />
+                  <Text style={[styles.batchBtnText, { color: '#fff' }]}>DELETE</Text>
+               </TouchableOpacity>
+            </View>
+          )}
         </View>
       ) : mainTab === "notes" ? (
         <ScrollView
           contentContainerStyle={styles.content}
           showsVerticalScrollIndicator={false}
         >
-          {notes.length === 0 ? (
+          {filteredNotes.length === 0 ? (
             <View style={[styles.empty, { marginTop: 60 }]}>
               <StickyNote size={80} color={Colors.primary} opacity={0.2} />
               <Text style={[styles.emptyTitle, { color: Colors.text }]}>
-                Your thoughts, organized.
+                {searchQuery ? "No notes found matching search." : "Your thoughts, organized."}
               </Text>
               <Text style={[styles.emptySub, { color: Colors.textMuted }]}>
                 Capture ideas, reminders, and financial tips in your private
@@ -686,7 +848,7 @@ export default function TodoScreen() {
             </View>
           ) : (
             <View style={styles.notesGrid}>
-              {notes.map((note) => (
+              {filteredNotes.map((note) => (
                 <TouchableOpacity
                   key={note.id}
                   style={[
@@ -701,9 +863,9 @@ export default function TodoScreen() {
                     ])
                   }
                 >
-                  <View style={styles.cardDecor}>
+                  <View style={[styles.cardDecor, { borderRadius: 8, borderBottomRightRadius: 28 }]}>
                     <StickyNote
-                      size={120}
+                      size={100}
                       color="#000"
                       opacity={0.05}
                       style={styles.decorIcon}
@@ -715,7 +877,7 @@ export default function TodoScreen() {
                       style={[styles.noteTitle, { color: "#000" }]}
                       numberOfLines={1}
                     >
-                      {note.title}
+                      {note.pinned ? '📌 ' : ''}{note.title}
                     </Text>
                     <TouchableOpacity onPress={() => deleteNote(note.id)}>
                       <Trash2 size={14} color="rgba(0,0,0,0.5)" />
@@ -782,11 +944,20 @@ export default function TodoScreen() {
             />
           </View>
 
-          {habits.length === 0 ? (
+          <View style={{ marginBottom: 20, backgroundColor: Colors.card, padding: 18, borderRadius: 16, borderLeftWidth: 4, borderLeftColor: Colors.primary }}>
+            <Text style={{ color: Colors.textMuted, fontStyle: 'italic', fontSize: 13, lineHeight: 20 }}>
+              "{dailyQuote.split(' - ')[0]}"
+            </Text>
+            <Text style={{ color: Colors.text, fontSize: 11, fontWeight: '900', marginTop: 10, textAlign: 'right', letterSpacing: 0.5 }}>
+              — {dailyQuote.split(' - ')[1].toUpperCase()}
+            </Text>
+          </View>
+
+          {filteredHabits.length === 0 ? (
             <View style={[styles.empty, { marginTop: 60 }]}>
               <Activity size={80} color={Colors.primary} opacity={0.2} />
               <Text style={[styles.emptyTitle, { color: Colors.text }]}>
-                Master Your Routine.
+                {searchQuery ? "No habits found matching search." : "Master Your Routine."}
               </Text>
               <Text style={[styles.emptySub, { color: Colors.textMuted }]}>
                 Small daily wins lead to big financial freedom. Start a habit
@@ -803,13 +974,13 @@ export default function TodoScreen() {
               </TouchableOpacity>
             </View>
           ) : (
-            habits.map((habit) => {
-              const daysInMonth = new Date(
-                new Date().getFullYear(),
-                new Date().getMonth() + 1,
-                0,
-              ).getDate();
-              const currentMonthPrefix = new Date().toISOString().slice(0, 8);
+            filteredHabits.map((habit) => {
+              const today = new Date();
+              const todayYear = today.getFullYear();
+              const todayMonthStr = String(today.getMonth() + 1).padStart(2, '0');
+              const todayDayNum = today.getDate();
+              const daysInMonth = new Date(todayYear, today.getMonth() + 1, 0).getDate();
+              const currentMonthPrefix = `${todayYear}-${todayMonthStr}-`;
               const Icon = HABIT_ICONS[habit.icon] || Zap;
 
               return (
@@ -845,14 +1016,8 @@ export default function TodoScreen() {
                         >
                           {habit.name}
                         </Text>
-                        <Text
-                          style={{
-                            color: Colors.textMuted,
-                            fontSize: 10,
-                            fontWeight: "bold",
-                          }}
-                        >
-                          MONTHLY PROGRESS
+                        <Text style={{color: Colors.textMuted, fontSize: 10, fontWeight: '800', marginTop: 2, letterSpacing: 0.5}}>
+                           🔥 {getHabitStreak(habit.logs)} DAY STREAK
                         </Text>
                       </View>
                     </View>
@@ -866,13 +1031,18 @@ export default function TodoScreen() {
                       const day = i + 1;
                       const dateStr = `${currentMonthPrefix}${day.toString().padStart(2, "0")}`;
                       const isDone = habit.logs.includes(dateStr);
+                      const isToday = day === todayDayNum;
+                      const isPast = day < todayDayNum;
+                      const disabled = !isToday;
 
                       return (
                         <TouchableOpacity
                           key={day}
+                          disabled={disabled}
                           style={[
                             styles.habitDay,
-                            { borderColor: Colors.border },
+                            { borderColor: isToday ? Colors.primary : Colors.border },
+                            isToday && !isDone && { backgroundColor: Colors.primary + '15' },
                             isDone && {
                               backgroundColor: habit.color,
                               borderColor: habit.color,
@@ -881,12 +1051,14 @@ export default function TodoScreen() {
                           onPress={() => toggleHabitDay(habit, dateStr)}
                         >
                           {isDone ? (
-                            <CheckCircle2 size={10} color="#000" />
+                            <Text style={{ fontSize: 10 }}>😊</Text>
+                          ) : isPast ? (
+                            <Text style={{ fontSize: 10 }}>😵</Text>
                           ) : (
                             <Text
                               style={[
                                 styles.habitDayText,
-                                { color: Colors.textMuted },
+                                { color: isToday ? Colors.primary : Colors.textMuted },
                               ]}
                             >
                               {day}
@@ -897,20 +1069,28 @@ export default function TodoScreen() {
                     })}
                   </View>
 
-                  <View style={styles.habitFooter}>
-                    <Text
-                      style={[styles.habitStat, { color: Colors.textMuted }]}
-                    >
-                      SCORE:{" "}
-                      <Text style={{ color: habit.color }}>
-                        {
-                          habit.logs.filter((l) =>
-                            l.startsWith(currentMonthPrefix),
-                          ).length
-                        }
-                      </Text>{" "}
-                      DAYS THIS MONTH
-                    </Text>
+                  <View style={[styles.habitFooter, { flexDirection: 'row', alignItems: 'center' }]}>
+                    <View style={{ flex: 1 }}>
+                        <Text style={[styles.habitStat, { color: Colors.textMuted, marginBottom: 6 }]}>
+                          90-DAY MASTERY: <Text style={{color: habit.color}}>{getHabitStreak(habit.logs)}</Text> / 90
+                        </Text>
+                        <View style={{ width: '100%', height: 6, backgroundColor: Colors.border, borderRadius: 3, overflow: 'hidden' }}>
+                            <View style={{ width: `${Math.min((getHabitStreak(habit.logs) / 90) * 100, 100)}%`, height: '100%', backgroundColor: habit.color }} />
+                        </View>
+                    </View>
+                    <View style={{ marginLeft: 20, alignItems: 'flex-end' }}>
+                        <Text style={[styles.habitStat, { color: Colors.textMuted }]}>
+                        SCORE:{" "}
+                        <Text style={{ color: habit.color, fontSize: 12 }}>
+                            {
+                            habit.logs.filter((l) =>
+                                l.startsWith(currentMonthPrefix),
+                            ).length
+                            }
+                        </Text>{" "}
+                        / {daysInMonth}
+                        </Text>
+                    </View>
                   </View>
                 </View>
               );
@@ -1101,7 +1281,6 @@ export default function TodoScreen() {
         </View>
       </Modal>
 
-      {/* Note Screen (Modal) */}
       <Modal
         visible={isNoteModalVisible}
         animationType="slide"
@@ -1114,9 +1293,7 @@ export default function TodoScreen() {
             { backgroundColor: noteColor || "#FEFF9C" },
           ]}
         >
-          {/* Artistic Background Spread (Moved to root of Modal content for visibility) */}
           <View style={StyleSheet.absoluteFill} pointerEvents="none">
-            {/* Watermarks around the screen */}
             <StickyNote
               size={300}
               color="#000"
@@ -1168,7 +1345,6 @@ export default function TodoScreen() {
               }}
             />
 
-            {/* Grid Pattern Dots for Paper Texture */}
             <View
               style={{
                 ...StyleSheet.absoluteFillObject,
@@ -1305,11 +1481,25 @@ export default function TodoScreen() {
                 </TouchableOpacity>
               )}
               
-              {/* Ad Banner Placeholder */}
+            <View style={{ marginTop: 20 }}>
+              <TouchableOpacity 
+                style={[
+                    styles.pickerBtn, 
+                    { backgroundColor: isNotePinned ? 'rgba(0,0,0,0.8)' : 'transparent', borderColor: 'rgba(0,0,0,0.8)', borderWidth: 2, padding: 15, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 }
+                ]}
+                onPress={() => setIsNotePinned(!isNotePinned)}
+              >
+                <Star size={18} color={isNotePinned ? "#FEFF9C" : "#000"} fill={isNotePinned ? "#FEFF9C" : "transparent"} />
+                <Text style={{ color: isNotePinned ? "#FEFF9C" : "#000", fontSize: 13, fontWeight: "700" }}>{isNotePinned ? "Pinned to Top" : "Pin to Top"}</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={{ marginTop: 40 }}>
               <FlowBannerAd />
-            </ScrollView>
-          </SafeAreaView>
-        </View>
+            </View>
+          </ScrollView>
+        </SafeAreaView>
+      </View>
       </Modal>
 
       {/* Habit Modal */}
@@ -1441,9 +1631,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     marginHorizontal: 20,
     marginBottom: 20,
-    backgroundColor: "rgba(0,0,0,0.2)",
+    backgroundColor: ThemeColors.card,
     padding: 6,
     borderRadius: 18,
+    borderWidth: 1,
+    borderColor: ThemeColors.border,
   },
   mainTabBtn: {
     flex: 1,
@@ -1546,11 +1738,17 @@ const styles = StyleSheet.create({
   notesGrid: { flexDirection: "row", flexWrap: "wrap", gap: 15 },
   noteCard: {
     width: (Dimensions.get("window").width - 55) / 2,
-    padding: 20,
-    borderRadius: 28,
-    borderWidth: 1,
+    padding: 16,
+    borderRadius: 8,
+    borderBottomRightRadius: 30, // Sticky note fold effect
     minHeight: 180,
-    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(0,0,0,0.05)",
+    shadowColor: "#000",
+    shadowOffset: { width: 2, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 5,
+    elevation: 4,
   },
   cardDecor: {
     ...StyleSheet.absoluteFillObject,
@@ -1560,8 +1758,8 @@ const styles = StyleSheet.create({
   },
   decorIcon: {
     position: "absolute",
-    bottom: -20,
-    right: -20,
+    bottom: -15,
+    right: -15,
     transform: [{ rotate: "-15deg" }],
   },
   noteCardHeader: {
@@ -1570,11 +1768,12 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     marginBottom: 12,
   },
-  noteTitle: { fontSize: 18, fontWeight: "900", flex: 1, marginRight: 10 },
-  noteText: { fontSize: 13, lineHeight: 18, fontWeight: "600" },
+  noteTitle: { fontSize: 16, fontWeight: "900", flex: 1, marginRight: 10, letterSpacing: -0.5 },
+  noteText: { fontSize: 13, lineHeight: 22, fontWeight: "600", marginTop: 4, flex: 1 },
   noteDate: {
     fontSize: 10,
-    fontWeight: "bold",
+    fontWeight: "800",
+    marginTop: 10,
     color: "rgba(255,255,255,0.4)",
     marginTop: "auto",
   },
@@ -1781,4 +1980,53 @@ const styles = StyleSheet.create({
     gap: 6,
     marginTop: 12,
   },
+  bottomActionBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 100,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 15,
+    paddingHorizontal: 20,
+    borderTopWidth: 1,
+    paddingBottom: 30,
+    elevation: 30,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 15,
+  },
+  batchBtn: {
+    flex: 1,
+    height: 54,
+    borderRadius: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  batchBtnText: {
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 1,
+    color: '#000',
+  },
+  selectedAccent: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 6,
+  },
+  selectionCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+  }
 });
