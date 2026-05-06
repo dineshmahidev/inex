@@ -20,31 +20,24 @@ try {
 export const FlowBannerAd = () => {
   const [adFailed, setAdFailed] = React.useState(false);
 
-  // Use real Ad if available, otherwise show the elite mock
-  if (BannerAd && !adFailed) {
-    return (
-      <View style={styles.container}>
-        <BannerAd
-          unitId={__DEV__ ? TestIds.BANNER : ADMOB_CONFIG.bannerAdUnitId}
-          size={BannerAdSize.BANNER}
-          requestOptions={{
-            requestNonPersonalizedAdsOnly: true,
-          }}
-          onAdFailedToLoad={(error: any) => {
-            console.warn('Ad failed to load: ', error);
-            setAdFailed(true);
-          }}
-        />
-      </View>
-    );
+  // Hide completely if native ads aren't built or if they fail to load
+  if (!BannerAd || adFailed) {
+    return null;
   }
 
-  // Fallback Mock UI (Elite version)
   return (
-    <View style={styles.testAdBody}>
-      <View style={styles.adBadge}><Text style={styles.adBadgeText}>Ad</Text></View>
-      <Text style={styles.testAdTitle}>Tracksy Ad Spot</Text>
-      <Text style={styles.testAdDesc}>Real Google Ads will appear here in the native build. Ready for production.</Text>
+    <View style={styles.container}>
+      <BannerAd
+        unitId={__DEV__ ? TestIds.BANNER : ADMOB_CONFIG.bannerAdUnitId}
+        size={BannerAdSize.BANNER}
+        requestOptions={{
+          requestNonPersonalizedAdsOnly: true,
+        }}
+        onAdFailedToLoad={(error: any) => {
+          console.warn('Ad failed to load: ', error);
+          setAdFailed(true);
+        }}
+      />
     </View>
   );
 };

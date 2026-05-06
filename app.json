@@ -62,13 +62,21 @@
         {
           "icon": "./assets/images/logo.png",
           "color": "#FF7A00",
-          "sounds": ["./assets/mixkit_bell_notification_933.wav"]
+          "sounds": [
+            "./assets/mixkit_bell_notification_933.wav"
+          ]
         }
       ]
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": false
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "c52a9fb3-5fee-4b38-baf5-69277c257c02"
+      }
     }
   }
 }
