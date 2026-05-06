@@ -14,10 +14,10 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.dineshmahidev.flowledger"
+      "bundleIdentifier": "com.dineshmahidev.tracksy"
     },
     "android": {
-      "package": "com.dineshmahidev.flowledger",
+      "package": "com.dineshmahidev.tracksy",
       "versionCode": 2,
       "adaptiveIcon": {
         "backgroundColor": "#FFFFFF",
