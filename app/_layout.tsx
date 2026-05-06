@@ -24,13 +24,14 @@ function AppContent() {
   const { isLoading, settings } = useDatabase();
   const router = useRouter();
 
+  // 1. Native Initialization (Runs once)
   useEffect(() => {
-    async function initialize() {
+    async function nativeInit() {
       try {
-        // Initial system UI background
-        await SystemUI.setBackgroundColorAsync('#000000');
+        // System UI background
+        await SystemUI.setBackgroundColorAsync('#000000').catch(() => {});
         
-        // Request notification permissions and init
+        // Notifications
         try {
           await requestNotificationPermissions();
           await initNotifications();
@@ -38,35 +39,37 @@ function AppContent() {
           console.warn("Notification init failed:", error);
         }
 
-        // Initialize Google Mobile Ads
+        // AdMob
         try {
           const mobileAds = require('react-native-google-mobile-ads').default;
           await mobileAds().initialize();
         } catch (e) {
-          // Ignore if native module isn't built
+          // Fallback handled
         }
-
       } catch (error) {
-        console.error("Initialization error:", error);
-      } finally {
-        // Safety: If database is loaded or we hit an error, hide splash
-        if (!isLoading) {
-           setTimeout(() => {
-             SplashScreen.hideAsync().catch(() => {});
-           }, 500);
-        }
+        console.error("Native init error:", error);
       }
     }
+    nativeInit();
+  }, []);
 
-    initialize();
+  // 2. Splash Screen Hiding (Watches isLoading)
+  useEffect(() => {
+    if (!isLoading) {
+      const timer = setTimeout(() => {
+        SplashScreen.hideAsync().catch(() => {});
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [isLoading]);
 
-    // Absolute fallback: hide splash after 7 seconds no matter what
-    const fallbackTimer = setTimeout(() => {
+  // 3. Global Absolute Fallback
+  useEffect(() => {
+    const fallback = setTimeout(() => {
       SplashScreen.hideAsync().catch(() => {});
     }, 7000);
-
-    return () => clearTimeout(fallbackTimer);
-  }, [isLoading, settings.hasOnboarded]);
+    return () => clearTimeout(fallback);
+  }, []);
 
   return (
     <ThemeProvider value={DarkTheme}>
