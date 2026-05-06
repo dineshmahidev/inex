@@ -5,7 +5,7 @@ workflows:
     instance_type: mac_mini_m1
     environment:
       groups:
-        - android-signing # This matches the group name we discussed
+        - android-signing
       node: 20
       java: 17
     scripts:
@@ -15,22 +15,22 @@ workflows:
         script: npx expo prebuild --platform android
       - name: Set up keystore
         script: |
-          echo $CM_KEYSTORE | base64 --decode > /tmp/tracksy.keystore
+          echo $ANDROID_KEYSTORE_BASE64 | base64 --decode > /tmp/tracksy.keystore
       - name: Build Android Production
         script: |
           cd android
           ./gradlew bundleRelease assembleRelease \
             -Pandroid.injected.signing.store.file=/tmp/tracksy.keystore \
-            -Pandroid.injected.signing.store.password=$CM_KEYSTORE_PASSWORD \
-            -Pandroid.injected.signing.key.alias=$CM_KEY_ALIAS \
-            -Pandroid.injected.signing.key.password=$CM_KEY_PASSWORD
+            -Pandroid.injected.signing.store.password=$ANDROID_KEYSTORE_PASSWORD \
+            -Pandroid.injected.signing.key.alias=$ANDROID_KEY_ALIAS \
+            -Pandroid.injected.signing.key.password=$ANDROID_KEY_PASSWORD
     artifacts:
       - android/app/build/outputs/apk/release/*.apk
       - android/app/build/outputs/bundle/release/*.aab
     publishing:
       email:
         recipients:
-          - your-email@example.com
+          - dinesh.mahi.dev@gmail.com
         notify:
           success: true
           failure: true
