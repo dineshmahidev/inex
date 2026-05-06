@@ -4,9 +4,9 @@
     "slug": "flow-ledger",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/logo.png",
+    "icon": "./assets/app_logo.png",
     "notification": {
-      "icon": "./assets/images/logo.png",
+      "icon": "./assets/notification_icon.png",
       "color": "#FF7A00"
     },
     "scheme": "flowledger",
@@ -18,16 +18,23 @@
     },
     "android": {
       "package": "com.dineshmahidev.flowledger",
-      "versionCode": 3,
+      "versionCode": 2,
       "adaptiveIcon": {
-        "backgroundColor": "#000000",
-        "foregroundImage": "./assets/images/logo.png",
-        "backgroundImage": "./assets/images/logo.png",
-        "monochromeImage": "./assets/images/logo.png"
+        "backgroundColor": "#FFFFFF",
+        "foregroundImage": "./assets/app_logo.png",
+        "backgroundImage": "./assets/app_logo.png",
+        "monochromeImage": "./assets/app_logo.png"
       },
       "config": {
         "googleMobileAdsAppId": "ca-app-pub-2141805169615611~4136629708"
-      }
+      },
+      "permissions": [
+        "SCHEDULE_EXACT_ALARM",
+        "USE_EXACT_ALARM",
+        "POST_NOTIFICATIONS",
+        "WAKE_LOCK",
+        "RECEIVE_BOOT_COMPLETED"
+      ]
     },
     "web": {
       "output": "static",
@@ -38,13 +45,10 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/logo.png",
+          "image": "./assets/app_logo.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#000000",
-          "dark": {
-            "backgroundColor": "#000000"
-          }
+          "backgroundColor": "#FFFFFF"
         }
       ],
       "@react-native-community/datetimepicker",
@@ -60,7 +64,7 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/images/logo.png",
+          "icon": "./assets/notification_icon.png",
           "color": "#FF7A00",
           "sounds": [
             "./assets/mixkit_bell_notification_933.wav"

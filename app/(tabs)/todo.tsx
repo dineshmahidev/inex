@@ -108,6 +108,7 @@ export default function TodoScreen() {
     deleteNote,
     todos,
     addTodo: addTodoToDb,
+    updateTodo,
     saveTodos,
     habits,
     addHabit,

@@ -15,16 +15,9 @@ export default function LockScreen() {
     const [error, setError] = useState(false);
 
     useEffect(() => {
-        checkBiometrics();
+        // Biometrics no longer automatically prompt on mount
+        // Only PIN lock is required initially
     }, []);
-
-    const checkBiometrics = async () => {
-        const hasHardware = await LocalAuthentication.hasHardwareAsync();
-        const isEnrolled = await LocalAuthentication.isEnrolledAsync();
-        if (hasHardware && isEnrolled) {
-            handleBiometricAuth();
-        }
-    };
 
     const handleBiometricAuth = async () => {
         const result = await LocalAuthentication.authenticateAsync({

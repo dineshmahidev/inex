@@ -1,6 +1,14 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: true,
+  }),
+});
+
 export async function initNotifications() {
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync('default', {
@@ -35,8 +43,8 @@ export async function scheduleReminderNotification(id: string, name: string, amo
       sound: Platform.OS === 'ios' ? 'mixkit_bell_notification_933.wav' : 'mixkit_bell_notification_933',
     },
     trigger: {
-      type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-      seconds: Math.max(1, Math.floor((date.getTime() - Date.now()) / 1000)),
+      type: Notifications.SchedulableTriggerInputTypes.DATE,
+      date: date,
       channelId: 'default',
     },
   });
@@ -92,8 +100,8 @@ export async function scheduleTodoNotification(id: string, text: string, date: D
       sound: Platform.OS === 'ios' ? 'mixkit_bell_notification_933.wav' : 'mixkit_bell_notification_933',
     },
     trigger: {
-      type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-      seconds: Math.max(1, Math.floor((date.getTime() - Date.now()) / 1000)),
+      type: Notifications.SchedulableTriggerInputTypes.DATE,
+      date: date,
       channelId: 'default',
     },
   });

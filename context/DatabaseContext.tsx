@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Theme } from '@/constants/theme';
 import * as Sharing from 'expo-sharing';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 
 const KEYS = {
   DATA: '@smart_data_v4',
@@ -311,10 +311,25 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
   };
 
   const exportData = async () => {
-    const backup = { transactions, categories, reminders, settings, notes, todos, habits };
-    const fileUri = FileSystem.cacheDirectory + 'inex_backup.json';
-    await FileSystem.writeAsStringAsync(fileUri, JSON.stringify(backup));
-    await Sharing.shareAsync(fileUri);
+    try {
+      const isSharingAvailable = await Sharing.isAvailableAsync();
+      if (!isSharingAvailable) {
+        throw new Error("Sharing is not available on this device");
+      }
+
+      const backup = { transactions, categories, reminders, settings, notes, todos, habits };
+      const fileUri = FileSystem.cacheDirectory + 'tracksy_backup.json';
+      await FileSystem.writeAsStringAsync(fileUri, JSON.stringify(backup));
+      
+      await Sharing.shareAsync(fileUri, {
+        mimeType: 'application/json',
+        dialogTitle: 'Export Tracksy Data',
+        UTI: 'public.json'
+      });
+    } catch (error) {
+      console.error("Export Error:", error);
+      throw error;
+    }
   };
 
   const importData = async (json: string) => {
