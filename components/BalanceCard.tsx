@@ -34,7 +34,7 @@ export function BalanceCard({ total, income, expense }: BalanceCardProps) {
           <LottieView
             source={
               expense > income
-                ? require("@/assets/Sad Emoticon.json")
+                ? require("@/assets/sad_emoticon.json")
                 : require("@/assets/Smiley.json")
             }
             style={styles.piggy}

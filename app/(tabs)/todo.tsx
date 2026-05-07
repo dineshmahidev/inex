@@ -937,7 +937,7 @@ export default function TodoScreen() {
               </View>
             </View>
             <LottieView
-              source={require("@/assets/Tomato plant.json")}
+              source={require("@/assets/tomato_plant.json")}
               style={styles.levelLottie}
               autoPlay
               loop

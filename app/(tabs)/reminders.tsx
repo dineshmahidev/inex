@@ -213,7 +213,7 @@ export default function RemindersScreen() {
         {mostUrgent && (
             <View style={[styles.heroCard, { backgroundColor: Colors.primary }]}>
                 <LottieView 
-                    source={require('../../assets/Cycle Rider.json')}
+                    source={require('../../assets/cycle_rider.json')}
                     style={styles.rider}
                     autoPlay
                     loop
