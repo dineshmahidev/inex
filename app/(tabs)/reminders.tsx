@@ -113,12 +113,16 @@ export default function RemindersScreen() {
   const currentMonth = new Date().toISOString().slice(0, 7);
 
   const pendingReminders = useMemo(() => {
-    return reminders?.filter(r => r.lastPaidMonth !== currentMonth) || [];
+    return reminders?.filter(r => r.lastPaidMonth !== currentMonth && !r.isCompleted) || [];
   }, [reminders, currentMonth]);
 
   const paidReminders = useMemo(() => {
-    return reminders?.filter(r => r.lastPaidMonth === currentMonth) || [];
+    return reminders?.filter(r => r.lastPaidMonth === currentMonth && !r.isCompleted) || [];
   }, [reminders, currentMonth]);
+
+  const completedReminders = useMemo(() => {
+    return reminders?.filter(r => r.isCompleted) || [];
+  }, [reminders]);
 
   const handleSave = async () => {
     if (!name || !amount || !dueDay) return;
@@ -333,6 +337,9 @@ export default function RemindersScreen() {
           })
         )}
 
+          </View>
+        )}
+
         {paidReminders.length > 0 && (
           <View style={{ marginTop: 25 }}>
             <Text style={[styles.sectionTitle, { color: Colors.textMuted }]}>Settled This Month</Text>
@@ -341,7 +348,23 @@ export default function RemindersScreen() {
                 <CheckCircle2 size={26} color={Colors.primary} />
                 <View style={styles.cardInfo}>
                   <Text style={[styles.cardName, { color: Colors.text }]}>{rem.name}</Text>
-                  <Text style={{ color: Colors.textMuted, fontSize: 11 }}>COMPLETED</Text>
+                  <Text style={{ color: Colors.textMuted, fontSize: 11 }}>PAID FOR {new Date().toLocaleString('default', { month: 'long' }).toUpperCase()}</Text>
+                </View>
+                <TouchableOpacity onPress={() => deleteReminder(rem.id)}><Trash2 size={18} color={Colors.textMuted} /></TouchableOpacity>
+              </View>
+            ))}
+          </View>
+        )}
+
+        {completedReminders.length > 0 && (
+          <View style={{ marginTop: 25 }}>
+            <Text style={[styles.sectionTitle, { color: Colors.primary, fontWeight: '900' }]}>Fully Completed Dues</Text>
+            {completedReminders.map(rem => (
+              <View key={rem.id} style={[styles.card, { backgroundColor: Colors.card, borderColor: Colors.primary, borderStyle: 'dashed' }]}>
+                <CheckCircle2 size={26} color={Colors.primary} />
+                <View style={styles.cardInfo}>
+                  <Text style={[styles.cardName, { color: Colors.text }]}>{rem.name}</Text>
+                  <Text style={{ color: Colors.primary, fontSize: 11, fontWeight: 'bold' }}>TENURE FINISHED ({rem.totalMonths}/{rem.totalMonths})</Text>
                 </View>
                 <TouchableOpacity onPress={() => deleteReminder(rem.id)}><Trash2 size={18} color={Colors.textMuted} /></TouchableOpacity>
               </View>

@@ -41,7 +41,8 @@ export interface Reminder {
   totalMonths?: number;
   paidMonths?: number;
   alertType?: 'on_day' | '2_days_before' | 'both' | 'none' | 'custom';
-  customDate?: string; // ISO string for the strict custom date
+  customDate?: string;
+  isCompleted?: boolean;
 }
 
 export interface UserSettings {
@@ -210,11 +211,19 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
     const rem = reminders.find(r => r.id === id);
     if (!rem || rem.lastPaidMonth === currentMonth) return;
     
-    const updatedReminders = reminders.map(r => 
-      r.id === id 
-        ? { ...r, lastPaidMonth: currentMonth, paidMonths: (r.paidMonths || 0) + 1 } 
-        : r
-    );
+    const updatedReminders = reminders.map(r => {
+      if (r.id !== id) return r;
+      
+      const newPaidCount = (r.paidMonths || 0) + 1;
+      const isDone = r.totalMonths ? newPaidCount >= r.totalMonths : false;
+      
+      return { 
+        ...r, 
+        lastPaidMonth: currentMonth, 
+        paidMonths: newPaidCount,
+        isCompleted: isDone
+      };
+    });
     setReminders(updatedReminders);
     await AsyncStorage.setItem(KEYS.REMINDERS, JSON.stringify(updatedReminders));
 
