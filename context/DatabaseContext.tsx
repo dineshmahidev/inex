@@ -3,6 +3,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Theme } from '@/constants/theme';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system/legacy';
+import * as Notifications from 'expo-notifications';
+import { parseFinancialText } from '@/utils/billParser';
 
 const KEYS = {
   DATA: '@smart_data_v4',
@@ -158,6 +160,7 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
 
   const load = async () => {
     try {
+      // 1. Load Current Version Data
       const [t, c, r, s, n, td, h, sms] = await Promise.all([
         AsyncStorage.getItem(KEYS.DATA),
         AsyncStorage.getItem(KEYS.CATS),
@@ -168,19 +171,47 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
         AsyncStorage.getItem(KEYS.HABITS),
         AsyncStorage.getItem('tracksy_sms'),
       ]);
-      if (t) setTransactions(JSON.parse(t));
+
+      // 2. Migration Check (Elite Safety)
+      // If current DATA is empty, check if old versions exist (v1, v2, v3)
+      if (!t) {
+          const legacyKeys = ['@smart_data_v3', '@smart_data_v2', '@smart_data_v1', 'transactions'];
+          for (const lk of legacyKeys) {
+              const legacyData = await AsyncStorage.getItem(lk);
+              if (legacyData) {
+                  setTransactions(JSON.parse(legacyData));
+                  await AsyncStorage.setItem(KEYS.DATA, legacyData); // Migrate to current
+                  break;
+              }
+          }
+      } else {
+          setTransactions(JSON.parse(t));
+      }
+
       if (c) setCategories(JSON.parse(c));
-      if (r) setReminders(JSON.parse(r));
+      
+      // Migrate Reminders
+      if (!r) {
+          const legacyRem = await AsyncStorage.getItem('@smart_reminders_v1');
+          if (legacyRem) {
+              setReminders(JSON.parse(legacyRem));
+              await AsyncStorage.setItem(KEYS.REMINDERS, legacyRem);
+          }
+      } else {
+          setReminders(JSON.parse(r));
+      }
+
       if (n) setNotes(JSON.parse(n));
       if (td) setTodos(JSON.parse(td));
       if (h) setHabits(JSON.parse(h));
       if (sms) setSmsBills(JSON.parse(sms));
+      
       if (s) {
           const loadedSettings = JSON.parse(s);
           setSettings(prev => ({...prev, ...loadedSettings}));
       }
     } catch (e) {
-      console.error(e);
+      console.error("Critical Load/Migration Error:", e);
     } finally {
       setIsLoading(false);
     }
@@ -399,7 +430,35 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
     if (!isLoading) {
       AsyncStorage.setItem('tracksy_sms', JSON.stringify(smsBills));
     }
-  }, [smsBills]);
+  }, [smsBills, isLoading]);
+
+  // Notification Parsing Listener
+  useEffect(() => {
+    const subscription = Notifications.addNotificationReceivedListener(notification => {
+      const body = notification.request.content.body || notification.request.content.title;
+      if (body) {
+        const parsed = parseFinancialText(body);
+        if (parsed) {
+          setSmsBills(prev => {
+            const id = Date.now().toString();
+            // Avoid duplicates within same session/short time
+            const isDuplicate = prev.some(s => s.name === parsed.name && Math.abs(s.amount - parsed.amount) < 1);
+            if (isDuplicate) return prev;
+            
+            return [{
+              id,
+              name: parsed.name,
+              amount: parsed.amount,
+              dueDay: parsed.date.getDate(),
+              type: parsed.type
+            }, ...prev];
+          });
+        }
+      }
+    });
+
+    return () => subscription.remove();
+  }, []);
 
   return (
     <DatabaseContext.Provider 

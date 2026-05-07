@@ -27,8 +27,12 @@ import {
     ShieldCheck,
     RefreshCw,
     Edit2,
-    Settings
-} from 'lucide-react-native';
+    Settings,
+    Ghost,
+    Smile,
+    Star,
+    Zap
+} from "lucide-react-native";
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -95,6 +99,25 @@ export default function SettingsScreen() {
       }
   };
 
+  const renderAvatar = (size: number = 90, borderRadius: number = 45) => {
+    const GUEST_ICONS = [User, Ghost, Smile, Star, Zap];
+    const GUEST_COLORS = ["#EB6001", "#22C55E", "#3B82F6", "#A855F7", "#F59E0B"];
+    
+    const hash = (settings.userName || "Guest").split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    const IconComponent = GUEST_ICONS[hash % GUEST_ICONS.length];
+    const bgColor = GUEST_COLORS[hash % GUEST_COLORS.length];
+
+    if (settings.userImage && settings.userImage.trim() !== "") {
+      return <Image source={{ uri: settings.userImage }} style={{ width: size, height: size, borderRadius }} />;
+    }
+
+    return (
+      <View style={{ width: size, height: size, borderRadius, backgroundColor: bgColor + '25', justifyContent: 'center', alignItems: 'center', borderWidth: 1.5, borderColor: bgColor + '40' }}>
+        <IconComponent size={size * 0.45} color={bgColor} strokeWidth={2.5} />
+      </View>
+    );
+  };
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: Colors.background }]}>
         <View style={styles.header}>
@@ -105,13 +128,7 @@ export default function SettingsScreen() {
             {/* Profile Section */}
             <View style={styles.profileHeader}>
                 <TouchableOpacity onPress={handlePickImage} style={styles.imageContainer}>
-                    {settings.userImage ? (
-                        <Image source={{ uri: settings.userImage }} style={styles.profilePic} />
-                    ) : (
-                        <View style={[styles.placeholderPic, { backgroundColor: Colors.card, borderColor: Colors.border }]}>
-                            <User size={40} color={Colors.textMuted} />
-                        </View>
-                    )}
+                    {renderAvatar()}
                     <View style={[styles.cameraIcon, { backgroundColor: Colors.primary }]}>
                         <Camera size={14} color="#000" />
                     </View>
@@ -132,7 +149,7 @@ export default function SettingsScreen() {
                         </View>
                     ) : (
                         <TouchableOpacity onPress={() => setIsEditingName(true)} style={styles.nameRow}>
-                            <Text style={[styles.profileName, { color: Colors.text }]}>{settings.userName}</Text>
+                            <Text style={[styles.profileName, { color: Colors.text }]}>{settings.userName || "Guest"}</Text>
                             <View style={[styles.editBadge, { backgroundColor: Colors.primary + '20' }]}>
                                 <Edit2 size={12} color={Colors.primary} />
                             </View>

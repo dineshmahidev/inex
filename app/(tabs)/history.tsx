@@ -113,6 +113,14 @@ export default function HistoryScreen() {
     );
   };
 
+  const totals = useMemo(() => {
+    return filteredTransactions.reduce((acc, t) => {
+      if (t.type === 'income') acc.income += t.amount;
+      else acc.expense += t.amount;
+      return acc;
+    }, { income: 0, expense: 0 });
+  }, [filteredTransactions]);
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: Colors.background }]}>
       <View style={styles.header}>
@@ -148,6 +156,24 @@ export default function HistoryScreen() {
                 </TouchableOpacity>
             )}
         </View>
+      </View>
+
+      {/* Horizontal Totals */}
+      <View style={styles.totalsRow}>
+          <View style={[styles.totalCard, { backgroundColor: Colors.primary + '10', borderColor: Colors.primary + '30' }]}>
+              <View style={styles.totalIconWrap}>
+                  <ArrowDownCircle size={14} color={Colors.primary} />
+                  <Text style={[styles.totalLabel, { color: Colors.primary }]}>INCOME</Text>
+              </View>
+              <Text style={[styles.totalValue, { color: Colors.text }]}>{settings.currency}{totals.income.toLocaleString()}</Text>
+          </View>
+          <View style={[styles.totalCard, { backgroundColor: Colors.secondary + '10', borderColor: Colors.secondary + '30' }]}>
+              <View style={styles.totalIconWrap}>
+                  <ArrowUpCircle size={14} color={Colors.secondary} />
+                  <Text style={[styles.totalLabel, { color: Colors.secondary }]}>EXPENSE</Text>
+              </View>
+              <Text style={[styles.totalValue, { color: Colors.text }]}>{settings.currency}{totals.expense.toLocaleString()}</Text>
+          </View>
       </View>
 
       {/* Month Selector & Filters */}
@@ -271,6 +297,11 @@ export default function HistoryScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 24, paddingBottom: 10 },
+  totalsRow: { flexDirection: 'row', gap: 15, paddingHorizontal: 24, marginBottom: 20 },
+  totalCard: { flex: 1, padding: 15, borderRadius: 20, borderWidth: 1 },
+  totalIconWrap: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 5 },
+  totalLabel: { fontSize: 10, fontWeight: '900', letterSpacing: 0.5 },
+  totalValue: { fontSize: 18, fontWeight: '900' },
   title: { fontSize: 32, fontWeight: '900', letterSpacing: -1 },
   headerRight: { flexDirection: 'row', gap: 10 },
   actionBtn: { width: 44, height: 44, borderRadius: 14, justifyContent: 'center', alignItems: 'center', borderWidth: 1 },

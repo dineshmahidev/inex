@@ -24,6 +24,11 @@
     "android": {
       "package": "com.dineshmahidev.tracksy",
       "versionCode": 5,
+      "splash": {
+        "image": "./assets/app_logo.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#EB6001"
+      },
       "adaptiveIcon": {
         "backgroundColor": "#EB6001",
         "foregroundImage": "./assets/app_logo.png",

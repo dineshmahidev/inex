@@ -17,6 +17,8 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { requestNotificationPermissions, cancelReminderNotification, scheduleReminderNotification, scheduleMonthlyReminderNotification } from '@/utils/notifications';
 import LottieView from 'lottie-react-native';
 import { FlowBannerAd } from '@/components/FlowBannerAd';
+import { parseFinancialText } from '@/utils/billParser';
+import { Sparkles } from 'lucide-react-native';
 
 export default function RemindersScreen() {
   const { reminders, addReminder, updateReminder, deleteReminder, markReminderPaid, settings, Colors, smsBills, setSmsBills } = useDatabase();
@@ -466,8 +468,34 @@ export default function RemindersScreen() {
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: Colors.card, borderColor: Colors.border }]}>
             <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: Colors.text }]}>New Payment Goal</Text>
+              <Text style={[styles.modalTitle, { color: Colors.text }]}>{editingRemId ? 'Edit Bill' : 'New Reminder'}</Text>
               <TouchableOpacity onPress={() => setIsModalVisible(false)}><X color={Colors.text} size={24} /></TouchableOpacity>
+            </View>
+
+            <View style={{ marginBottom: 20, padding: 12, backgroundColor: Colors.background, borderRadius: 15, borderStyle: 'dashed', borderWidth: 1.5, borderColor: Colors.primary + '60' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                    <Sparkles size={14} color={Colors.primary} />
+                    <Text style={{ color: Colors.primary, fontSize: 11, fontWeight: '900', letterSpacing: 0.5 }}>PASTE SMS TO AUTO-FILL 🅾️</Text>
+                </View>
+                <TextInput
+                    placeholder="Paste bank/bill notification text here..."
+                    placeholderTextColor={Colors.textMuted}
+                    multiline
+                    numberOfLines={2}
+                    style={{ color: Colors.text, fontSize: 13, padding: 5 }}
+                    onChangeText={(text) => {
+                        if (text.length > 10) {
+                            const parsed = parseFinancialText(text);
+                            if (parsed) {
+                                setName(parsed.name);
+                                setAmount(parsed.amount.toString());
+                                setDueDay(parsed.date.getDate().toString());
+                                setType(parsed.type);
+                                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                            }
+                        }
+                    }}
+                />
             </View>
             
             <TextInput style={[styles.input, { backgroundColor: Colors.background, color: Colors.text, borderColor: Colors.border }]} placeholder="Bill Name" placeholderTextColor={Colors.textMuted} value={name} onChangeText={setName} />

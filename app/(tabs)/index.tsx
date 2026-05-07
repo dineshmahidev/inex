@@ -13,7 +13,10 @@ import {
     Trash2,
     Zap,
     TrendingUp,
-    User
+    User,
+    Ghost,
+    Smile,
+    Star
 } from "lucide-react-native";
 import React, { useMemo, useState, useEffect } from "react";
 import { initNotifications } from "@/utils/notifications";
@@ -138,6 +141,32 @@ export default function DashboardScreen() {
     );
   };
 
+  const renderAvatar = () => {
+    const GUEST_ICONS = [User, Ghost, Smile, Star, Zap];
+    const GUEST_COLORS = ["#EB6001", "#22C55E", "#3B82F6", "#A855F7", "#F59E0B"];
+    
+    const hash = (settings.userName || "Guest").split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    const IconComponent = GUEST_ICONS[hash % GUEST_ICONS.length];
+    const bgColor = GUEST_COLORS[hash % GUEST_COLORS.length];
+
+    if (settings.userImage && settings.userImage.trim() !== "") {
+      return (
+        <View style={[styles.avatar, { borderColor: Colors.border }]}>
+          <Image 
+            source={{ uri: settings.userImage }} 
+            style={{ width: '100%', height: '100%', borderRadius: 20 }} 
+          />
+        </View>
+      );
+    }
+
+    return (
+      <View style={[styles.avatar, { backgroundColor: bgColor + '25', borderColor: bgColor + '40' }]}>
+        <IconComponent size={22} color={bgColor} strokeWidth={2.5} />
+      </View>
+    );
+  };
+
   return (
     <SafeAreaView
       style={[styles.container, { backgroundColor: Colors.background }]}
@@ -155,16 +184,10 @@ export default function DashboardScreen() {
                   <Text style={[styles.brandElite, { color: Colors.primary }]}>YOUR PRODUCTIVITY APP</Text>
               </View>
           </View>
-          <TouchableOpacity style={styles.profileContainer}>
-             <View style={[styles.avatar, { backgroundColor: Colors.card, borderColor: Colors.border }]}>
-                {settings.userImage ? (
-                  <Image source={{ uri: settings.userImage }} style={{ width: '100%', height: '100%', borderRadius: 18, resizeMode: 'cover' }} />
-                ) : (
-                  <User size={20} color={Colors.primary} />
-                )}
-             </View>
+          <TouchableOpacity style={styles.profileContainer} onPress={() => router.push('/settings')}>
+             {renderAvatar()}
              <Text style={[styles.greetingName, { color: Colors.text }]} numberOfLines={1}>
-                {settings.userName}
+                {settings.userName || "Guest"}
              </Text>
           </TouchableOpacity>
       </View>
@@ -395,13 +418,20 @@ const styles = StyleSheet.create({
     maxWidth: 80,
   },
   avatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    borderWidth: 1,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    borderWidth: 1.5,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 4,
+    overflow: 'hidden'
+  },
+  avatarInner: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   greetingName: { 
     fontSize: 10, 

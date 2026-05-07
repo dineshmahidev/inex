@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Alert } from 'react-native';
 import { useDatabase } from '@/context/DatabaseContext';
 import { useRouter } from 'expo-router';
 import { Lock, Fingerprint, Delete } from 'lucide-react-native';
