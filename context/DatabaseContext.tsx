@@ -43,6 +43,7 @@ export interface Reminder {
   alertType?: 'on_day' | '2_days_before' | 'both' | 'none' | 'custom';
   customDate?: string;
   isCompleted?: boolean;
+  paymentHistory?: { date: string; amount: number }[];
 }
 
 export interface UserSettings {
@@ -206,22 +207,26 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
     await AsyncStorage.setItem(KEYS.DATA, JSON.stringify(updated));
   };
 
-  const markReminderPaid = async (id: string, trackAsExpense: boolean = true) => {
+  const markReminderPaid = async (id: string, trackAsExpense: boolean = true, manualDate?: string) => {
     const currentMonth = new Date().toISOString().slice(0, 7);
     const rem = reminders.find(r => r.id === id);
-    if (!rem || rem.lastPaidMonth === currentMonth) return;
+    if (!rem) return;
+    // Allow multiple payments if it's a tenure-based reminder (totalMonths exists)
+    if (!rem.totalMonths && rem.lastPaidMonth === currentMonth) return;
     
     const updatedReminders = reminders.map(r => {
       if (r.id !== id) return r;
       
       const newPaidCount = (r.paidMonths || 0) + 1;
       const isDone = r.totalMonths ? newPaidCount >= r.totalMonths : false;
+      const newHistory = [...(r.paymentHistory || []), { date: manualDate || new Date().toISOString(), amount: r.amount }];
       
       return { 
         ...r, 
         lastPaidMonth: currentMonth, 
         paidMonths: newPaidCount,
-        isCompleted: isDone
+        isCompleted: isDone,
+        paymentHistory: newHistory
       };
     });
     setReminders(updatedReminders);

@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useDatabase, Reminder } from '@/hooks/useDatabase';
-import { Bell, Plus, CheckCircle2, Circle, Trash2, Calendar, X, Clock } from 'lucide-react-native';
+import { Bell, Plus, CheckCircle2, Circle, Trash2, Calendar, X, Clock, Eye } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { requestNotificationPermissions, cancelReminderNotification, scheduleReminderNotification, scheduleMonthlyReminderNotification } from '@/utils/notifications';
@@ -24,6 +24,10 @@ export default function RemindersScreen() {
   const [tick, setTick] = useState(0); // Trigger live updates
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<'required' | 'sms'>('required');
+  const [historyRem, setHistoryRem] = useState<Reminder | null>(null);
+  const [payingRemId, setPayingRemId] = useState<string | null>(null);
+  const [showPaymentDatePicker, setShowPaymentDatePicker] = useState(false);
+  const [paymentDate, setPaymentDate] = useState(new Date());
   
   const isSelectionMode = selectedIds.length > 0;
 
@@ -300,10 +304,9 @@ export default function RemindersScreen() {
                         {text: "Cancel", style: "cancel"}, 
                         {text: "Edit", onPress: () => handleOpenModal(rem)}, 
                         {text: "Mark as Paid", onPress: () => {
-                            Alert.alert("Track Expense?", "Do you want to add this payment to your expense tracker?", [
-                                {text: "No, just mark paid", onPress: () => markReminderPaid(rem.id, false)},
-                                {text: "Yes, track it", onPress: () => markReminderPaid(rem.id, true)}
-                            ]);
+                            setPayingRemId(rem.id);
+                            setPaymentDate(new Date());
+                            setShowPaymentDatePicker(true);
                         }}
                     ]);
                 }}
@@ -327,31 +330,65 @@ export default function RemindersScreen() {
                 <View style={{ alignItems: 'flex-end' }}>
                   <Text style={[styles.cardAmount, { color: isSelected ? '#000' : Colors.text }]}>{settings.currency}{rem.amount.toLocaleString()}</Text>
                   {rem.totalMonths && (
-                      <Text style={{ color: isSelected ? 'rgba(0,0,0,0.7)' : Colors.textMuted, fontSize: 10, marginTop: 4, fontWeight: 'bold' }}>
-                          {rem.paidMonths || 0} / {rem.totalMonths} months
-                      </Text>
+                    <View style={{ marginTop: 6, width: 80 }}>
+                        <View style={{ height: 4, backgroundColor: isSelected ? 'rgba(0,0,0,0.1)' : Colors.border, borderRadius: 2, overflow: 'hidden' }}>
+                            <View style={{ height: '100%', width: `${((rem.paidMonths || 0) / rem.totalMonths) * 100}%`, backgroundColor: isSelected ? '#000' : Colors.primary }} />
+                        </View>
+                        <Text style={{ color: isSelected ? 'rgba(0,0,0,0.7)' : Colors.textMuted, fontSize: 9, marginTop: 2, fontWeight: 'bold', textAlign: 'right' }}>
+                            {rem.paidMonths || 0}/{rem.totalMonths}
+                        </Text>
+                    </View>
                   )}
+                  <TouchableOpacity onPress={() => setHistoryRem(rem)} style={{ padding: 10, marginTop: -5 }}>
+                      <Eye size={20} color={isSelected ? '#000' : Colors.primary} />
+                  </TouchableOpacity>
                 </View>
               </TouchableOpacity>
             );
           })
         )}
 
-          </View>
-        )}
+
 
         {paidReminders.length > 0 && (
           <View style={{ marginTop: 25 }}>
             <Text style={[styles.sectionTitle, { color: Colors.textMuted }]}>Settled This Month</Text>
             {paidReminders.map(rem => (
-              <View key={rem.id} style={[styles.card, { backgroundColor: Colors.card, borderColor: Colors.border, opacity: 0.5 }]}>
+              <TouchableOpacity 
+                key={rem.id} 
+                style={[styles.card, { backgroundColor: Colors.card, borderColor: Colors.border, opacity: 0.8 }]}
+                onPress={() => {
+                  if (rem.totalMonths) {
+                    setPayingRemId(rem.id);
+                    setPaymentDate(new Date());
+                    setShowPaymentDatePicker(true);
+                  }
+                }}
+              >
                 <CheckCircle2 size={26} color={Colors.primary} />
                 <View style={styles.cardInfo}>
                   <Text style={[styles.cardName, { color: Colors.text }]}>{rem.name}</Text>
-                  <Text style={{ color: Colors.textMuted, fontSize: 11 }}>PAID FOR {new Date().toLocaleString('default', { month: 'long' }).toUpperCase()}</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                    <Text style={{ color: Colors.primary, fontSize: 11, fontWeight: 'bold' }}>PAID</Text>
+                    {rem.totalMonths && (
+                        <Text style={{ color: Colors.textMuted, fontSize: 11 }}>• {rem.paidMonths}/{rem.totalMonths} DONE</Text>
+                    )}
+                  </View>
                 </View>
-                <TouchableOpacity onPress={() => deleteReminder(rem.id)}><Trash2 size={18} color={Colors.textMuted} /></TouchableOpacity>
-              </View>
+                <View style={{ alignItems: 'flex-end', marginRight: 10 }}>
+                   <Text style={[styles.cardAmount, { color: Colors.text, opacity: 0.8, fontSize: 14 }]}>{settings.currency}{rem.amount.toLocaleString()}</Text>
+                   {rem.totalMonths && (
+                    <View style={{ marginTop: 4, width: 60 }}>
+                        <View style={{ height: 3, backgroundColor: Colors.border, borderRadius: 1.5, overflow: 'hidden' }}>
+                            <View style={{ height: '100%', width: `${((rem.paidMonths || 0) / rem.totalMonths) * 100}%`, backgroundColor: Colors.primary }} />
+                        </View>
+                    </View>
+                   )}
+                   <Text style={{ color: Colors.textMuted, fontSize: 10, marginTop: 2 }}>Next: {rem.dueDay}th {new Date(new Date().setMonth(new Date().getMonth() + 1)).toLocaleString('default', { month: 'short' })}</Text>
+                </View>
+                <TouchableOpacity onPress={() => setHistoryRem(rem)} style={{ padding: 10 }}><Eye size={18} color={Colors.primary} /></TouchableOpacity>
+                <TouchableOpacity onPress={() => deleteReminder(rem.id)} style={{ padding: 10 }}><Trash2 size={18} color={Colors.textMuted} /></TouchableOpacity>
+              </TouchableOpacity>
             ))}
           </View>
         )}
@@ -366,7 +403,8 @@ export default function RemindersScreen() {
                   <Text style={[styles.cardName, { color: Colors.text }]}>{rem.name}</Text>
                   <Text style={{ color: Colors.primary, fontSize: 11, fontWeight: 'bold' }}>TENURE FINISHED ({rem.totalMonths}/{rem.totalMonths})</Text>
                 </View>
-                <TouchableOpacity onPress={() => deleteReminder(rem.id)}><Trash2 size={18} color={Colors.textMuted} /></TouchableOpacity>
+                <TouchableOpacity onPress={() => setHistoryRem(rem)} style={{ padding: 10 }}><Eye size={18} color={Colors.primary} /></TouchableOpacity>
+                <TouchableOpacity onPress={() => deleteReminder(rem.id)} style={{ padding: 10 }}><Trash2 size={18} color={Colors.textMuted} /></TouchableOpacity>
               </View>
             ))}
           </View>
@@ -528,6 +566,82 @@ export default function RemindersScreen() {
           </View>
         </View>
       </Modal>
+
+      <Modal visible={!!historyRem} animationType="fade" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: Colors.card, borderColor: Colors.border, height: '70%' }]}>
+            <View style={styles.modalHeader}>
+              <View>
+                <Text style={[styles.modalTitle, { color: Colors.text }]}>Installment Statement</Text>
+                <Text style={{ color: Colors.textMuted, fontSize: 12 }}>{historyRem?.name}</Text>
+              </View>
+              <TouchableOpacity onPress={() => setHistoryRem(null)}><X color={Colors.text} size={24} /></TouchableOpacity>
+            </View>
+
+            {historyRem && (
+                <View style={{ flex: 1 }}>
+                    <View style={{ flexDirection: 'row', gap: 15, marginBottom: 25 }}>
+                        <View style={{ flex: 1, backgroundColor: Colors.background, padding: 15, borderRadius: 20, borderWidth: 1, borderColor: Colors.border }}>
+                            <Text style={{ color: Colors.textMuted, fontSize: 10, fontWeight: 'bold' }}>TOTAL DUES</Text>
+                            <Text style={{ color: Colors.text, fontSize: 18, fontWeight: '900', marginTop: 5 }}>
+                                {settings.currency}{(historyRem.amount * (historyRem.totalMonths || 1)).toLocaleString()}
+                            </Text>
+                        </View>
+                        <View style={{ flex: 1, backgroundColor: Colors.background, padding: 15, borderRadius: 20, borderWidth: 1, borderColor: Colors.border }}>
+                            <Text style={{ color: Colors.primary, fontSize: 10, fontWeight: 'bold' }}>BALANCE LEFT</Text>
+                            <Text style={{ color: Colors.primary, fontSize: 18, fontWeight: '900', marginTop: 5 }}>
+                                {settings.currency}{(historyRem.amount * ((historyRem.totalMonths || 0) - (historyRem.paidMonths || 0))).toLocaleString()}
+                            </Text>
+                        </View>
+                    </View>
+
+                    <Text style={[styles.sectionTitle, { color: Colors.textMuted, marginBottom: 10 }]}>Payment Logs</Text>
+                    <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
+                        {historyRem.paymentHistory?.length ? (
+                            historyRem.paymentHistory.map((log, idx) => (
+                                <View key={idx} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.border }}>
+                                    <View>
+                                        <Text style={{ color: Colors.text, fontWeight: 'bold', fontSize: 14 }}>Installment #{idx + 1}</Text>
+                                        <Text style={{ color: Colors.textMuted, fontSize: 12 }}>{new Date(log.date).toLocaleString()}</Text>
+                                    </View>
+                                    <Text style={{ color: Colors.primary, fontWeight: '900' }}>+{settings.currency}{log.amount.toLocaleString()}</Text>
+                                </View>
+                            ))
+                        ) : (
+                            <Text style={{ color: Colors.textMuted, textAlign: 'center', marginTop: 20 }}>No payments recorded yet.</Text>
+                        )}
+                    </ScrollView>
+                </View>
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      {showPaymentDatePicker && (
+          <DateTimePicker
+            value={paymentDate}
+            mode="date"
+            display="default"
+            onChange={(e, d) => {
+                setShowPaymentDatePicker(false);
+                if (d && payingRemId) {
+                    Alert.alert("Track Expense?", "Do you want to add this payment to your expense tracker?", [
+                        {text: "No, just mark paid", onPress: () => {
+                            markReminderPaid(payingRemId, false, d.toISOString());
+                            setPayingRemId(null);
+                        }},
+                        {text: "Yes, track it", onPress: () => {
+                            markReminderPaid(payingRemId, true, d.toISOString());
+                            setPayingRemId(null);
+                        }}
+                    ]);
+                } else {
+                    setPayingRemId(null);
+                }
+            }}
+          />
+      )}
+
     </SafeAreaView>
   );
 }

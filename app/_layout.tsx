@@ -29,7 +29,7 @@ function AppContent() {
     async function nativeInit() {
       try {
         // System UI background
-        await SystemUI.setBackgroundColorAsync('#FFFFFF').catch(() => {});
+        await SystemUI.setBackgroundColorAsync('#EB6001').catch(() => {});
         
         // Notifications
         try {
