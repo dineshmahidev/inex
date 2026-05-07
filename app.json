@@ -18,7 +18,7 @@
     },
     "android": {
       "package": "com.dineshmahidev.tracksy",
-      "versionCode": 2,
+      "versionCode": 3,
       "adaptiveIcon": {
         "backgroundColor": "#FFFFFF",
         "foregroundImage": "./assets/app_logo.png",
@@ -30,7 +30,6 @@
       },
       "permissions": [
         "SCHEDULE_EXACT_ALARM",
-        "USE_EXACT_ALARM",
         "POST_NOTIFICATIONS",
         "WAKE_LOCK",
         "RECEIVE_BOOT_COMPLETED"
