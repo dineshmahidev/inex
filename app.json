@@ -81,9 +81,7 @@
             "./assets/mixkit_bell_notification_933.wav"
           ]
         }
-      ],
-      "expo-sharing",
-      "expo-file-system"
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
