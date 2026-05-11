@@ -24,6 +24,8 @@
     "android": {
       "package": "com.dineshmahidev.tracksy",
       "versionCode": 6,
+      "allowBackup": true,
+      "fullBackupOnly": false,
       "splash": {
         "image": "./assets/app_logo.png",
         "resizeMode": "contain",
@@ -79,7 +81,9 @@
             "./assets/mixkit_bell_notification_933.wav"
           ]
         }
-      ]
+      ],
+      "expo-sharing",
+      "expo-file-system"
     ],
     "experiments": {
       "typedRoutes": true,

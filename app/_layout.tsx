@@ -8,6 +8,7 @@ import * as Notifications from 'expo-notifications';
 import * as SplashScreen from 'expo-splash-screen';
 import { DatabaseProvider, useDatabase } from '@/context/DatabaseContext';
 import { requestNotificationPermissions, initNotifications } from '@/utils/notifications';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 // Keep the splash screen visible while we fetch resources
 SplashScreen.preventAutoHideAsync();
@@ -87,8 +88,10 @@ function AppContent() {
 
 export default function RootLayout() {
   return (
-    <DatabaseProvider>
-      <AppContent />
-    </DatabaseProvider>
+    <SafeAreaProvider>
+      <DatabaseProvider>
+        <AppContent />
+      </DatabaseProvider>
+    </SafeAreaProvider>
   );
 }

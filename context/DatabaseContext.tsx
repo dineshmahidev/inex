@@ -131,6 +131,7 @@ interface DatabaseContextType {
   setGlobalMonth: React.Dispatch<React.SetStateAction<Date>>;
   smsBills: { id: string; name: string; amount: number; dueDay: number; type: 'bill'|'emi'|'loan' }[];
   setSmsBills: React.Dispatch<React.SetStateAction<{ id: string; name: string; amount: number; dueDay: number; type: 'bill'|'emi'|'loan' }[]>>;
+  saveToSafetyFile: () => Promise<void>;
 }
 
 const DatabaseContext = createContext<DatabaseContextType | undefined>(undefined);
@@ -173,15 +174,28 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
       ]);
 
       // 2. Migration Check (Elite Safety)
-      // If current DATA is empty, check if old versions exist (v1, v2, v3)
+      // If current DATA is empty, check for safety backup or legacy versions
       if (!t) {
-          const legacyKeys = ['@smart_data_v3', '@smart_data_v2', '@smart_data_v1', 'transactions'];
-          for (const lk of legacyKeys) {
-              const legacyData = await AsyncStorage.getItem(lk);
-              if (legacyData) {
-                  setTransactions(JSON.parse(legacyData));
-                  await AsyncStorage.setItem(KEYS.DATA, legacyData); // Migrate to current
-                  break;
+          // Check safety backup first (for reinstalls)
+          const safetyData = await loadFromSafetyFile();
+          if (safetyData) {
+              setTransactions(safetyData.transactions || []);
+              setCategories(safetyData.categories || DEFAULT_CATS);
+              setReminders(safetyData.reminders || []);
+              setNotes(safetyData.notes || []);
+              setTodos(safetyData.todos || []);
+              setHabits(safetyData.habits || []);
+              if (safetyData.settings) setSettings(prev => ({...prev, ...safetyData.settings}));
+          } else {
+              // Fallback to legacy migration
+              const legacyKeys = ['@smart_data_v3', '@smart_data_v2', '@smart_data_v1', 'transactions'];
+              for (const lk of legacyKeys) {
+                  const legacyData = await AsyncStorage.getItem(lk);
+                  if (legacyData) {
+                      setTransactions(JSON.parse(legacyData));
+                      await AsyncStorage.setItem(KEYS.DATA, legacyData);
+                      break;
+                  }
               }
           }
       } else {
@@ -216,6 +230,39 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
       setIsLoading(false);
     }
   };
+
+  const loadFromSafetyFile = async () => {
+    try {
+        const fileUri = FileSystem.documentDirectory + 'tracksy_safety_backup.json';
+        const info = await FileSystem.getInfoAsync(fileUri);
+        if (info.exists) {
+            const content = await FileSystem.readAsStringAsync(fileUri);
+            return JSON.parse(content);
+        }
+    } catch (e) {
+        console.log("Safety recovery check failed:", e);
+    }
+    return null;
+  };
+
+  const saveToSafetyFile = async () => {
+      try {
+          const backup = { transactions, categories, reminders, settings, notes, todos, habits };
+          const fileUri = FileSystem.documentDirectory + 'tracksy_safety_backup.json';
+          await FileSystem.writeAsStringAsync(fileUri, JSON.stringify(backup));
+          
+          // On Android, we try to write to a more persistent location if possible
+          // For now, documentDirectory is the most stable across all devices.
+      } catch (e) {
+          console.error("Safety backup failed:", e);
+      }
+  };
+
+  useEffect(() => {
+      if (!isLoading) {
+          saveToSafetyFile();
+      }
+  }, [transactions, reminders, notes, todos, habits, settings]);
 
   useEffect(() => { load(); }, []);
 
@@ -362,13 +409,29 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
         throw new Error("Sharing is not available on this device");
       }
 
-      const backup = { transactions, categories, reminders, settings, notes, todos, habits };
-      const fileUri = FileSystem.cacheDirectory + 'tracksy_backup.json';
-      await FileSystem.writeAsStringAsync(fileUri, JSON.stringify(backup));
+      const backup = { 
+        transactions, 
+        categories, 
+        reminders, 
+        settings, 
+        notes, 
+        todos, 
+        habits,
+        exportDate: new Date().toISOString(),
+        appName: 'Tracksy'
+      };
+
+      // Use a timestamped filename to avoid cache issues in native builds
+      const fileName = `tracksy_backup_${new Date().getTime()}.json`;
+      const fileUri = `${FileSystem.cacheDirectory}${fileName}`;
+      
+      await FileSystem.writeAsStringAsync(fileUri, JSON.stringify(backup), {
+        encoding: 'utf8'
+      });
       
       await Sharing.shareAsync(fileUri, {
         mimeType: 'application/json',
-        dialogTitle: 'Export Tracksy Data',
+        dialogTitle: 'Export Tracksy Backup',
         UTI: 'public.json'
       });
     } catch (error) {
@@ -472,7 +535,8 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
         settings, setSettings: updateSettings, refresh: load,
         clearAllData, exportData, importData, detectCategory,
         globalMonth, setGlobalMonth,
-        smsBills, setSmsBills
+        smsBills, setSmsBills,
+        saveToSafetyFile
       }}
     >
       {children}

@@ -8,11 +8,13 @@ import {
   History,
   Settings,
 } from "lucide-react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import React from "react";
 import { Platform, StyleSheet, TouchableOpacity, View } from "react-native";
 
 export default function TabLayout() {
   const { Colors } = useDatabase();
+  const insets = useSafeAreaInsets();
 
   return (
     <Tabs
@@ -23,7 +25,7 @@ export default function TabLayout() {
         tabBarShowLabel: false,
         tabBarStyle: {
           backgroundColor: Colors.card,
-          height: Platform.OS === "ios" ? 85 : 65,
+          height: Platform.OS === "ios" ? 60 + insets.bottom : 65,
           borderTopWidth: 1,
           borderTopColor: Colors.border,
           elevation: 0,
