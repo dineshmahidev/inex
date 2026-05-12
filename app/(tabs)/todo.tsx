@@ -1,71 +1,69 @@
+import { FlowBannerAd } from "@/components/FlowBannerAd";
 import { useDatabase } from "@/hooks/useDatabase";
+import {
+  cancelReminderNotification,
+  requestNotificationPermissions,
+  scheduleHabitNotification,
+  scheduleTodoNotification,
+  scheduleVoiceNoteNotification,
+} from "@/utils/notifications";
 import DateTimePicker from "@react-native-community/datetimepicker";
+import { Audio } from "expo-av";
+import * as FileSystem from "expo-file-system";
+import * as Haptics from "expo-haptics";
 import LottieView from "lottie-react-native";
 import {
-    Activity,
-    Briefcase,
-    Calendar,
-    CheckCircle2,
-    ChevronLeft,
-    Circle,
-    Clock,
-    FileText,
-    LayoutGrid,
-    Palette,
-    Plus,
-    Search,
-    ShoppingCart,
-    Sparkles,
-    Star,
-    StickyNote,
-    Book,
-    Coffee,
-    Dumbbell,
-    Heart,
-    Smile,
-    Edit2,
-    Trash2,
-    Trophy,
-    User,
-    Wallet,
-    X,
-    Zap,
-    Bell,
-    Mic,
-    Play,
-    Pause,
-    StopCircle,
-    Music,
-    Pin,
-    MessageSquare,
+  Activity,
+  Bell,
+  Book,
+  Briefcase,
+  Calendar,
+  CheckCircle2,
+  ChevronLeft,
+  Circle,
+  Clock,
+  Coffee,
+  Dumbbell,
+  Edit2,
+  FileText,
+  Heart,
+  LayoutGrid,
+  Mic,
+  Palette,
+  Pause,
+  Pin,
+  Play,
+  Plus,
+  Search,
+  ShoppingCart,
+  Smile,
+  Sparkles,
+  Star,
+  StickyNote,
+  StopCircle,
+  Trash2,
+  Trophy,
+  User,
+  Wallet,
+  X,
+  Zap
 } from "lucide-react-native";
-import * as FileSystem from 'expo-file-system/legacy';
 import React, { useMemo, useState } from "react";
 import {
-    Alert,
-    Dimensions,
-    Modal,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
-    Platform,
-    KeyboardAvoidingView,
+  Alert,
+  Dimensions,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { 
-  requestNotificationPermissions, 
-  scheduleTodoNotification,
-  scheduleHabitNotification,
-  scheduleVoiceNoteNotification,
-  cancelReminderNotification 
-} from "@/utils/notifications";
-import * as Haptics from 'expo-haptics';
-import { FlowBannerAd } from "@/components/FlowBannerAd";
-import { Colors as ThemeColors } from "@/constants/theme";
-import { Audio } from 'expo-av';
 
 const TODO_KEY = "@productivity_todos_v5";
 const NOTE_COLORS = ["#FEFF9C", "#7AFEC6", "#FF7EB9", "#7AFBFF", "#FFF3B0"];
@@ -79,7 +77,7 @@ const DAILY_QUOTES = [
   "Good habits are worth being fanatical about. - John Irving",
   "Small daily improvements over time lead to stunning results. - Robin Sharma",
   "First forget inspiration. Habit is more dependable. - Octavia Butler",
-  "Drop by drop is the water pot filled. - Buddha"
+  "Drop by drop is the water pot filled. - Buddha",
 ];
 
 interface Todo {
@@ -110,7 +108,7 @@ const HABIT_ICONS: any = {
   Coffee,
   Dumbbell,
   Book,
-  Wallet
+  Wallet,
 };
 
 export default function TodoScreen() {
@@ -136,11 +134,20 @@ export default function TodoScreen() {
   } = useDatabase();
 
   const dailyQuote = useMemo(() => {
-    const dayOfYear = Math.floor((new Date().getTime() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 1000 / 60 / 60 / 24);
+    const dayOfYear = Math.floor(
+      (new Date().getTime() -
+        new Date(new Date().getFullYear(), 0, 0).getTime()) /
+        1000 /
+        60 /
+        60 /
+        24,
+    );
     return DAILY_QUOTES[dayOfYear % DAILY_QUOTES.length];
   }, []);
 
-  const [mainTab, setMainTab] = useState<"todos" | "notes" | "habits" | "voice" | "sms">("todos");
+  const [mainTab, setMainTab] = useState<
+    "todos" | "notes" | "habits" | "voice"
+  >("todos");
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isNoteModalVisible, setIsNoteModalVisible] = useState(false);
   const [selectedTab, setSelectedTab] = useState<
@@ -197,7 +204,7 @@ export default function TodoScreen() {
     let interval: NodeJS.Timeout;
     if (isRecording) {
       interval = setInterval(() => {
-        setRecordingDuration(prev => prev + 1);
+        setRecordingDuration((prev) => prev + 1);
       }, 1000);
     } else {
       setRecordingDuration(0);
@@ -208,7 +215,7 @@ export default function TodoScreen() {
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
   const [editingTodoId, setEditingTodoId] = useState<string | null>(null);
@@ -216,8 +223,8 @@ export default function TodoScreen() {
   const isSelectionMode = selectedIds.length > 0;
 
   const toggleSelection = (id: string) => {
-    setSelectedIds(prev => 
-      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id],
     );
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   };
@@ -228,59 +235,66 @@ export default function TodoScreen() {
       `Remove ${selectedIds.length} tasks and their reminders?`,
       [
         { text: "Cancel", style: "cancel" },
-        { text: "Delete", style: "destructive", onPress: async () => {
-          const updated = todos.filter(t => !selectedIds.includes(t.id));
-          await saveTodos(updated);
-          for (const id of selectedIds) {
-            await cancelReminderNotification(id);
-          }
-          setSelectedIds([]);
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        }}
-      ]
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            const updated = todos.filter((t) => !selectedIds.includes(t.id));
+            await saveTodos(updated);
+            for (const id of selectedIds) {
+              await cancelReminderNotification(id);
+            }
+            setSelectedIds([]);
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          },
+        },
+      ],
     );
   };
 
   const addTodo = async () => {
     if (!task) return;
-    
+
     if (editingTodoId) {
-        await updateTodo(editingTodoId, {
-            text: task,
-            date: todoDate.toLocaleDateString(),
-            time: todoDate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-            category: cat,
-            starred: isStarred,
-            reminderDate: todoDate.toISOString()
-        });
-        // Reschedule notification
-        const hasPermission = await requestNotificationPermissions();
-        if (hasPermission) {
-            await cancelReminderNotification(editingTodoId);
-            if (todoDate.getTime() > Date.now()) {
-                await scheduleTodoNotification(editingTodoId, task, todoDate);
-            }
+      await updateTodo(editingTodoId, {
+        text: task,
+        date: todoDate.toLocaleDateString(),
+        time: todoDate.toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+        category: cat,
+        starred: isStarred,
+        reminderDate: todoDate.toISOString(),
+      });
+      // Reschedule notification
+      const hasPermission = await requestNotificationPermissions();
+      if (hasPermission) {
+        await cancelReminderNotification(editingTodoId);
+        if (todoDate.getTime() > Date.now()) {
+          await scheduleTodoNotification(editingTodoId, task, todoDate);
         }
+      }
     } else {
-        const item: Omit<Todo, "id"> = {
-          text: task,
-          date: todoDate.toLocaleDateString(),
-          time: todoDate.toLocaleTimeString([], {
-            hour: "2-digit",
-            minute: "2-digit",
-          }),
-          category: cat,
-          starred: isStarred,
-          completed: false,
-          reminderDate: todoDate.toISOString()
-        };
-        const todoId = await addTodoToDb(item);
-        
-        // Schedule notification
-        const hasPermission = await requestNotificationPermissions();
-        if (hasPermission && todoDate.getTime() > Date.now()) {
-            await scheduleTodoNotification(todoId, task, todoDate);
-        }
+      const item: Omit<Todo, "id"> = {
+        text: task,
+        date: todoDate.toLocaleDateString(),
+        time: todoDate.toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+        category: cat,
+        starred: isStarred,
+        completed: false,
+        reminderDate: todoDate.toISOString(),
+      };
+      const todoId = await addTodoToDb(item);
+
+      // Schedule notification
+      const hasPermission = await requestNotificationPermissions();
+      if (hasPermission && todoDate.getTime() > Date.now()) {
+        await scheduleTodoNotification(todoId, task, todoDate);
+      }
     }
 
     setTask("");
@@ -295,40 +309,43 @@ export default function TodoScreen() {
       toggleSelection(todo.id);
       return;
     }
-    Alert.alert(
-        "Manage Task",
-        todo.text,
-        [
-            { text: "Edit", onPress: () => {
-                setEditingTodoId(todo.id);
-                setTask(todo.text);
-                setCat(todo.category as any);
-                setIsStarred(todo.starred);
-                if (todo.reminderDate) {
-                    setTodoDate(new Date(todo.reminderDate));
-                }
-                setIsModalVisible(true);
-            }},
-            { text: "Delete", style: "destructive", onPress: () => confirmDeleteTodo(todo.id) },
-            { text: "Cancel", style: "cancel" }
-        ]
-    );
+    Alert.alert("Manage Task", todo.text, [
+      {
+        text: "Edit",
+        onPress: () => {
+          setEditingTodoId(todo.id);
+          setTask(todo.text);
+          setCat(todo.category as any);
+          setIsStarred(todo.starred);
+          if (todo.reminderDate) {
+            setTodoDate(new Date(todo.reminderDate));
+          }
+          setIsModalVisible(true);
+        },
+      },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: () => confirmDeleteTodo(todo.id),
+      },
+      { text: "Cancel", style: "cancel" },
+    ]);
   };
 
   const confirmDeleteTodo = (id: string) => {
-      Alert.alert(
-          "Delete Task?",
-          "This task and its reminder will be removed.",
-          [
-              { text: "Keep" },
-              { text: "Delete", style: "destructive", onPress: async () => {
-                  const updated = todos.filter(t => t.id !== id);
-                  await saveTodos(updated);
-                  await cancelReminderNotification(id);
-                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-              }}
-          ]
-      );
+    Alert.alert("Delete Task?", "This task and its reminder will be removed.", [
+      { text: "Keep" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: async () => {
+          const updated = todos.filter((t) => t.id !== id);
+          await saveTodos(updated);
+          await cancelReminderNotification(id);
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        },
+      },
+    ]);
   };
 
   const handleOpenNote = (note?: any) => {
@@ -386,9 +403,14 @@ export default function TodoScreen() {
 
   const handleCreateHabit = async () => {
     if (!hName) return;
-    
+
     if (editingHabitId) {
-      await updateHabit(editingHabitId, { name: hName, color: hColor, icon: hIcon, reminderTime: hTime || undefined });
+      await updateHabit(editingHabitId, {
+        name: hName,
+        color: hColor,
+        icon: hIcon,
+        reminderTime: hTime || undefined,
+      });
       await cancelReminderNotification(editingHabitId);
       if (hTime) {
         const hasPermission = await requestNotificationPermissions();
@@ -397,7 +419,12 @@ export default function TodoScreen() {
         }
       }
     } else {
-      const id = await addHabit({ name: hName, color: hColor, icon: hIcon, reminderTime: hTime || undefined });
+      const id = await addHabit({
+        name: hName,
+        color: hColor,
+        icon: hIcon,
+        reminderTime: hTime || undefined,
+      });
       if (hTime) {
         const hasPermission = await requestNotificationPermissions();
         if (hasPermission) {
@@ -446,37 +473,50 @@ export default function TodoScreen() {
   const filteredNotes = useMemo(() => {
     let f = notes;
     if (searchQuery) {
-        f = f.filter(n => n.title.toLowerCase().includes(searchQuery.toLowerCase()) || n.text.toLowerCase().includes(searchQuery.toLowerCase()));
+      f = f.filter(
+        (n) =>
+          n.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          n.text.toLowerCase().includes(searchQuery.toLowerCase()),
+      );
     }
-    return f.sort((a,b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
+    return f.sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
   }, [notes, searchQuery]);
 
   const filteredHabits = useMemo(() => {
     let f = habits;
     if (searchQuery) {
-        f = f.filter(h => h.name.toLowerCase().includes(searchQuery.toLowerCase()));
+      f = f.filter((h) =>
+        h.name.toLowerCase().includes(searchQuery.toLowerCase()),
+      );
     }
     return f;
   }, [habits, searchQuery]);
 
   const getHabitStreak = (logs: string[]) => {
-      if (!logs || logs.length === 0) return 0;
-      const sorted = [...logs].sort((a,b) => new Date(b).getTime() - new Date(a).getTime());
-      let streak = 0;
-      let current = new Date();
-      const formatLocal = (d: Date) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-      if (!sorted.includes(formatLocal(current))) {
-          current.setDate(current.getDate() - 1);
+    if (!logs || logs.length === 0) return 0;
+    const sorted = [...logs].sort(
+      (a, b) => new Date(b).getTime() - new Date(a).getTime(),
+    );
+    let streak = 0;
+    let current = new Date();
+    const formatLocal = (d: Date) =>
+      d.getFullYear() +
+      "-" +
+      String(d.getMonth() + 1).padStart(2, "0") +
+      "-" +
+      String(d.getDate()).padStart(2, "0");
+    if (!sorted.includes(formatLocal(current))) {
+      current.setDate(current.getDate() - 1);
+    }
+    for (const d of sorted) {
+      if (d === formatLocal(current)) {
+        streak++;
+        current.setDate(current.getDate() - 1);
+      } else {
+        break;
       }
-      for (const d of sorted) {
-          if (d === formatLocal(current)) {
-              streak++;
-              current.setDate(current.getDate() - 1);
-          } else {
-              break;
-          }
-      }
-      return streak;
+    }
+    return streak;
   };
 
   const totalMonthlyLogs = useMemo(() => {
@@ -493,23 +533,28 @@ export default function TodoScreen() {
         stage: "Seedling",
         icon: "🌱",
         msg: "Just starting the journey.",
-        segments: [0, 60] as [number, number]
+        segments: [0, 60] as [number, number],
       };
     if (score < 30)
       return {
         stage: "Sprouter",
         icon: "🌿",
         msg: "Consistency is building up!",
-        segments: [60, 100] as [number, number]
+        segments: [60, 100] as [number, number],
       };
     if (score < 60)
       return {
         stage: "Bloomer",
         icon: "🌳",
         msg: "You are mastering your system.",
-        segments: [100, 150] as [number, number]
+        segments: [100, 150] as [number, number],
       };
-    return { stage: "Master", icon: "👑", msg: "Elite habit formation.", segments: [150, 200] as [number, number] };
+    return {
+      stage: "Master",
+      icon: "👑",
+      msg: "Elite habit formation.",
+      segments: [150, 200] as [number, number],
+    };
   };
 
   const level = getProductivityLevel(totalMonthlyLogs);
@@ -518,13 +563,13 @@ export default function TodoScreen() {
   const startRecording = async () => {
     try {
       const permission = await Audio.requestPermissionsAsync();
-      if (permission.status === 'granted') {
+      if (permission.status === "granted") {
         await Audio.setAudioModeAsync({
           allowsRecordingIOS: true,
           playsInSilentModeIOS: true,
         });
         const { recording } = await Audio.Recording.createAsync(
-          Audio.RecordingOptionsPresets.HIGH_QUALITY
+          Audio.RecordingOptionsPresets.HIGH_QUALITY,
         );
         setRecording(recording);
         setIsRecording(true);
@@ -532,8 +577,11 @@ export default function TodoScreen() {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       }
     } catch (err) {
-      console.error('Failed to start recording', err);
-      Alert.alert("Permission Error", "Microphone access is required to record voice notes.");
+      console.error("Failed to start recording", err);
+      Alert.alert(
+        "Permission Error",
+        "Microphone access is required to record voice notes.",
+      );
     }
   };
 
@@ -548,7 +596,7 @@ export default function TodoScreen() {
         setIsVoiceModalVisible(true);
       }
     } catch (err) {
-      console.error('Failed to stop recording', err);
+      console.error("Failed to stop recording", err);
     }
   };
 
@@ -557,9 +605,9 @@ export default function TodoScreen() {
       if (sound && isPlayingId === id) {
         const status = await sound.getStatusAsync();
         if (status.isLoaded && status.isPlaying) {
-            await sound.pauseAsync();
+          await sound.pauseAsync();
         } else if (status.isLoaded) {
-            await sound.playAsync();
+          await sound.playAsync();
         }
         return;
       }
@@ -572,85 +620,95 @@ export default function TodoScreen() {
 
       const { sound: newSound } = await Audio.Sound.createAsync(
         { uri },
-        { shouldPlay: true }
+        { shouldPlay: true },
       );
-      
+
       setSound(newSound);
       setIsPlayingId(id);
 
       newSound.setOnPlaybackStatusUpdate((status: any) => {
         if (status.isLoaded) {
-            setPlaybackPosition(status.positionMillis || 0);
-            setPlaybackDuration(status.durationMillis || 0);
-            
-            if (status.didJustFinish) {
-              setIsPlayingId(null);
-              setPlaybackPosition(0);
-            }
+          setPlaybackPosition(status.positionMillis || 0);
+          setPlaybackDuration(status.durationMillis || 0);
+
+          if (status.didJustFinish) {
+            setIsPlayingId(null);
+            setPlaybackPosition(0);
+          }
         }
       });
     } catch (err) {
-      console.error('Playback error', err);
+      console.error("Playback error", err);
       Alert.alert("Playback Error", "Could not play this voice note.");
     }
   };
 
   const handleSaveVoiceNote = async () => {
     if (!recordedUri) return;
-    
+
     try {
-        const fileName = `voice_${Date.now()}.m4a`;
-        const permanentUri = FileSystem.documentDirectory + fileName;
-        
-        // Move file from cache to permanent storage
-        await FileSystem.moveAsync({
-            from: recordedUri,
-            to: permanentUri
-        });
+      const fileName = `voice_${Date.now()}.m4a`;
+      const permanentUri = `${FileSystem.documentDirectory}${fileName}`;
 
-            const vnId = await addVoiceNote({
-                title: vnTitle || "Voice Note",
-                uri: permanentUri,
-                date: vnDate.toLocaleDateString(),
-                time: vnDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                reminderDate: vnDate.toISOString(),
-                duration: recordingDuration
-            });
-        
-        // Schedule Notification
-        if (vnDate.getTime() > Date.now()) {
-            await scheduleVoiceNoteNotification(vnId, vnTitle || "Voice Note", vnDate);
-        }
+      // Move file from cache to permanent storage
+      await FileSystem.moveAsync({
+        from: recordedUri,
+        to: permanentUri,
+      });
 
-        setIsVoiceModalVisible(false);
-        setVnTitle("");
-        setRecordedUri(null);
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      const vnId = await addVoiceNote({
+        title: vnTitle || "Voice Note",
+        uri: permanentUri,
+        date: vnDate.toLocaleDateString(),
+        time: vnDate.toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+        reminderDate: vnDate.toISOString(),
+        duration: recordingDuration,
+      });
+
+      // Schedule Notification
+      if (vnDate.getTime() > Date.now()) {
+        await scheduleVoiceNoteNotification(
+          vnId,
+          vnTitle || "Voice Note",
+          vnDate,
+        );
+      }
+
+      setIsVoiceModalVisible(false);
+      setVnTitle("");
+      setRecordedUri(null);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (error) {
-        console.error("Failed to save voice note:", error);
-        Alert.alert("Save Failed", "Could not persist the audio mission.");
+      console.error("Failed to save voice note:", error);
+      Alert.alert("Save Failed", "Could not persist the audio mission.");
     }
   };
 
   const deleteVoice = (id: string, uri?: string) => {
     Alert.alert("Delete Note", "Remove this voice mission forever?", [
       { text: "Keep" },
-      { text: "Delete", style: 'destructive', onPress: async () => {
-        await deleteVoiceNote(id);
-        if (uri) {
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: async () => {
+          await deleteVoiceNote(id);
+          if (uri) {
             try {
-                // Ensure we delete the actual file
-                await FileSystem.deleteAsync(uri, { idempotent: true });
+              // Ensure we delete the actual file
+              const fileToDelete = new FileSystem.File(uri);
+              await fileToDelete.delete();
             } catch (err) {
-                console.warn("Failed to delete audio file:", err);
+              console.warn("Failed to delete audio file:", err);
             }
-        }
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      }}
+          }
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        },
+      },
     ]);
   };
-
-
 
   const productivityScore = useMemo(() => {
     if (todos.length === 0) return 0;
@@ -666,7 +724,11 @@ export default function TodoScreen() {
       <View style={styles.header}>
         <View>
           <Text style={[styles.title, { color: Colors.text }]}>
-            {mainTab === "todos" && isSelectionMode ? `${selectedIds.length} Selected` : (mainTab === "todos" ? "Focus" : "Notes")}
+            {mainTab === "todos" && isSelectionMode
+              ? `${selectedIds.length} Selected`
+              : mainTab === "todos"
+                ? "Focus"
+                : "Notes"}
           </Text>
           <View style={styles.scoreRow}>
             {mainTab === "todos" ? (
@@ -698,49 +760,49 @@ export default function TodoScreen() {
             )}
           </View>
         </View>
-        
-        <View style={{ flexDirection: 'row', gap: 10 }}>
-          {mainTab === "todos" && isSelectionMode ? (
+
+        <View style={{ flexDirection: "row", gap: 10 }}>
+          {mainTab === "todos" && isSelectionMode && (
             <>
-              <TouchableOpacity 
-                style={[styles.litAddBtn, { backgroundColor: Colors.card, borderWidth: 1, borderColor: Colors.primary }]} 
+              <TouchableOpacity
+                style={[
+                  styles.litAddBtn,
+                  {
+                    backgroundColor: Colors.card,
+                    borderWidth: 1,
+                    borderColor: Colors.primary,
+                  },
+                ]}
                 onPress={() => {
                   if (selectedIds.length === filteredTodos.length) {
                     setSelectedIds([]);
                   } else {
-                    setSelectedIds(filteredTodos.map(t => t.id));
+                    setSelectedIds(filteredTodos.map((t) => t.id));
                   }
                   Haptics.selectionAsync();
                 }}
               >
                 <CheckCircle2 color={Colors.primary} size={20} />
               </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.litAddBtn, { backgroundColor: Colors.card, borderWidth: 1, borderColor: Colors.border }]} 
+              <TouchableOpacity
+                style={[
+                  styles.litAddBtn,
+                  {
+                    backgroundColor: Colors.card,
+                    borderWidth: 1,
+                    borderColor: Colors.border,
+                  },
+                ]}
                 onPress={() => setSelectedIds([])}
               >
                 <X color={Colors.text} size={20} />
               </TouchableOpacity>
             </>
-          ) : (
-            <TouchableOpacity
-              style={[
-                styles.litAddBtn,
-                { backgroundColor: Colors.primary, shadowColor: Colors.primary },
-              ]}
-              onPress={() => {
-                if (mainTab === "todos") setIsModalVisible(true);
-                else if (mainTab === "notes") handleOpenNote();
-                else handleOpenHabitModal();
-              }}
-            >
-              <Plus color="#000" size={28} />
-            </TouchableOpacity>
           )}
         </View>
       </View>
 
-      <View style={[styles.mainTabContainer, { backgroundColor: Colors.background, borderColor: Colors.border }]}>
+      <View style={styles.mainTabContainer}>
         <TouchableOpacity
           onPress={() => setMainTab("todos")}
           style={[
@@ -810,38 +872,24 @@ export default function TodoScreen() {
             NOTES
           </Text>
         </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => setMainTab("sms")}
-          style={[
-            styles.mainTabBtn,
-            mainTab === "sms" && {
-              backgroundColor: Colors.card,
-              borderColor: Colors.primary,
-            },
-          ]}
-        >
-          <MessageSquare
-            size={18}
-            color={mainTab === "sms" ? Colors.primary : Colors.textMuted}
-          />
-          <Text
-            style={[
-              styles.mainTabText,
-              { color: mainTab === "sms" ? Colors.text : Colors.textMuted },
-            ]}
-          >
-            SMS
-          </Text>
-        </TouchableOpacity>
       </View>
 
       {mainTab === "todos" && (
         <View style={{ flex: 1 }}>
-          <View style={[styles.searchContainer, { flexDirection: 'row', alignItems: 'center', gap: 10 }]}>
+          <View
+            style={[
+              styles.searchContainer,
+              { flexDirection: "row", alignItems: "center", gap: 10 },
+            ]}
+          >
             <View
               style={[
                 styles.litSearchBox,
-                { backgroundColor: Colors.card, borderColor: Colors.border, flex: 1 },
+                {
+                  backgroundColor: Colors.card,
+                  borderColor: Colors.border,
+                  flex: 1,
+                },
               ]}
             >
               <Search size={20} color={Colors.primary} />
@@ -853,17 +901,27 @@ export default function TodoScreen() {
                 onChangeText={setSearchQuery}
               />
             </View>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={[
-                styles.starFilterBtn, 
-                { backgroundColor: selectedTab === 'starred' ? Colors.primary : Colors.card, borderColor: Colors.border }
+                styles.starFilterBtn,
+                {
+                  backgroundColor:
+                    selectedTab === "starred" ? Colors.primary : Colors.card,
+                  borderColor: Colors.border,
+                },
               ]}
-              onPress={() => setSelectedTab(selectedTab === 'starred' ? 'all' : 'starred')}
+              onPress={() =>
+                setSelectedTab(selectedTab === "starred" ? "all" : "starred")
+              }
             >
-              <Star 
-                size={22} 
-                color={selectedTab === 'starred' ? Colors.background : Colors.primary} 
-                fill={selectedTab === 'starred' ? Colors.background : "transparent"} 
+              <Star
+                size={22}
+                color={
+                  selectedTab === "starred" ? Colors.background : Colors.primary
+                }
+                fill={
+                  selectedTab === "starred" ? Colors.background : "transparent"
+                }
               />
             </TouchableOpacity>
           </View>
@@ -934,7 +992,10 @@ export default function TodoScreen() {
                 const catColor =
                   CATEGORIES.find((c) => c.id === item.category)?.color ||
                   Colors.primary;
-                const isOverdue = item.reminderDate && new Date(item.reminderDate).getTime() < Date.now() && !item.completed;
+                const isOverdue =
+                  item.reminderDate &&
+                  new Date(item.reminderDate).getTime() < Date.now() &&
+                  !item.completed;
 
                 return (
                   <TouchableOpacity
@@ -944,28 +1005,39 @@ export default function TodoScreen() {
                     style={[
                       styles.litCard,
                       {
-                        backgroundColor: isSelectionMode && selectedIds.includes(item.id) 
-                          ? Colors.primary 
-                          : Colors.card,
+                        backgroundColor:
+                          isSelectionMode && selectedIds.includes(item.id)
+                            ? Colors.primary
+                            : Colors.card,
                         borderColor: selectedIds.includes(item.id)
                           ? Colors.primary
-                          : (item.completed ? Colors.border : Colors.primary + "30"),
+                          : item.completed
+                            ? Colors.border
+                            : Colors.primary + "30",
                         borderWidth: selectedIds.includes(item.id) ? 2 : 1,
                         opacity: item.completed && !isSelectionMode ? 0.5 : 1,
-                        overflow: 'hidden',
+                        overflow: "hidden",
                       },
                     ]}
                   >
                     {isSelectionMode ? (
                       <View style={styles.litCheckContainer}>
-                        <View style={[
-                            styles.selectionCircle, 
-                            { 
-                                backgroundColor: selectedIds.includes(item.id) ? '#000' : 'transparent',
-                                borderColor: selectedIds.includes(item.id) ? '#000' : Colors.border
-                            }
-                        ]}>
-                           {selectedIds.includes(item.id) && <CheckCircle2 color={Colors.primary} size={18} />}
+                        <View
+                          style={[
+                            styles.selectionCircle,
+                            {
+                              backgroundColor: selectedIds.includes(item.id)
+                                ? "#000"
+                                : "transparent",
+                              borderColor: selectedIds.includes(item.id)
+                                ? "#000"
+                                : Colors.border,
+                            },
+                          ]}
+                        >
+                          {selectedIds.includes(item.id) && (
+                            <CheckCircle2 color={Colors.primary} size={18} />
+                          )}
                         </View>
                       </View>
                     ) : (
@@ -993,7 +1065,11 @@ export default function TodoScreen() {
                         <Text
                           style={[
                             styles.litText,
-                            { color: selectedIds.includes(item.id) ? "#000" : Colors.text },
+                            {
+                              color: selectedIds.includes(item.id)
+                                ? "#000"
+                                : Colors.text,
+                            },
                             item.completed && styles.litStrike,
                           ]}
                         >
@@ -1013,36 +1089,79 @@ export default function TodoScreen() {
                           <Star
                             size={16}
                             color={
-                              item.starred ? (selectedIds.includes(item.id) ? "#000" : Colors.primary) : (selectedIds.includes(item.id) ? "rgba(0,0,0,0.4)" : Colors.textMuted)
+                              item.starred
+                                ? selectedIds.includes(item.id)
+                                  ? "#000"
+                                  : Colors.primary
+                                : selectedIds.includes(item.id)
+                                  ? "rgba(0,0,0,0.4)"
+                                  : Colors.textMuted
                             }
-                            fill={item.starred ? (selectedIds.includes(item.id) ? "#000" : Colors.primary) : "transparent"}
+                            fill={
+                              item.starred
+                                ? selectedIds.includes(item.id)
+                                  ? "#000"
+                                  : Colors.primary
+                                : "transparent"
+                            }
                           />
                         </TouchableOpacity>
                       </View>
- 
+
                       <View style={styles.litMeta}>
                         <View
                           style={[
                             styles.litTag,
-                            { backgroundColor: selectedIds.includes(item.id) ? "rgba(0,0,0,0.1)" : catColor + "20" },
+                            {
+                              backgroundColor: selectedIds.includes(item.id)
+                                ? "rgba(0,0,0,0.1)"
+                                : catColor + "20",
+                            },
                           ]}
                         >
-                          <CategoryIcon size={10} color={selectedIds.includes(item.id) ? "#000" : catColor} />
+                          <CategoryIcon
+                            size={10}
+                            color={
+                              selectedIds.includes(item.id) ? "#000" : catColor
+                            }
+                          />
                           <Text
-                            style={[styles.litTagText, { color: selectedIds.includes(item.id) ? "#000" : catColor }]}
+                            style={[
+                              styles.litTagText,
+                              {
+                                color: selectedIds.includes(item.id)
+                                  ? "#000"
+                                  : catColor,
+                              },
+                            ]}
                           >
                             {item.category.toUpperCase()}
                           </Text>
                         </View>
-                        <View style={[styles.dot, { backgroundColor: selectedIds.includes(item.id) ? "rgba(0,0,0,0.3)" : "rgba(255,255,255,0.2)" }]} />
+                        <View
+                          style={[
+                            styles.dot,
+                            {
+                              backgroundColor: selectedIds.includes(item.id)
+                                ? "rgba(0,0,0,0.3)"
+                                : "rgba(255,255,255,0.2)",
+                            },
+                          ]}
+                        />
                         <Text
                           style={{
-                            color: isOverdue ? '#EF4444' : (selectedIds.includes(item.id) ? "#000" : Colors.textMuted),
+                            color: isOverdue
+                              ? "#EF4444"
+                              : selectedIds.includes(item.id)
+                                ? "#000"
+                                : Colors.textMuted,
                             fontSize: 10,
                             fontWeight: "700",
                           }}
                         >
-                          {isOverdue ? 'OVERDUE' : (item.time || item.date || "Today")}
+                          {isOverdue
+                            ? "OVERDUE"
+                            : item.time || item.date || "Today"}
                         </Text>
                       </View>
                     </View>
@@ -1050,37 +1169,15 @@ export default function TodoScreen() {
                 );
               })
             )}
-            <View style={{ marginTop: 20 }}>
-                <FlowBannerAd />
-            </View>
           </ScrollView>
 
-          {isSelectionMode ? (
-            <View style={[styles.bottomActionBar, { backgroundColor: Colors.card, borderTopColor: Colors.border, height: 80 + insets.bottom, paddingBottom: insets.bottom + 10 }]}>
-               <TouchableOpacity 
-                  style={[styles.batchBtn, { backgroundColor: Colors.primary }]} 
-                  onPress={() => {
-                      saveTodos(todos.map(t => selectedIds.includes(t.id) ? { ...t, completed: true } : t));
-                      setSelectedIds([]);
-                      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                  }}
-               >
-                  <CheckCircle2 color="#000" size={20} />
-                  <Text style={styles.batchBtnText}>MARK DONE</Text>
-               </TouchableOpacity>
-               
-               <TouchableOpacity 
-                  style={[styles.batchBtn, { backgroundColor: '#EF4444' }]} 
-                  onPress={deleteSelected}
-               >
-                  <Trash2 color="#fff" size={20} />
-                  <Text style={[styles.batchBtnText, { color: '#fff' }]}>DELETE</Text>
-               </TouchableOpacity>
-            </View>
-          ) : (
+          {!isSelectionMode && (
             <TouchableOpacity
               onPress={() => setIsModalVisible(true)}
-              style={[styles.mainFab, { backgroundColor: Colors.primary, bottom: 20 + insets.bottom }]}
+              style={[
+                styles.mainFab,
+                { backgroundColor: Colors.primary, bottom: 20 + insets.bottom },
+              ]}
             >
               <Plus size={32} color="#000" />
             </TouchableOpacity>
@@ -1091,469 +1188,786 @@ export default function TodoScreen() {
       {mainTab === "notes" && (
         <>
           <ScrollView
-          contentContainerStyle={styles.content}
-          showsVerticalScrollIndicator={false}
-        >
-          {filteredNotes.length === 0 ? (
-            <View style={[styles.empty, { marginTop: 60 }]}>
-              <StickyNote size={80} color={Colors.primary} opacity={0.2} />
-              <Text style={[styles.emptyTitle, { color: Colors.text }]}>
-                {searchQuery ? "No notes found matching search." : "Your thoughts, organized."}
-              </Text>
-              <Text style={[styles.emptySub, { color: Colors.textMuted }]}>
-                Capture ideas, reminders, and financial tips in your private
-                notes space.
-              </Text>
-              <TouchableOpacity
-                style={[styles.emptyBtn, { backgroundColor: Colors.primary }]}
-                onPress={() => handleOpenNote()}
-              >
-                <Plus size={20} color="#000" />
-                <Text style={{ fontWeight: "bold", color: "#000" }}>
-                  START WRITING
+            contentContainerStyle={styles.content}
+            showsVerticalScrollIndicator={false}
+          >
+            {filteredNotes.length === 0 ? (
+              <View style={[styles.empty, { marginTop: 60 }]}>
+                <StickyNote size={80} color={Colors.primary} opacity={0.2} />
+                <Text style={[styles.emptyTitle, { color: Colors.text }]}>
+                  {searchQuery
+                    ? "No notes found matching search."
+                    : "Your thoughts, organized."}
                 </Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <View style={styles.notesGrid}>
-              {filteredNotes.map((note, index) => {
-                const rotation = index % 2 === 0 ? '1.5deg' : '-1.5deg';
-                return (
-                  <TouchableOpacity
-                    key={note.id}
-                    style={[
-                      styles.noteCard,
-                      { 
-                        backgroundColor: note.color || "#FEFF9C",
-                        transform: [{ rotate: note.pinned ? '0deg' : rotation }]
-                      },
-                    ]}
-                    onPress={() => handleOpenNote(note)}
-                    onLongPress={() =>
-                      Alert.alert("Delete Note", "Are you sure?", [
-                        { text: "No" },
-                        { text: "Delete", onPress: () => deleteNote(note.id) },
-                      ])
-                    }
-                  >
-                    {/* Push Pin Visual */}
-                    <View style={styles.pushPinContainer}>
-                        <View style={[styles.pushPinHead, { backgroundColor: note.pinned ? '#EF4444' : '#94A3B8' }]}>
-                            <View style={styles.pushPinShine} />
+                <Text style={[styles.emptySub, { color: Colors.textMuted }]}>
+                  Capture ideas, reminders, and financial tips in your private
+                  notes space.
+                </Text>
+                <TouchableOpacity
+                  style={[styles.emptyBtn, { backgroundColor: Colors.primary }]}
+                  onPress={() => handleOpenNote()}
+                >
+                  <Plus size={20} color="#000" />
+                  <Text style={{ fontWeight: "bold", color: "#000" }}>
+                    START WRITING
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={styles.notesGrid}>
+                {filteredNotes.map((note, index) => {
+                  const rotation = index % 2 === 0 ? "1.5deg" : "-1.5deg";
+                  return (
+                    <TouchableOpacity
+                      key={note.id}
+                      style={[
+                        styles.noteCard,
+                        {
+                          backgroundColor: note.color || "#FEFF9C",
+                          transform: [
+                            { rotate: note.pinned ? "0deg" : rotation },
+                          ],
+                        },
+                      ]}
+                      onPress={() => handleOpenNote(note)}
+                      onLongPress={() =>
+                        Alert.alert("Delete Note", "Are you sure?", [
+                          { text: "No" },
+                          {
+                            text: "Delete",
+                            onPress: () => deleteNote(note.id),
+                          },
+                        ])
+                      }
+                    >
+                      {/* Push Pin Visual */}
+                      <View style={styles.pushPinContainer}>
+                        <View
+                          style={[
+                            styles.pushPinHead,
+                            {
+                              backgroundColor: note.pinned
+                                ? "#EF4444"
+                                : "#94A3B8",
+                            },
+                          ]}
+                        >
+                          <View style={styles.pushPinShine} />
                         </View>
                         <View style={styles.pushPinNeedle} />
-                    </View>
+                      </View>
 
-                    <View style={styles.noteCardHeader}>
+                      <View style={styles.noteCardHeader}>
+                        <Text
+                          style={[styles.noteTitle, { color: "#1E293B" }]}
+                          numberOfLines={1}
+                        >
+                          {note.title}
+                        </Text>
+                        {note.pinned && (
+                          <Pin size={12} color="#EF4444" fill="#EF4444" />
+                        )}
+                      </View>
+
                       <Text
-                        style={[styles.noteTitle, { color: "#1E293B" }]}
-                        numberOfLines={1}
+                        style={[styles.noteText, { color: "rgba(0,0,0,0.7)" }]}
+                        numberOfLines={5}
                       >
-                        {note.title}
+                        {note.text}
                       </Text>
-                      {note.pinned && <Pin size={12} color="#EF4444" fill="#EF4444" />}
-                    </View>
-                    
-                    <Text
-                      style={[styles.noteText, { color: "rgba(0,0,0,0.7)" }]}
-                      numberOfLines={5}
-                    >
-                      {note.text}
-                    </Text>
-                    
-                    <Text style={[styles.noteDate, { color: "rgba(0,0,0,0.4)" }]}>
-                      {note.date}
-                    </Text>
 
-                    {/* Corner Fold Effect Overlay */}
-                    <View style={[styles.cornerFold, { borderBottomColor: 'rgba(0,0,0,0.05)', borderLeftColor: 'rgba(0,0,0,0.05)' }]} />
-                    <View style={[styles.cornerFoldInner, { backgroundColor: 'rgba(0,0,0,0.1)' }]} />
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          )}
-
-          <View style={{ marginTop: 40, marginBottom: 20 }}>
-              <Text style={{ color: Colors.text, fontSize: 24, fontWeight: '900', letterSpacing: -1 }}>Voice Library</Text>
-              <Text style={{ color: Colors.textMuted, fontSize: 13, fontWeight: '600', marginTop: 4 }}>Your auditory missions and reminders</Text>
-          </View>
-
-          {voiceNotes.length === 0 ? (
-              <View style={[styles.empty, { marginTop: 20, backgroundColor: Colors.card, borderRadius: 24, padding: 30 }]}>
-                  <Mic size={50} color={Colors.primary} opacity={0.2} />
-                  <Text style={[styles.emptyTitle, { color: Colors.text, fontSize: 18 }]}>No Voice Notes</Text>
-                  <Text style={[styles.emptySub, { color: Colors.textMuted, fontSize: 12 }]}>
-                      Record a voice note to set a reminder.
-                  </Text>
-              </View>
-          ) : (
-              voiceNotes.map((vn) => {
-                  const isPlaying = isPlayingId === vn.id;
-                  const progress = isPlaying && playbackDuration > 0 ? (playbackPosition / playbackDuration) : 0;
-                  
-                  return (
-                      <View 
-                          key={vn.id} 
-                          style={[styles.voiceCard, { backgroundColor: Colors.card, borderColor: Colors.border, overflow: 'hidden' }]}
+                      <Text
+                        style={[styles.noteDate, { color: "rgba(0,0,0,0.4)" }]}
                       >
-                          {/* Playback Progress Overlay */}
-                          {isPlaying && (
-                              <View style={[styles.progressBackground, { width: `${progress * 100}%`, backgroundColor: Colors.primary + '15' }]} />
-                          )}
-                          
-                          <View style={styles.voiceCardLeft}>
-                              <TouchableOpacity 
-                                  style={[styles.playBtn, { backgroundColor: Colors.primary }]}
-                                  onPress={() => playVoiceNote(vn.uri, vn.id)}
-                              >
-                                  {isPlaying ? (
-                                      <Pause size={20} color="#000" />
-                                  ) : (
-                                      <Play size={20} color="#000" style={{ marginLeft: 3 }} />
-                                  )}
-                              </TouchableOpacity>
-                              <View style={{ flex: 1, marginLeft: 15 }}>
-                                  <Text style={{ color: Colors.text, fontSize: 16, fontWeight: '800' }} numberOfLines={1}>
-                                      {vn.title}
-                                  </Text>
-                                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
-                                      <Clock size={12} color={Colors.textMuted} />
-                                      <Text style={{ color: Colors.textMuted, fontSize: 11, fontWeight: '700' }}>
-                                          {vn.date} • {isPlaying ? `${formatTime(Math.floor(playbackPosition/1000))} / ${formatTime(Math.floor(playbackDuration/1000))}` : vn.time}
-                                      </Text>
-                                  </View>
-                              </View>
-                          </View>
-                          <TouchableOpacity onPress={() => deleteVoice(vn.id, vn.uri)}>
-                              <Trash2 size={18} color="#EF4444" opacity={0.8} />
-                          </TouchableOpacity>
-                      </View>
+                        {note.date}
+                      </Text>
+
+                      {/* Corner Fold Effect Overlay */}
+                      <View
+                        style={[
+                          styles.cornerFold,
+                          {
+                            borderBottomColor: "rgba(0,0,0,0.05)",
+                            borderLeftColor: "rgba(0,0,0,0.05)",
+                          },
+                        ]}
+                      />
+                      <View
+                        style={[
+                          styles.cornerFoldInner,
+                          { backgroundColor: "rgba(0,0,0,0.1)" },
+                        ]}
+                      />
+                    </TouchableOpacity>
                   );
-              })
-          )}
-          <View style={[styles.recordControls, { position: 'relative', marginTop: 40, paddingBottom: 20 + insets.bottom }]}>
-              <View style={[styles.recordingVisual, isRecording && { borderColor: '#EF4444', backgroundColor: '#EF444410' }]}>
-                  {isRecording ? (
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                          <View style={styles.pulseDot} />
-                          <Text style={{ color: '#EF4444', fontWeight: '900', fontSize: 16 }}>{formatTime(recordingDuration)}</Text>
+                })}
+              </View>
+            )}
+
+            <View style={{ marginTop: 40, marginBottom: 20 }}>
+              <Text
+                style={{
+                  color: Colors.text,
+                  fontSize: 24,
+                  fontWeight: "900",
+                  letterSpacing: -1,
+                }}
+              >
+                Voice Library
+              </Text>
+              <Text
+                style={{
+                  color: Colors.textMuted,
+                  fontSize: 13,
+                  fontWeight: "600",
+                  marginTop: 4,
+                }}
+              >
+                Your auditory missions and reminders
+              </Text>
+            </View>
+
+            {voiceNotes.length === 0 ? (
+              <View
+                style={[
+                  styles.empty,
+                  {
+                    marginTop: 20,
+                    backgroundColor: Colors.card,
+                    borderRadius: 24,
+                    padding: 30,
+                  },
+                ]}
+              >
+                <Mic size={50} color={Colors.primary} opacity={0.2} />
+                <Text
+                  style={[
+                    styles.emptyTitle,
+                    { color: Colors.text, fontSize: 18 },
+                  ]}
+                >
+                  No Voice Notes
+                </Text>
+                <Text
+                  style={[
+                    styles.emptySub,
+                    { color: Colors.textMuted, fontSize: 12 },
+                  ]}
+                >
+                  Record a voice note to set a reminder.
+                </Text>
+              </View>
+            ) : (
+              voiceNotes.map((vn) => {
+                const isPlaying = isPlayingId === vn.id;
+                const progress =
+                  isPlaying && playbackDuration > 0
+                    ? playbackPosition / playbackDuration
+                    : 0;
+
+                return (
+                  <View
+                    key={vn.id}
+                    style={[
+                      styles.voiceCard,
+                      {
+                        backgroundColor: Colors.card,
+                        borderColor: Colors.border,
+                        overflow: "hidden",
+                      },
+                    ]}
+                  >
+                    {/* Playback Progress Overlay */}
+                    {isPlaying && (
+                      <View
+                        style={[
+                          styles.progressBackground,
+                          {
+                            width: `${progress * 100}%`,
+                            backgroundColor: Colors.primary + "15",
+                          },
+                        ]}
+                      />
+                    )}
+
+                    <View style={styles.voiceCardLeft}>
+                      <TouchableOpacity
+                        style={[
+                          styles.playBtn,
+                          { backgroundColor: Colors.primary },
+                        ]}
+                        onPress={() => playVoiceNote(vn.uri, vn.id)}
+                      >
+                        {isPlaying ? (
+                          <Pause size={20} color="#000" />
+                        ) : (
+                          <Play
+                            size={20}
+                            color="#000"
+                            style={{ marginLeft: 3 }}
+                          />
+                        )}
+                      </TouchableOpacity>
+                      <View style={{ flex: 1, marginLeft: 15 }}>
+                        <Text
+                          style={{
+                            color: Colors.text,
+                            fontSize: 16,
+                            fontWeight: "800",
+                          }}
+                          numberOfLines={1}
+                        >
+                          {vn.title}
+                        </Text>
+                        <View
+                          style={{
+                            flexDirection: "row",
+                            alignItems: "center",
+                            gap: 6,
+                            marginTop: 4,
+                          }}
+                        >
+                          <Clock size={12} color={Colors.textMuted} />
+                          <Text
+                            style={{
+                              color: Colors.textMuted,
+                              fontSize: 11,
+                              fontWeight: "700",
+                            }}
+                          >
+                            {vn.date} •{" "}
+                            {isPlaying
+                              ? `${formatTime(Math.floor(playbackPosition / 1000))} / ${formatTime(Math.floor(playbackDuration / 1000))}`
+                              : vn.time}
+                          </Text>
+                        </View>
                       </View>
-                  ) : (
-                      <Text style={{ color: Colors.textMuted, fontWeight: '800', fontSize: 14 }}>READY TO CAPTURE</Text>
-                  )}
+                    </View>
+                    <TouchableOpacity
+                      onPress={() => deleteVoice(vn.id, vn.uri)}
+                    >
+                      <Trash2 size={18} color="#EF4444" opacity={0.8} />
+                    </TouchableOpacity>
+                  </View>
+                );
+              })
+            )}
+            <View
+              style={[
+                styles.recordControls,
+                {
+                  position: "relative",
+                  marginTop: 40,
+                  paddingBottom: 20 + insets.bottom,
+                },
+              ]}
+            >
+              <View
+                style={[
+                  styles.recordingVisual,
+                  isRecording && {
+                    borderColor: "#EF4444",
+                    backgroundColor: "#EF444410",
+                  },
+                ]}
+              >
+                {isRecording ? (
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 10,
+                    }}
+                  >
+                    <View style={styles.pulseDot} />
+                    <Text
+                      style={{
+                        color: "#EF4444",
+                        fontWeight: "900",
+                        fontSize: 16,
+                      }}
+                    >
+                      {formatTime(recordingDuration)}
+                    </Text>
+                  </View>
+                ) : (
+                  <Text
+                    style={{
+                      color: Colors.textMuted,
+                      fontWeight: "800",
+                      fontSize: 14,
+                    }}
+                  >
+                    READY TO CAPTURE
+                  </Text>
+                )}
               </View>
 
-              <TouchableOpacity 
-                  onLongPress={startRecording}
-                  onPressOut={stopRecording}
-                  activeOpacity={0.7}
-                  style={[styles.recordBtn, { backgroundColor: Colors.primary }, isRecording && { backgroundColor: '#EF4444', transform: [{ scale: 1.2 }] }]}
+              <TouchableOpacity
+                onLongPress={startRecording}
+                onPressOut={stopRecording}
+                activeOpacity={0.7}
+                style={[
+                  styles.recordBtn,
+                  { backgroundColor: Colors.primary },
+                  isRecording && {
+                    backgroundColor: "#EF4444",
+                    transform: [{ scale: 1.2 }],
+                  },
+                ]}
               >
-                  {isRecording ? <StopCircle size={36} color="#fff" /> : <Mic size={36} color="#fff" />}
+                {isRecording ? (
+                  <StopCircle size={36} color="#fff" />
+                ) : (
+                  <Mic size={36} color="#fff" />
+                )}
               </TouchableOpacity>
-              
-              <Text style={{ color: Colors.text, marginTop: 15, fontWeight: '900', fontSize: 12, letterSpacing: 1 }}>
-                  HOLD BUTTON TO RECORD
+
+              <Text
+                style={{
+                  color: Colors.text,
+                  marginTop: 15,
+                  fontWeight: "900",
+                  fontSize: 12,
+                  letterSpacing: 1,
+                }}
+              >
+                HOLD BUTTON TO RECORD
               </Text>
-          </View>
+            </View>
+          </ScrollView>
 
-          <View style={{ marginTop: 20 }}>
-              <FlowBannerAd />
-          </View>
-        </ScrollView>
-
-        <TouchableOpacity
-          onPress={() => handleOpenNote()}
-          style={[styles.mainFab, { backgroundColor: Colors.primary, bottom: 20 + insets.bottom }]}
-        >
-          <Plus size={32} color="#000" />
-        </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => handleOpenNote()}
+            style={[
+              styles.mainFab,
+              { backgroundColor: Colors.primary, bottom: 20 + insets.bottom },
+            ]}
+          >
+            <Plus size={32} color="#000" />
+          </TouchableOpacity>
         </>
       )}
 
       {mainTab === "habits" && (
         <>
           <ScrollView
-          contentContainerStyle={styles.content}
-          showsVerticalScrollIndicator={false}
-        >
-          <View
-            style={[
-              styles.levelCard,
-              {
+            contentContainerStyle={styles.content}
+            showsVerticalScrollIndicator={false}
+          >
+            <View
+              style={[
+                styles.levelCard,
+                {
+                  backgroundColor: Colors.card,
+                  borderColor: Colors.primary + "30",
+                },
+              ]}
+            >
+              <View style={styles.levelInfo}>
+                <Text style={[styles.levelSub, { color: Colors.primary }]}>
+                  YOUR STATUS: {level.icon}
+                </Text>
+                <Text style={[styles.levelTitle, { color: Colors.text }]}>
+                  {level.stage.toUpperCase()}
+                </Text>
+                <Text style={[styles.levelMsg, { color: Colors.textMuted }]}>
+                  {level.msg}
+                </Text>
+
+                <View style={styles.levelProgressRow}>
+                  <Zap size={10} color={Colors.primary} fill={Colors.primary} />
+                  <Text
+                    style={{
+                      color: Colors.text,
+                      fontSize: 10,
+                      fontWeight: "bold",
+                    }}
+                  >
+                    {totalMonthlyLogs} MONTHLY TICKS
+                  </Text>
+                </View>
+              </View>
+              <LottieView
+                source={require("@/assets/tomato_plant.json")}
+                style={styles.levelLottie}
+                autoPlay
+                loop
+                initialSegment={level.segments}
+              />
+            </View>
+
+            <View
+              style={{
+                marginBottom: 20,
                 backgroundColor: Colors.card,
-                borderColor: Colors.primary + "30",
-              },
+                padding: 18,
+                borderRadius: 16,
+                borderLeftWidth: 4,
+                borderLeftColor: Colors.primary,
+              }}
+            >
+              <Text
+                style={{
+                  color: Colors.textMuted,
+                  fontStyle: "italic",
+                  fontSize: 13,
+                  lineHeight: 20,
+                }}
+              >
+                "{dailyQuote.split(" - ")[0]}"
+              </Text>
+              <Text
+                style={{
+                  color: Colors.text,
+                  fontSize: 11,
+                  fontWeight: "900",
+                  marginTop: 10,
+                  textAlign: "right",
+                  letterSpacing: 0.5,
+                }}
+              >
+                — {dailyQuote.split(" - ")[1].toUpperCase()}
+              </Text>
+            </View>
+
+            {filteredHabits.length === 0 ? (
+              <View style={[styles.empty, { marginTop: 60 }]}>
+                <Activity size={80} color={Colors.primary} opacity={0.2} />
+                <Text style={[styles.emptyTitle, { color: Colors.text }]}>
+                  {searchQuery
+                    ? "No habits found matching search."
+                    : "Master Your Routine."}
+                </Text>
+                <Text style={[styles.emptySub, { color: Colors.textMuted }]}>
+                  Small daily wins lead to big financial freedom. Start a habit
+                  today.
+                </Text>
+                <TouchableOpacity
+                  style={[styles.emptyBtn, { backgroundColor: Colors.primary }]}
+                  onPress={() => handleOpenHabitModal()}
+                >
+                  <Plus size={20} color="#000" />
+                  <Text style={{ fontWeight: "bold", color: "#000" }}>
+                    ADD HABIT
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              filteredHabits.map((habit) => {
+                const today = new Date();
+                const todayYear = today.getFullYear();
+                const todayMonthStr = String(today.getMonth() + 1).padStart(
+                  2,
+                  "0",
+                );
+                const todayDayNum = today.getDate();
+                const daysInMonth = new Date(
+                  todayYear,
+                  today.getMonth() + 1,
+                  0,
+                ).getDate();
+                const currentMonthPrefix = `${todayYear}-${todayMonthStr}-`;
+                const Icon = HABIT_ICONS[habit.icon] || Zap;
+
+                return (
+                  <View
+                    key={habit.id}
+                    style={[
+                      styles.habitCard,
+                      {
+                        backgroundColor: Colors.card,
+                        borderColor: Colors.border,
+                      },
+                    ]}
+                  >
+                    <View style={styles.habitHeader}>
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          gap: 12,
+                        }}
+                      >
+                        <View
+                          style={[
+                            styles.habitIconBox,
+                            { backgroundColor: habit.color + "20" },
+                          ]}
+                        >
+                          <Icon size={18} color={habit.color} />
+                        </View>
+                        <View>
+                          <Text
+                            style={[styles.habitName, { color: Colors.text }]}
+                          >
+                            {habit.name}
+                          </Text>
+                          <View
+                            style={{
+                              flexDirection: "row",
+                              alignItems: "center",
+                              gap: 5,
+                              marginTop: 2,
+                            }}
+                          >
+                            <Text
+                              style={{
+                                color: Colors.textMuted,
+                                fontSize: 10,
+                                fontWeight: "800",
+                                letterSpacing: 0.5,
+                              }}
+                            >
+                              🔥 {getHabitStreak(habit.logs)} DAY STREAK
+                            </Text>
+                            {habit.reminderTime && (
+                              <>
+                                <View
+                                  style={{
+                                    width: 3,
+                                    height: 3,
+                                    borderRadius: 1.5,
+                                    backgroundColor: Colors.textMuted,
+                                    opacity: 0.5,
+                                  }}
+                                />
+                                <View
+                                  style={{
+                                    flexDirection: "row",
+                                    alignItems: "center",
+                                    gap: 3,
+                                  }}
+                                >
+                                  <Bell size={10} color={Colors.primary} />
+                                  <Text
+                                    style={{
+                                      color: Colors.primary,
+                                      fontSize: 10,
+                                      fontWeight: "900",
+                                    }}
+                                  >
+                                    {habit.reminderTime}
+                                  </Text>
+                                </View>
+                              </>
+                            )}
+                          </View>
+                        </View>
+                      </View>
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          gap: 15,
+                        }}
+                      >
+                        <TouchableOpacity
+                          onPress={() => handleOpenHabitModal(habit)}
+                        >
+                          <Edit2 size={16} color={Colors.textMuted} />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={async () => {
+                            Alert.alert(
+                              "Delete Habit",
+                              "Remove this habit and its daily reminders?",
+                              [
+                                { text: "Keep" },
+                                {
+                                  text: "Delete",
+                                  style: "destructive",
+                                  onPress: async () => {
+                                    deleteHabit(habit.id);
+                                    await cancelReminderNotification(habit.id);
+                                    Haptics.notificationAsync(
+                                      Haptics.NotificationFeedbackType.Warning,
+                                    );
+                                  },
+                                },
+                              ],
+                            );
+                          }}
+                        >
+                          <Trash2 size={16} color={Colors.textMuted} />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+
+                    <View style={styles.habitGrid}>
+                      {Array.from({ length: daysInMonth }).map((_, i) => {
+                        const day = i + 1;
+                        const dateStr = `${currentMonthPrefix}${day.toString().padStart(2, "0")}`;
+                        const isDone = habit.logs.includes(dateStr);
+                        const isToday = day === todayDayNum;
+                        const isPast = day < todayDayNum;
+                        const disabled = !isToday;
+
+                        return (
+                          <TouchableOpacity
+                            key={day}
+                            disabled={disabled}
+                            style={[
+                              styles.habitDay,
+                              {
+                                borderColor: isToday
+                                  ? Colors.primary
+                                  : Colors.border,
+                              },
+                              isToday &&
+                                !isDone && {
+                                  backgroundColor: Colors.primary + "15",
+                                },
+                              isDone && {
+                                backgroundColor: habit.color,
+                                borderColor: habit.color,
+                              },
+                            ]}
+                            onPress={() => toggleHabitDay(habit, dateStr)}
+                          >
+                            {isDone ? (
+                              <Text style={{ fontSize: 10 }}>😊</Text>
+                            ) : isPast ? (
+                              <Text style={{ fontSize: 10 }}>😵</Text>
+                            ) : (
+                              <Text
+                                style={[
+                                  styles.habitDayText,
+                                  {
+                                    color: isToday
+                                      ? Colors.primary
+                                      : Colors.textMuted,
+                                  },
+                                ]}
+                              >
+                                {day}
+                              </Text>
+                            )}
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+
+                    <View
+                      style={[
+                        styles.habitFooter,
+                        { flexDirection: "row", alignItems: "center" },
+                      ]}
+                    >
+                      <View style={{ flex: 1 }}>
+                        <Text
+                          style={[
+                            styles.habitStat,
+                            { color: Colors.textMuted, marginBottom: 6 },
+                          ]}
+                        >
+                          90-DAY MASTERY:{" "}
+                          <Text style={{ color: habit.color }}>
+                            {getHabitStreak(habit.logs)}
+                          </Text>{" "}
+                          / 90
+                        </Text>
+                        <View
+                          style={{
+                            width: "100%",
+                            height: 6,
+                            backgroundColor: Colors.border,
+                            borderRadius: 3,
+                            overflow: "hidden",
+                          }}
+                        >
+                          <View
+                            style={{
+                              width: `${Math.min((getHabitStreak(habit.logs) / 90) * 100, 100)}%`,
+                              height: "100%",
+                              backgroundColor: habit.color,
+                            }}
+                          />
+                        </View>
+                      </View>
+                      <View style={{ marginLeft: 20, alignItems: "flex-end" }}>
+                        <Text
+                          style={[
+                            styles.habitStat,
+                            { color: Colors.textMuted },
+                          ]}
+                        >
+                          SCORE:{" "}
+                          <Text style={{ color: habit.color, fontSize: 12 }}>
+                            {
+                              habit.logs.filter((l) =>
+                                l.startsWith(currentMonthPrefix),
+                              ).length
+                            }
+                          </Text>{" "}
+                          / {daysInMonth}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                );
+              })
+            )}
+          </ScrollView>
+
+          <TouchableOpacity
+            onPress={() => handleOpenHabitModal()}
+            style={[
+              styles.mainFab,
+              { backgroundColor: Colors.primary, bottom: 20 + insets.bottom },
             ]}
           >
-            <View style={styles.levelInfo}>
-              <Text style={[styles.levelSub, { color: Colors.primary }]}>
-                YOUR STATUS: {level.icon}
-              </Text>
-              <Text style={[styles.levelTitle, { color: Colors.text }]}>
-                {level.stage.toUpperCase()}
-              </Text>
-              <Text style={[styles.levelMsg, { color: Colors.textMuted }]}>
-                {level.msg}
-              </Text>
-
-              <View style={styles.levelProgressRow}>
-                <Zap size={10} color={Colors.primary} fill={Colors.primary} />
-                <Text
-                  style={{
-                    color: Colors.text,
-                    fontSize: 10,
-                    fontWeight: "bold",
-                  }}
-                >
-                  {totalMonthlyLogs} MONTHLY TICKS
-                </Text>
-              </View>
-            </View>
-            <LottieView
-              source={require("@/assets/tomato_plant.json")}
-              style={styles.levelLottie}
-              autoPlay
-              loop
-              initialSegment={level.segments}
-            />
-          </View>
-
-          <View style={{ marginBottom: 20, backgroundColor: Colors.card, padding: 18, borderRadius: 16, borderLeftWidth: 4, borderLeftColor: Colors.primary }}>
-            <Text style={{ color: Colors.textMuted, fontStyle: 'italic', fontSize: 13, lineHeight: 20 }}>
-              "{dailyQuote.split(' - ')[0]}"
-            </Text>
-            <Text style={{ color: Colors.text, fontSize: 11, fontWeight: '900', marginTop: 10, textAlign: 'right', letterSpacing: 0.5 }}>
-              — {dailyQuote.split(' - ')[1].toUpperCase()}
-            </Text>
-          </View>
-
-          {filteredHabits.length === 0 ? (
-            <View style={[styles.empty, { marginTop: 60 }]}>
-              <Activity size={80} color={Colors.primary} opacity={0.2} />
-              <Text style={[styles.emptyTitle, { color: Colors.text }]}>
-                {searchQuery ? "No habits found matching search." : "Master Your Routine."}
-              </Text>
-              <Text style={[styles.emptySub, { color: Colors.textMuted }]}>
-                Small daily wins lead to big financial freedom. Start a habit
-                today.
-              </Text>
-              <TouchableOpacity
-                style={[styles.emptyBtn, { backgroundColor: Colors.primary }]}
-                onPress={() => handleOpenHabitModal()}
-              >
-                <Plus size={20} color="#000" />
-                <Text style={{ fontWeight: "bold", color: "#000" }}>
-                  ADD HABIT
-                </Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            filteredHabits.map((habit) => {
-              const today = new Date();
-              const todayYear = today.getFullYear();
-              const todayMonthStr = String(today.getMonth() + 1).padStart(2, '0');
-              const todayDayNum = today.getDate();
-              const daysInMonth = new Date(todayYear, today.getMonth() + 1, 0).getDate();
-              const currentMonthPrefix = `${todayYear}-${todayMonthStr}-`;
-              const Icon = HABIT_ICONS[habit.icon] || Zap;
-
-              return (
-                <View
-                  key={habit.id}
-                  style={[
-                    styles.habitCard,
-                    {
-                      backgroundColor: Colors.card,
-                      borderColor: Colors.border,
-                    },
-                  ]}
-                >
-                  <View style={styles.habitHeader}>
-                    <View
-                      style={{
-                        flexDirection: "row",
-                        alignItems: "center",
-                        gap: 12,
-                      }}
-                    >
-                      <View
-                        style={[
-                          styles.habitIconBox,
-                          { backgroundColor: habit.color + "20" },
-                        ]}
-                      >
-                        <Icon size={18} color={habit.color} />
-                      </View>
-                      <View>
-                        <Text
-                          style={[styles.habitName, { color: Colors.text }]}
-                        >
-                          {habit.name}
-                        </Text>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 }}>
-                          <Text style={{color: Colors.textMuted, fontSize: 10, fontWeight: '800', letterSpacing: 0.5}}>
-                             🔥 {getHabitStreak(habit.logs)} DAY STREAK
-                          </Text>
-                          {habit.reminderTime && (
-                            <>
-                              <View style={{ width: 3, height: 3, borderRadius: 1.5, backgroundColor: Colors.textMuted, opacity: 0.5 }} />
-                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                                <Bell size={10} color={Colors.primary} />
-                                <Text style={{ color: Colors.primary, fontSize: 10, fontWeight: '900' }}>{habit.reminderTime}</Text>
-                              </View>
-                            </>
-                          )}
-                        </View>
-                      </View>
-                    </View>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 15 }}>
-                      <TouchableOpacity onPress={() => handleOpenHabitModal(habit)}>
-                        <Edit2 size={16} color={Colors.textMuted} />
-                      </TouchableOpacity>
-                      <TouchableOpacity onPress={async () => {
-                        Alert.alert("Delete Habit", "Remove this habit and its daily reminders?", [
-                          { text: "Keep" },
-                          { text: "Delete", style: 'destructive', onPress: async () => {
-                            deleteHabit(habit.id);
-                            await cancelReminderNotification(habit.id);
-                            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-                          }}
-                        ]);
-                      }}>
-                        <Trash2 size={16} color={Colors.textMuted} />
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-
-                  <View style={styles.habitGrid}>
-                    {Array.from({ length: daysInMonth }).map((_, i) => {
-                      const day = i + 1;
-                      const dateStr = `${currentMonthPrefix}${day.toString().padStart(2, "0")}`;
-                      const isDone = habit.logs.includes(dateStr);
-                      const isToday = day === todayDayNum;
-                      const isPast = day < todayDayNum;
-                      const disabled = !isToday;
-
-                      return (
-                        <TouchableOpacity
-                          key={day}
-                          disabled={disabled}
-                          style={[
-                            styles.habitDay,
-                            { borderColor: isToday ? Colors.primary : Colors.border },
-                            isToday && !isDone && { backgroundColor: Colors.primary + '15' },
-                            isDone && {
-                              backgroundColor: habit.color,
-                              borderColor: habit.color,
-                            },
-                          ]}
-                          onPress={() => toggleHabitDay(habit, dateStr)}
-                        >
-                          {isDone ? (
-                            <Text style={{ fontSize: 10 }}>😊</Text>
-                          ) : isPast ? (
-                            <Text style={{ fontSize: 10 }}>😵</Text>
-                          ) : (
-                            <Text
-                              style={[
-                                styles.habitDayText,
-                                { color: isToday ? Colors.primary : Colors.textMuted },
-                              ]}
-                            >
-                              {day}
-                            </Text>
-                          )}
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-
-                  <View style={[styles.habitFooter, { flexDirection: 'row', alignItems: 'center' }]}>
-                    <View style={{ flex: 1 }}>
-                        <Text style={[styles.habitStat, { color: Colors.textMuted, marginBottom: 6 }]}>
-                          90-DAY MASTERY: <Text style={{color: habit.color}}>{getHabitStreak(habit.logs)}</Text> / 90
-                        </Text>
-                        <View style={{ width: '100%', height: 6, backgroundColor: Colors.border, borderRadius: 3, overflow: 'hidden' }}>
-                            <View style={{ width: `${Math.min((getHabitStreak(habit.logs) / 90) * 100, 100)}%`, height: '100%', backgroundColor: habit.color }} />
-                        </View>
-                    </View>
-                    <View style={{ marginLeft: 20, alignItems: 'flex-end' }}>
-                        <Text style={[styles.habitStat, { color: Colors.textMuted }]}>
-                        SCORE:{" "}
-                        <Text style={{ color: habit.color, fontSize: 12 }}>
-                            {
-                            habit.logs.filter((l) =>
-                                l.startsWith(currentMonthPrefix),
-                            ).length
-                            }
-                        </Text>{" "}
-                        / {daysInMonth}
-                        </Text>
-                    </View>
-                  </View>
-                </View>
-              );
-            })
-          )}
-          <View style={{ marginTop: 20 }}>
-              <FlowBannerAd />
-          </View>
-        </ScrollView>
-
-        <TouchableOpacity
-          onPress={() => handleOpenHabitModal()}
-          style={[styles.mainFab, { backgroundColor: Colors.primary, bottom: 20 + insets.bottom }]}
-        >
-          <Plus size={32} color="#000" />
-        </TouchableOpacity>
+            <Plus size={32} color="#000" />
+          </TouchableOpacity>
         </>
-      )}
-
-      {mainTab === "sms" && (
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 }}>
-            <View style={{ width: 120, height: 120, borderRadius: 60, backgroundColor: Colors.primary + '10', justifyContent: 'center', alignItems: 'center', marginBottom: 25 }}>
-                <MessageSquare size={50} color={Colors.primary} />
-            </View>
-            <Text style={{ color: Colors.text, fontSize: 32, fontWeight: '900', letterSpacing: -1 }}>Coming Soon</Text>
-            <Text style={{ color: Colors.textMuted, fontSize: 16, textAlign: 'center', marginTop: 12, lineHeight: 24 }}>
-                AI-Powered SMS Parsing is on the way. Soon you'll be able to track expenses and bills automatically from your notifications.
-            </Text>
-            
-            <View style={{ marginTop: 50, width: '100%' }}>
-                <FlowBannerAd />
-            </View>
-        </View>
       )}
 
       <Modal visible={isModalVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <KeyboardAvoidingView 
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-            style={[styles.modalContent, { backgroundColor: Colors.card, borderColor: Colors.border }]}
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : undefined}
+            style={[
+              styles.modalContent,
+              { backgroundColor: Colors.card, borderColor: Colors.border },
+            ]}
           >
-            <ScrollView 
-              contentContainerStyle={{ flexGrow: 1, paddingBottom: 30 }} 
+            <ScrollView
+              contentContainerStyle={{ flexGrow: 1, paddingBottom: 30 }}
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
             >
               <View style={styles.modalHeader}>
                 <View>
-                  <Text style={{ color: Colors.text, fontSize: 24, fontWeight: "900", letterSpacing: -0.5 }}>
+                  <Text
+                    style={{
+                      color: Colors.text,
+                      fontSize: 24,
+                      fontWeight: "900",
+                      letterSpacing: -0.5,
+                    }}
+                  >
                     {editingTodoId ? "Edit Task" : "New Task"}
                   </Text>
-                  <Text style={{ color: Colors.textMuted, fontSize: 12, fontWeight: '600' }}>
+                  <Text
+                    style={{
+                      color: Colors.textMuted,
+                      fontSize: 12,
+                      fontWeight: "600",
+                    }}
+                  >
                     Plan your next daily mission
                   </Text>
                 </View>
-                <TouchableOpacity 
+                <TouchableOpacity
                   onPress={() => {
                     setIsModalVisible(false);
                     setEditingTodoId(null);
                     setTask("");
                   }}
-                  style={[styles.iconBtn, { backgroundColor: Colors.background }]}
+                  style={[
+                    styles.iconBtn,
+                    { backgroundColor: Colors.background },
+                  ]}
                 >
                   <X color={Colors.text} size={20} />
                 </TouchableOpacity>
@@ -1571,7 +1985,7 @@ export default function TodoScreen() {
                     fontSize: 18,
                     padding: 20,
                     borderRadius: 20,
-                    marginTop: 20
+                    marginTop: 20,
                   },
                 ]}
                 placeholder="What needs to be done?"
@@ -1589,13 +2003,19 @@ export default function TodoScreen() {
                       backgroundColor: Colors.background,
                       borderColor: Colors.border,
                       flex: 1,
-                      height: 50
+                      height: 50,
                     },
                   ]}
                   onPress={() => setShowDate(true)}
                 >
                   <Calendar size={16} color={Colors.primary} />
-                  <Text style={{ color: Colors.text, fontSize: 13, fontWeight: "700" }}>
+                  <Text
+                    style={{
+                      color: Colors.text,
+                      fontSize: 13,
+                      fontWeight: "700",
+                    }}
+                  >
                     {todoDate.toLocaleDateString()}
                   </Text>
                 </TouchableOpacity>
@@ -1606,13 +2026,19 @@ export default function TodoScreen() {
                       backgroundColor: Colors.background,
                       borderColor: Colors.border,
                       flex: 1,
-                      height: 50
+                      height: 50,
                     },
                   ]}
                   onPress={() => setShowTime(true)}
                 >
                   <Clock size={16} color={Colors.primary} />
-                  <Text style={{ color: Colors.text, fontSize: 13, fontWeight: "700" }}>
+                  <Text
+                    style={{
+                      color: Colors.text,
+                      fontSize: 13,
+                      fontWeight: "700",
+                    }}
+                  >
                     {todoDate.toLocaleTimeString([], {
                       hour: "2-digit",
                       minute: "2-digit",
@@ -1625,19 +2051,19 @@ export default function TodoScreen() {
                 <DateTimePicker
                   value={todoDate}
                   mode="date"
-                  display={Platform.OS === 'android' ? 'calendar' : 'default'}
+                  display={Platform.OS === "android" ? "calendar" : "default"}
                   onChange={(event, d) => {
-                    if (Platform.OS === 'android') {
+                    if (Platform.OS === "android") {
                       setShowDate(false);
                     }
-                    if (event.type === 'set' && d) {
+                    if (event.type === "set" && d) {
                       const next = new Date(todoDate);
                       next.setFullYear(d.getFullYear());
                       next.setMonth(d.getMonth());
                       next.setDate(d.getDate());
                       setTodoDate(next);
                     }
-                    if (Platform.OS === 'ios') {
+                    if (Platform.OS === "ios") {
                       setShowDate(false);
                     }
                   }}
@@ -1647,26 +2073,31 @@ export default function TodoScreen() {
                 <DateTimePicker
                   value={todoDate}
                   mode="time"
-                  display={Platform.OS === 'android' ? 'clock' : 'default'}
+                  display={Platform.OS === "android" ? "clock" : "default"}
                   is24Hour={false}
                   onChange={(event, d) => {
-                    if (Platform.OS === 'android') {
+                    if (Platform.OS === "android") {
                       setShowTime(false);
                     }
-                    if (event.type === 'set' && d) {
+                    if (event.type === "set" && d) {
                       const next = new Date(todoDate);
                       next.setHours(d.getHours());
                       next.setMinutes(d.getMinutes());
                       setTodoDate(next);
                     }
-                    if (Platform.OS === 'ios') {
+                    if (Platform.OS === "ios") {
                       setShowTime(false);
                     }
                   }}
                 />
               )}
 
-              <Text style={[styles.label, { color: Colors.textMuted, marginTop: 25 }]}>
+              <Text
+                style={[
+                  styles.label,
+                  { color: Colors.textMuted, marginTop: 25 },
+                ]}
+              >
                 ASSIGN CATEGORY
               </Text>
               <View style={[styles.catGrid, { marginBottom: 10 }]}>
@@ -1692,7 +2123,7 @@ export default function TodoScreen() {
                         color: cat === c.id ? c.color : Colors.textMuted,
                         fontSize: 11,
                         fontWeight: "900",
-                        marginTop: 4
+                        marginTop: 4,
                       }}
                     >
                       {c.label.toUpperCase()}
@@ -1705,15 +2136,32 @@ export default function TodoScreen() {
                 <TouchableOpacity
                   style={[
                     styles.importantToggle,
-                    { 
-                      backgroundColor: isStarred ? Colors.primary + '15' : Colors.background, 
-                      borderColor: isStarred ? Colors.primary : Colors.border 
-                    }
+                    {
+                      backgroundColor: isStarred
+                        ? Colors.primary + "15"
+                        : Colors.background,
+                      borderColor: isStarred ? Colors.primary : Colors.border,
+                    },
                   ]}
                   onPress={() => setIsStarred(!isStarred)}
                 >
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                    <View style={[styles.starIconBox, { backgroundColor: isStarred ? Colors.primary : Colors.border }]}>
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 12,
+                    }}
+                  >
+                    <View
+                      style={[
+                        styles.starIconBox,
+                        {
+                          backgroundColor: isStarred
+                            ? Colors.primary
+                            : Colors.border,
+                        },
+                      ]}
+                    >
                       <Star
                         size={18}
                         color={isStarred ? Colors.background : Colors.textMuted}
@@ -1721,25 +2169,57 @@ export default function TodoScreen() {
                       />
                     </View>
                     <View>
-                      <Text style={{ color: Colors.text, fontWeight: "900", fontSize: 14 }}>
+                      <Text
+                        style={{
+                          color: Colors.text,
+                          fontWeight: "900",
+                          fontSize: 14,
+                        }}
+                      >
                         MARK AS IMPORTANT
                       </Text>
-                      <Text style={{ color: Colors.textMuted, fontSize: 11, fontWeight: '600' }}>
+                      <Text
+                        style={{
+                          color: Colors.textMuted,
+                          fontSize: 11,
+                          fontWeight: "600",
+                        }}
+                      >
                         Prioritize this mission
                       </Text>
                     </View>
                   </View>
-                  <View style={[styles.checkDot, { borderColor: isStarred ? Colors.primary : Colors.border, backgroundColor: isStarred ? Colors.primary : 'transparent' }]} />
+                  <View
+                    style={[
+                      styles.checkDot,
+                      {
+                        borderColor: isStarred ? Colors.primary : Colors.border,
+                        backgroundColor: isStarred
+                          ? Colors.primary
+                          : "transparent",
+                      },
+                    ]}
+                  />
                 </TouchableOpacity>
               </View>
 
-              <TouchableOpacity style={[styles.saveBtn, { backgroundColor: Colors.primary, marginTop: 30 }]} onPress={addTodo}>
-                <Text style={{ color: Colors.background, fontSize: 18, fontWeight: '900' }}>
-                  {editingTodoId ? 'UPDATE MISSION' : 'DEPLOY MISSION'}
+              <TouchableOpacity
+                style={[
+                  styles.saveBtn,
+                  { backgroundColor: Colors.primary, marginTop: 30 },
+                ]}
+                onPress={addTodo}
+              >
+                <Text
+                  style={{
+                    color: Colors.background,
+                    fontSize: 18,
+                    fontWeight: "900",
+                  }}
+                >
+                  {editingTodoId ? "UPDATE MISSION" : "DEPLOY MISSION"}
                 </Text>
               </TouchableOpacity>
-
-              <FlowBannerAd />
             </ScrollView>
           </KeyboardAvoidingView>
         </View>
@@ -1946,26 +2426,46 @@ export default function TodoScreen() {
                   </Text>
                 </TouchableOpacity>
               )}
-              
-            <View style={{ marginTop: 20 }}>
-              <TouchableOpacity 
-                style={[
-                    styles.pickerBtn, 
-                    { backgroundColor: isNotePinned ? 'rgba(0,0,0,0.8)' : 'transparent', borderColor: 'rgba(0,0,0,0.8)', borderWidth: 2, padding: 15, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 }
-                ]}
-                onPress={() => setIsNotePinned(!isNotePinned)}
-              >
-                <Star size={18} color={isNotePinned ? "#FEFF9C" : "#000"} fill={isNotePinned ? "#FEFF9C" : "transparent"} />
-                <Text style={{ color: isNotePinned ? "#FEFF9C" : "#000", fontSize: 13, fontWeight: "700" }}>{isNotePinned ? "Pinned to Top" : "Pin to Top"}</Text>
-              </TouchableOpacity>
-            </View>
 
-            <View style={{ marginTop: 40 }}>
-              <FlowBannerAd />
-            </View>
-          </ScrollView>
-        </SafeAreaView>
-      </View>
+              <View style={{ marginTop: 20 }}>
+                <TouchableOpacity
+                  style={[
+                    styles.pickerBtn,
+                    {
+                      backgroundColor: isNotePinned
+                        ? "rgba(0,0,0,0.8)"
+                        : "transparent",
+                      borderColor: "rgba(0,0,0,0.8)",
+                      borderWidth: 2,
+                      padding: 15,
+                      borderRadius: 12,
+                      flexDirection: "row",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 10,
+                    },
+                  ]}
+                  onPress={() => setIsNotePinned(!isNotePinned)}
+                >
+                  <Star
+                    size={18}
+                    color={isNotePinned ? "#FEFF9C" : "#000"}
+                    fill={isNotePinned ? "#FEFF9C" : "transparent"}
+                  />
+                  <Text
+                    style={{
+                      color: isNotePinned ? "#FEFF9C" : "#000",
+                      fontSize: 13,
+                      fontWeight: "700",
+                    }}
+                  >
+                    {isNotePinned ? "Pinned to Top" : "Pin to Top"}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </SafeAreaView>
+        </View>
       </Modal>
 
       {/* Habit Modal */}
@@ -1973,261 +2473,443 @@ export default function TodoScreen() {
         <View
           style={[styles.modalOverlay, { backgroundColor: "rgba(0,0,0,0.85)" }]}
         >
-          <KeyboardAvoidingView 
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : undefined}
             style={[
               styles.modalContent,
               { backgroundColor: Colors.card, borderColor: Colors.border },
             ]}
           >
-            <ScrollView 
+            <ScrollView
               showsVerticalScrollIndicator={false}
               contentContainerStyle={{ paddingBottom: 30 }}
               keyboardShouldPersistTaps="handled"
             >
-            <View style={styles.modalHeader}>
-              <Text
-                style={{ color: Colors.text, fontSize: 24, fontWeight: "900" }}
-              >
-                {editingHabitId ? 'Edit Habit' : 'New Habit'}
-              </Text>
-              <TouchableOpacity onPress={() => {
-                  setIsHabitModalVisible(false);
-                  setEditingHabitId(null);
-                  setHName("");
-                  setHTime("");
-              }}>
-                <X color={Colors.text} size={24} />
-              </TouchableOpacity>
-            </View>
-
-            <TextInput
-              style={[
-                styles.input,
-                {
-                  backgroundColor: Colors.background,
-                  color: Colors.text,
-                  borderColor: Colors.border,
-                },
-              ]}
-              placeholder="E.g. Daily Exercise, Save 100..."
-              placeholderTextColor={Colors.textMuted}
-              value={hName}
-              onChangeText={setHName}
-            />
-
-            <Text style={[styles.label, { color: Colors.textMuted }]}>
-              PICK COLOR
-            </Text>
-            <View style={styles.catGrid}>
-              {[
-                "#FF7A00",
-                "#10B981",
-                "#3B82F6",
-                "#8B5CF6",
-                "#F43F5E",
-                "#EAB308",
-              ].map((c) => (
+              <View style={styles.modalHeader}>
+                <Text
+                  style={{
+                    color: Colors.text,
+                    fontSize: 24,
+                    fontWeight: "900",
+                  }}
+                >
+                  {editingHabitId ? "Edit Habit" : "New Habit"}
+                </Text>
                 <TouchableOpacity
-                  key={c}
-                  style={[
-                    styles.colorCircle,
-                    { backgroundColor: c },
-                    hColor === c && {
-                      borderWidth: 3,
-                      borderColor: Colors.text,
-                    },
-                  ]}
-                  onPress={() => setHColor(c)}
-                />
-              ))}
-            </View>
+                  onPress={() => {
+                    setIsHabitModalVisible(false);
+                    setEditingHabitId(null);
+                    setHName("");
+                    setHTime("");
+                  }}
+                >
+                  <X color={Colors.text} size={24} />
+                </TouchableOpacity>
+              </View>
 
-            <Text style={[styles.label, { color: Colors.textMuted }]}>
-              CHOOSE ICON
-            </Text>
-            <View style={styles.catGrid}>
-                {Object.keys(HABIT_ICONS).map(iconName => {
-                    const Icon = HABIT_ICONS[iconName];
-                    return (
-                        <TouchableOpacity 
-                            key={iconName}
-                            onPress={() => setHIcon(iconName)}
-                            style={[
-                                styles.catBtn, 
-                                hIcon === iconName && { backgroundColor: hColor + '15', borderColor: hColor },
-                                { borderColor: Colors.border }
-                            ]}
-                        >
-                            <Icon size={20} color={hIcon === iconName ? hColor : Colors.textMuted} />
-                        </TouchableOpacity>
-                    );
-                })}
-            </View>
+              <FlowBannerAd />
 
-            <Text style={[styles.label, { color: Colors.textMuted }]}>
-              DAILY REMINDER
-            </Text>
-            <TouchableOpacity 
-                style={[styles.pickerBtn, { borderColor: Colors.border, borderWidth: 1, padding: 15, borderRadius: 12, marginTop: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]} 
-                onPress={() => setShowHTime(true)}
-            >
-                <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
-                    <Bell size={20} color={hTime ? Colors.primary : Colors.textMuted} />
-                    <Text style={{ color: hTime ? Colors.text : Colors.textMuted, fontWeight: '700' }}>
-                        {hTime ? `Reminder: ${hTime}` : 'No Daily Reminder'}
-                    </Text>
-                </View>
-                {hTime && <TouchableOpacity onPress={() => setHTime('')}><X size={16} color={Colors.textMuted} /></TouchableOpacity>}
-            </TouchableOpacity>
+              <TextInput
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: Colors.background,
+                    color: Colors.text,
+                    borderColor: Colors.border,
+                  },
+                ]}
+                placeholder="E.g. Daily Exercise, Save 100..."
+                placeholderTextColor={Colors.textMuted}
+                value={hName}
+                onChangeText={setHName}
+              />
 
-            {showHTime && (
-                <DateTimePicker
-                    value={new Date()}
-                    mode="time"
-                    is24Hour={false}
-                    display={Platform.OS === 'android' ? 'clock' : 'default'}
-                    onChange={(event, d) => {
-                        if (Platform.OS === 'android') {
-                            setShowHTime(false);
-                        }
-                        if (event.type === 'set' && d) {
-                            const hours = d.getHours().toString().padStart(2, '0');
-                            const minutes = d.getMinutes().toString().padStart(2, '0');
-                            setHTime(`${hours}:${minutes}`);
-                        }
-                        if (Platform.OS === 'ios') {
-                            setShowHTime(false);
-                        }
-                    }}
-                />
-            )}
-
-            <TouchableOpacity style={[styles.saveBtn, { backgroundColor: Colors.primary, marginTop: 30 }]} onPress={handleCreateHabit}>
-              <Text style={{ color: Colors.background, fontSize: 18, fontWeight: '900' }}>
-                {editingHabitId ? 'Update Evolution' : 'Start Evolution'}
+              <Text style={[styles.label, { color: Colors.textMuted }]}>
+                PICK COLOR
               </Text>
-            </TouchableOpacity>
+              <View style={styles.catGrid}>
+                {[
+                  "#FF7A00",
+                  "#10B981",
+                  "#3B82F6",
+                  "#8B5CF6",
+                  "#F43F5E",
+                  "#EAB308",
+                ].map((c) => (
+                  <TouchableOpacity
+                    key={c}
+                    style={[
+                      styles.colorCircle,
+                      { backgroundColor: c },
+                      hColor === c && {
+                        borderWidth: 3,
+                        borderColor: Colors.text,
+                      },
+                    ]}
+                    onPress={() => setHColor(c)}
+                  />
+                ))}
+              </View>
 
-            <FlowBannerAd />
+              <Text style={[styles.label, { color: Colors.textMuted }]}>
+                CHOOSE ICON
+              </Text>
+              <View style={styles.catGrid}>
+                {Object.keys(HABIT_ICONS).map((iconName) => {
+                  const Icon = HABIT_ICONS[iconName];
+                  return (
+                    <TouchableOpacity
+                      key={iconName}
+                      onPress={() => setHIcon(iconName)}
+                      style={[
+                        styles.catBtn,
+                        hIcon === iconName && {
+                          backgroundColor: hColor + "15",
+                          borderColor: hColor,
+                        },
+                        { borderColor: Colors.border },
+                      ]}
+                    >
+                      <Icon
+                        size={20}
+                        color={hIcon === iconName ? hColor : Colors.textMuted}
+                      />
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              <Text style={[styles.label, { color: Colors.textMuted }]}>
+                DAILY REMINDER
+              </Text>
+              <TouchableOpacity
+                style={[
+                  styles.pickerBtn,
+                  {
+                    borderColor: Colors.border,
+                    borderWidth: 1,
+                    padding: 15,
+                    borderRadius: 12,
+                    marginTop: 10,
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  },
+                ]}
+                onPress={() => setShowHTime(true)}
+              >
+                <View
+                  style={{
+                    flexDirection: "row",
+                    gap: 10,
+                    alignItems: "center",
+                  }}
+                >
+                  <Bell
+                    size={20}
+                    color={hTime ? Colors.primary : Colors.textMuted}
+                  />
+                  <Text
+                    style={{
+                      color: hTime ? Colors.text : Colors.textMuted,
+                      fontWeight: "700",
+                    }}
+                  >
+                    {hTime ? `Reminder: ${hTime}` : "No Daily Reminder"}
+                  </Text>
+                </View>
+                {hTime && (
+                  <TouchableOpacity onPress={() => setHTime("")}>
+                    <X size={16} color={Colors.textMuted} />
+                  </TouchableOpacity>
+                )}
+              </TouchableOpacity>
+
+              {showHTime && (
+                <DateTimePicker
+                  value={new Date()}
+                  mode="time"
+                  is24Hour={false}
+                  display={Platform.OS === "android" ? "clock" : "default"}
+                  onChange={(event, d) => {
+                    if (Platform.OS === "android") {
+                      setShowHTime(false);
+                    }
+                    if (event.type === "set" && d) {
+                      const hours = d.getHours().toString().padStart(2, "0");
+                      const minutes = d
+                        .getMinutes()
+                        .toString()
+                        .padStart(2, "0");
+                      setHTime(`${hours}:${minutes}`);
+                    }
+                    if (Platform.OS === "ios") {
+                      setShowHTime(false);
+                    }
+                  }}
+                />
+              )}
+
+              <TouchableOpacity
+                style={[
+                  styles.saveBtn,
+                  { backgroundColor: Colors.primary, marginTop: 30 },
+                ]}
+                onPress={handleCreateHabit}
+              >
+                <Text
+                  style={{
+                    color: Colors.background,
+                    fontSize: 18,
+                    fontWeight: "900",
+                  }}
+                >
+                  {editingHabitId ? "Update Evolution" : "Start Evolution"}
+                </Text>
+              </TouchableOpacity>
             </ScrollView>
           </KeyboardAvoidingView>
         </View>
       </Modal>
 
       <Modal visible={isVoiceModalVisible} animationType="fade" transparent>
-        <View style={[styles.modalOverlay, { backgroundColor: 'rgba(0,0,0,0.7)' }]}>
-          <KeyboardAvoidingView 
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-            style={{ width: '100%', alignItems: 'center' }}
+        <View
+          style={[styles.modalOverlay, { backgroundColor: "rgba(0,0,0,0.7)" }]}
+        >
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : undefined}
+            style={{ width: "100%", alignItems: "center" }}
           >
-              <View style={[styles.premiumCard, { backgroundColor: Colors.card, borderColor: Colors.border }]}>
-                {/* Decorative Accent */}
-                <View style={[styles.cardTopAccent, { backgroundColor: Colors.primary }]} />
-                
-                <View style={styles.modalHeader}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                    <View style={[styles.iconCircle, { backgroundColor: Colors.primary + '20' }]}>
-                      <Mic size={20} color={Colors.primary} />
-                    </View>
-                    <View>
-                      <Text style={[styles.modalTitle, { color: Colors.text }]}>Mission Captured</Text>
-                      <Text style={{ color: Colors.textMuted, fontSize: 12, fontWeight: '600' }}>Review and schedule your recording</Text>
-                    </View>
-                  </View>
-                  <TouchableOpacity 
-                    onPress={() => setIsVoiceModalVisible(false)}
-                    style={styles.closeBtn}
-                  >
-                    <X size={20} color={Colors.textMuted} />
-                  </TouchableOpacity>
-                </View>
+            <View
+              style={[
+                styles.premiumCard,
+                { backgroundColor: Colors.card, borderColor: Colors.border },
+              ]}
+            >
+              {/* Decorative Accent */}
+              <View
+                style={[
+                  styles.cardTopAccent,
+                  { backgroundColor: Colors.primary },
+                ]}
+              />
 
-                <FlowBannerAd />
-
-                <ScrollView 
-                  showsVerticalScrollIndicator={false}
-                  contentContainerStyle={{ paddingBottom: 20 }}
+              <View style={styles.modalHeader}>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 12,
+                  }}
                 >
-                  <View style={styles.previewSection}>
-                      <View style={[styles.durationBadge, { position: 'relative', bottom: 0, marginBottom: 12, backgroundColor: Colors.primary + '20', borderColor: Colors.primary }]}>
-                         <Text style={[styles.durationText, { color: Colors.primary }]}>
-                            {isPlayingId === 'preview' 
-                                ? `${formatTime(Math.floor(playbackPosition/1000))} / ${formatTime(Math.floor(playbackDuration/1000))}`
-                                : formatTime(recordingDuration)}
-                         </Text>
-                      </View>
-                      <View style={{ width: '80%', height: 4, backgroundColor: Colors.border, borderRadius: 2, marginBottom: 20, overflow: 'hidden' }}>
-                          <View style={{ 
-                              width: isPlayingId === 'preview' && playbackDuration > 0 ? `${(playbackPosition / playbackDuration) * 100}%` : '0%', 
-                              height: '100%', 
-                              backgroundColor: Colors.primary 
-                          }} />
-                      </View>
-                      <TouchableOpacity 
-                        onPress={() => recordedUri && playVoiceNote(recordedUri, 'preview')}
-                        style={[styles.playBtnLarge, { backgroundColor: Colors.primary }]}
-                        activeOpacity={0.8}
-                      >
-                          {isPlayingId === 'preview' ? (
-                              <Pause size={32} color="#000" fill="#000" />
-                          ) : (
-                              <Play size={32} color="#000" fill="#000" />
-                          )}
-                      </TouchableOpacity>
-                      <Text style={{ color: Colors.text, marginTop: 15, fontWeight: '800', fontSize: 13 }}>AUDITORY MISSION PREVIEW</Text>
+                  <View
+                    style={[
+                      styles.iconCircle,
+                      { backgroundColor: Colors.primary + "20" },
+                    ]}
+                  >
+                    <Mic size={20} color={Colors.primary} />
                   </View>
+                  <View>
+                    <Text style={[styles.modalTitle, { color: Colors.text }]}>
+                      Mission Captured
+                    </Text>
+                    <Text
+                      style={{
+                        color: Colors.textMuted,
+                        fontSize: 12,
+                        fontWeight: "600",
+                      }}
+                    >
+                      Review and schedule your recording
+                    </Text>
+                  </View>
+                </View>
+                <TouchableOpacity
+                  onPress={() => setIsVoiceModalVisible(false)}
+                  style={styles.closeBtn}
+                >
+                  <X size={20} color={Colors.textMuted} />
+                </TouchableOpacity>
+              </View>
 
-                  <View style={styles.formGroup}>
-                    <Text style={[styles.inputLabel, { color: Colors.textMuted }]}>MISSION TITLE</Text>
-                    <TextInput
-                      style={[styles.premiumInput, { backgroundColor: Colors.background, color: Colors.text, borderColor: Colors.border }]}
-                      placeholder="Give your mission a name..."
-                      placeholderTextColor={Colors.textMuted + '80'}
-                      value={vnTitle}
-                      onChangeText={setVnTitle}
+              <FlowBannerAd />
+
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ paddingBottom: 20 }}
+              >
+                <View style={styles.previewSection}>
+                  <View
+                    style={[
+                      styles.durationBadge,
+                      {
+                        position: "relative",
+                        bottom: 0,
+                        marginBottom: 12,
+                        backgroundColor: Colors.primary + "20",
+                        borderColor: Colors.primary,
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[styles.durationText, { color: Colors.primary }]}
+                    >
+                      {isPlayingId === "preview"
+                        ? `${formatTime(Math.floor(playbackPosition / 1000))} / ${formatTime(Math.floor(playbackDuration / 1000))}`
+                        : formatTime(recordingDuration)}
+                    </Text>
+                  </View>
+                  <View
+                    style={{
+                      width: "80%",
+                      height: 4,
+                      backgroundColor: Colors.border,
+                      borderRadius: 2,
+                      marginBottom: 20,
+                      overflow: "hidden",
+                    }}
+                  >
+                    <View
+                      style={{
+                        width:
+                          isPlayingId === "preview" && playbackDuration > 0
+                            ? `${(playbackPosition / playbackDuration) * 100}%`
+                            : "0%",
+                        height: "100%",
+                        backgroundColor: Colors.primary,
+                      }}
                     />
                   </View>
-
-                  <View style={styles.formGroup}>
-                    <Text style={[styles.inputLabel, { color: Colors.textMuted }]}>REMINDER SCHEDULE</Text>
-                    <View style={{ flexDirection: 'row', gap: 12 }}>
-                        <TouchableOpacity 
-                            onPress={() => setShowVnDate(true)}
-                            style={[styles.premiumPicker, { backgroundColor: Colors.background, borderColor: Colors.border }]}
-                        >
-                            <Calendar size={18} color={Colors.primary} />
-                            <Text style={{ color: Colors.text, fontWeight: '700', fontSize: 13 }}>{vnDate.toLocaleDateString()}</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity 
-                            onPress={() => setShowVnTime(true)}
-                            style={[styles.premiumPicker, { backgroundColor: Colors.background, borderColor: Colors.border }]}
-                        >
-                            <Clock size={18} color={Colors.primary} />
-                            <Text style={{ color: Colors.text, fontWeight: '700', fontSize: 13 }}>{vnDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text>
-                        </TouchableOpacity>
-                    </View>
-                  </View>
-
                   <TouchableOpacity
-                    style={[styles.mainActionBtn, { backgroundColor: Colors.primary }]}
-                    onPress={handleSaveVoiceNote}
-                    activeOpacity={0.9}
+                    onPress={() =>
+                      recordedUri && playVoiceNote(recordedUri, "preview")
+                    }
+                    style={[
+                      styles.playBtnLarge,
+                      { backgroundColor: Colors.primary },
+                    ]}
+                    activeOpacity={0.8}
                   >
-                    <CheckCircle2 size={22} color="#000" />
-                    <Text style={styles.mainActionText}>SAVE VOICE MISSION</Text>
+                    {isPlayingId === "preview" ? (
+                      <Pause size={32} color="#000" fill="#000" />
+                    ) : (
+                      <Play size={32} color="#000" fill="#000" />
+                    )}
                   </TouchableOpacity>
-                  
-                  <TouchableOpacity 
-                    style={styles.cancelBtn}
-                    onPress={() => setIsVoiceModalVisible(false)}
+                  <Text
+                    style={{
+                      color: Colors.text,
+                      marginTop: 15,
+                      fontWeight: "800",
+                      fontSize: 13,
+                    }}
                   >
-                    <Text style={{ color: Colors.textMuted, fontWeight: '700' }}>DISCARD RECORDING</Text>
-                  </TouchableOpacity>
-                </ScrollView>
-              </View>
-            </KeyboardAvoidingView>
-          </View>
+                    AUDITORY MISSION PREVIEW
+                  </Text>
+                </View>
+
+                <View style={styles.formGroup}>
+                  <Text
+                    style={[styles.inputLabel, { color: Colors.textMuted }]}
+                  >
+                    MISSION TITLE
+                  </Text>
+                  <TextInput
+                    style={[
+                      styles.premiumInput,
+                      {
+                        backgroundColor: Colors.background,
+                        color: Colors.text,
+                        borderColor: Colors.border,
+                      },
+                    ]}
+                    placeholder="Give your mission a name..."
+                    placeholderTextColor={Colors.textMuted + "80"}
+                    value={vnTitle}
+                    onChangeText={setVnTitle}
+                  />
+                </View>
+
+                <View style={styles.formGroup}>
+                  <Text
+                    style={[styles.inputLabel, { color: Colors.textMuted }]}
+                  >
+                    REMINDER SCHEDULE
+                  </Text>
+                  <View style={{ flexDirection: "row", gap: 12 }}>
+                    <TouchableOpacity
+                      onPress={() => setShowVnDate(true)}
+                      style={[
+                        styles.premiumPicker,
+                        {
+                          backgroundColor: Colors.background,
+                          borderColor: Colors.border,
+                        },
+                      ]}
+                    >
+                      <Calendar size={18} color={Colors.primary} />
+                      <Text
+                        style={{
+                          color: Colors.text,
+                          fontWeight: "700",
+                          fontSize: 13,
+                        }}
+                      >
+                        {vnDate.toLocaleDateString()}
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => setShowVnTime(true)}
+                      style={[
+                        styles.premiumPicker,
+                        {
+                          backgroundColor: Colors.background,
+                          borderColor: Colors.border,
+                        },
+                      ]}
+                    >
+                      <Clock size={18} color={Colors.primary} />
+                      <Text
+                        style={{
+                          color: Colors.text,
+                          fontWeight: "700",
+                          fontSize: 13,
+                        }}
+                      >
+                        {vnDate.toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                <TouchableOpacity
+                  style={[
+                    styles.mainActionBtn,
+                    { backgroundColor: Colors.primary },
+                  ]}
+                  onPress={handleSaveVoiceNote}
+                  activeOpacity={0.9}
+                >
+                  <CheckCircle2 size={22} color="#000" />
+                  <Text style={styles.mainActionText}>SAVE VOICE MISSION</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.cancelBtn}
+                  onPress={() => setIsVoiceModalVisible(false)}
+                >
+                  <Text style={{ color: Colors.textMuted, fontWeight: "700" }}>
+                    DISCARD RECORDING
+                  </Text>
+                </TouchableOpacity>
+              </ScrollView>
+            </View>
+          </KeyboardAvoidingView>
+        </View>
       </Modal>
     </SafeAreaView>
   );
@@ -2264,11 +2946,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     marginHorizontal: 20,
     marginBottom: 20,
-    backgroundColor: ThemeColors.card,
-    padding: 6,
+    padding: 2,
     borderRadius: 18,
-    borderWidth: 1,
-    borderColor: ThemeColors.border,
   },
   mainTabBtn: {
     flex: 1,
@@ -2301,7 +2980,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   litTabText: { fontSize: 11, fontWeight: "900", letterSpacing: 1 },
-  content: { padding: 20, paddingBottom: 130 },
+  content: { padding: 20, paddingBottom: 100 },
   litCard: {
     flexDirection: "row",
     alignItems: "center",
@@ -2381,14 +3060,14 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 4,
     marginBottom: 10,
-    overflow: 'visible',
+    overflow: "visible",
   },
   pushPinContainer: {
-    position: 'absolute',
+    position: "absolute",
     top: -10,
-    left: '50%',
+    left: "50%",
     marginLeft: -6,
-    alignItems: 'center',
+    alignItems: "center",
     zIndex: 10,
   },
   pushPinHead: {
@@ -2396,7 +3075,7 @@ const styles = StyleSheet.create({
     height: 12,
     borderRadius: 6,
     elevation: 4,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 2,
@@ -2405,32 +3084,32 @@ const styles = StyleSheet.create({
     width: 3,
     height: 3,
     borderRadius: 1.5,
-    backgroundColor: 'rgba(255,255,255,0.5)',
-    position: 'absolute',
+    backgroundColor: "rgba(255,255,255,0.5)",
+    position: "absolute",
     top: 2,
     left: 3,
   },
   pushPinNeedle: {
     width: 1.5,
     height: 10,
-    backgroundColor: '#64748B',
+    backgroundColor: "#64748B",
     marginTop: -2,
   },
   cornerFold: {
-    position: 'absolute',
+    position: "absolute",
     bottom: 0,
     right: 0,
     width: 0,
     height: 0,
-    backgroundColor: 'transparent',
-    borderStyle: 'solid',
+    backgroundColor: "transparent",
+    borderStyle: "solid",
     borderRightWidth: 25,
     borderTopWidth: 25,
-    borderRightColor: 'transparent',
-    borderTopColor: 'transparent',
+    borderRightColor: "transparent",
+    borderTopColor: "transparent",
   },
   cornerFoldInner: {
-    position: 'absolute',
+    position: "absolute",
     bottom: 0,
     right: 0,
     width: 25,
@@ -2444,7 +3123,13 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   noteTitle: { fontSize: 15, fontWeight: "900", flex: 1, letterSpacing: -0.3 },
-  noteText: { fontSize: 13, lineHeight: 20, fontWeight: "600", marginTop: 2, flex: 1 },
+  noteText: {
+    fontSize: 13,
+    lineHeight: 20,
+    fontWeight: "600",
+    marginTop: 2,
+    flex: 1,
+  },
   noteDate: {
     fontSize: 9,
     fontWeight: "800",
@@ -2455,12 +3140,12 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.7)",
     justifyContent: "center",
-    alignItems: 'center',
+    alignItems: "center",
   },
   modalContent: {
     flex: 1,
     padding: 24,
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    paddingTop: Platform.OS === "ios" ? 60 : 40,
   },
   modalHeader: {
     flexDirection: "row",
@@ -2476,21 +3161,21 @@ const styles = StyleSheet.create({
   },
   modalTitle: { fontSize: 20, fontWeight: "900", letterSpacing: -0.5 },
   premiumCard: {
-    width: '92%',
-    maxHeight: '85%',
+    width: "92%",
+    maxHeight: "85%",
     borderRadius: 32,
     borderWidth: 1.5,
     padding: 24,
     paddingTop: 30,
-    overflow: 'hidden',
+    overflow: "hidden",
     elevation: 25,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 15 },
     shadowOpacity: 0.4,
     shadowRadius: 20,
   },
   cardTopAccent: {
-    position: 'absolute',
+    position: "absolute",
     top: 0,
     left: 0,
     right: 0,
@@ -2500,35 +3185,35 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   closeBtn: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: 'rgba(0,0,0,0.05)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "rgba(0,0,0,0.05)",
+    justifyContent: "center",
+    alignItems: "center",
   },
   previewSection: {
-    alignItems: 'center',
+    alignItems: "center",
     marginVertical: 30,
   },
   durationBadge: {
-    position: 'absolute',
+    position: "absolute",
     bottom: -10,
-    backgroundColor: '#000',
+    backgroundColor: "#000",
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
+    borderColor: "rgba(255,255,255,0.2)",
   },
   durationText: {
-    color: '#FFF',
+    color: "#FFF",
     fontSize: 12,
-    fontWeight: '900',
+    fontWeight: "900",
   },
   formGroup: {
     marginBottom: 20,
@@ -2542,39 +3227,45 @@ const styles = StyleSheet.create({
   },
   premiumPicker: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 10,
     padding: 16,
     borderRadius: 20,
     borderWidth: 1.5,
   },
   mainActionBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     gap: 12,
     height: 64,
     borderRadius: 24,
     marginTop: 10,
     elevation: 8,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 8,
   },
   mainActionText: {
-    color: '#000',
-    fontWeight: '900',
+    color: "#000",
+    fontWeight: "900",
     fontSize: 16,
     letterSpacing: 0.5,
   },
   cancelBtn: {
-    alignItems: 'center',
+    alignItems: "center",
     padding: 15,
     marginTop: 5,
   },
-  inputLabel: { fontSize: 11, fontWeight: "900", marginBottom: 8, letterSpacing: 1.5, opacity: 0.6 },
+  inputLabel: {
+    fontSize: 11,
+    fontWeight: "900",
+    marginBottom: 8,
+    letterSpacing: 1.5,
+    opacity: 0.6,
+  },
   modalSubRow: { flexDirection: "row", gap: 12, marginTop: 12 },
   modalInputBtn: {
     flex: 1,
@@ -2610,23 +3301,28 @@ const styles = StyleSheet.create({
     gap: 15,
     marginTop: 25,
   },
-  saveBtn: { height: 60, borderRadius: 20, justifyContent: "center", alignItems: "center" },
+  saveBtn: {
+    height: 60,
+    borderRadius: 20,
+    justifyContent: "center",
+    alignItems: "center",
+  },
   adPlaceholder: {
     height: 60,
-    width: '100%',
+    width: "100%",
     borderRadius: 16,
     borderWidth: 1,
-    borderStyle: 'dashed',
-    justifyContent: 'center',
-    alignItems: 'center',
+    borderStyle: "dashed",
+    justifyContent: "center",
+    alignItems: "center",
     marginTop: 20,
     marginBottom: 5,
-    opacity: 0.6
+    opacity: 0.6,
   },
   adLabel: {
     fontSize: 10,
-    fontWeight: '900',
-    letterSpacing: 1
+    fontWeight: "900",
+    letterSpacing: 1,
   },
   noteTitleInput: {
     fontSize: 24,
@@ -2760,32 +3456,32 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   bottomActionBar: {
-    position: 'absolute',
+    position: "absolute",
     bottom: 0,
     left: 0,
     right: 0,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     gap: 15,
     paddingHorizontal: 20,
     borderTopWidth: 1,
     elevation: 30,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: -10 },
     shadowOpacity: 0.3,
     shadowRadius: 15,
   },
   mainFab: {
-    position: 'absolute',
+    position: "absolute",
     right: 20,
     width: 64,
     height: 64,
     borderRadius: 32,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     elevation: 10,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 5 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -2795,19 +3491,19 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 54,
     borderRadius: 18,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     gap: 8,
   },
   batchBtnText: {
     fontSize: 12,
-    fontWeight: '900',
+    fontWeight: "900",
     letterSpacing: 1,
-    color: '#000',
+    color: "#000",
   },
   selectedAccent: {
-    position: 'absolute',
+    position: "absolute",
     left: 0,
     top: 0,
     bottom: 0,
@@ -2818,21 +3514,21 @@ const styles = StyleSheet.create({
     height: 28,
     borderRadius: 14,
     borderWidth: 2,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   starFilterBtn: {
     width: 48,
     height: 48,
     borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     borderWidth: 1.5,
   },
   importantToggle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     padding: 16,
     borderRadius: 24,
     borderWidth: 2,
@@ -2842,8 +3538,8 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   checkDot: {
     width: 20,
@@ -2852,9 +3548,9 @@ const styles = StyleSheet.create({
     borderWidth: 2,
   },
   voiceCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     padding: 18,
     borderRadius: 24,
     borderWidth: 2,
@@ -2862,44 +3558,44 @@ const styles = StyleSheet.create({
   },
   voiceCardLeft: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   playBtn: {
     width: 44,
     height: 44,
     borderRadius: 15,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   playBtnLarge: {
     width: 80,
     height: 80,
     borderRadius: 30,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     elevation: 10,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.3,
     shadowRadius: 10,
   },
   recordControls: {
-    position: 'absolute',
+    position: "absolute",
     bottom: 0,
     left: 0,
     right: 0,
-    alignItems: 'center',
-    backgroundColor: 'transparent',
+    alignItems: "center",
+    backgroundColor: "transparent",
   },
   recordBtn: {
     width: 84,
     height: 84,
     borderRadius: 42,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     elevation: 20,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.4,
     shadowRadius: 12,
@@ -2909,18 +3605,18 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 30,
     borderWidth: 1.5,
-    borderColor: 'transparent',
+    borderColor: "transparent",
     marginBottom: 15,
-    alignItems: 'center',
+    alignItems: "center",
   },
   pulseDot: {
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: '#EF4444',
+    backgroundColor: "#EF4444",
   },
   progressBackground: {
-    position: 'absolute',
+    position: "absolute",
     top: 0,
     left: 0,
     bottom: 0,

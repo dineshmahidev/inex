@@ -1,71 +1,78 @@
-import React, { useState } from 'react';
-import { 
-  StyleSheet, 
-  View, 
-  Text, 
-  TouchableOpacity, 
-  ScrollView, 
-  Switch,
-  TextInput,
-  Alert,
-  Dimensions,
-  Modal,
-  Image,
-  Animated
-} from 'react-native';
-import { useDatabase } from '@/hooks/useDatabase';
-import { 
-    Moon, 
-    Sun, 
-    Lock, 
-    Trash2, 
-    User, 
-    Camera, 
-    Download, 
-    Upload, 
+import { useDatabase } from "@/hooks/useDatabase";
+import * as DocumentPicker from "expo-document-picker";
+import * as FileSystem from "expo-file-system";
+import * as ImagePicker from "expo-image-picker";
+import { useRouter } from "expo-router";
+import {
+    Camera,
     ChevronRight,
-    CircleDashed,
-    ShieldCheck,
-    RefreshCw,
+    Download,
     Edit2,
-    Settings,
     Ghost,
+    Lock,
+    Moon,
+    ShieldCheck,
     Smile,
     Star,
+    Sun,
+    Trash2,
+    Upload,
+    User,
     Zap
 } from "lucide-react-native";
-import * as ImagePicker from 'expo-image-picker';
-import * as DocumentPicker from 'expo-document-picker';
-import * as FileSystem from 'expo-file-system/legacy';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import React, { useState } from "react";
+import {
+    Alert,
+    Animated,
+    Dimensions,
+    Image,
+    Modal,
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Switch,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
+} from "react-native";
 
-const { width } = Dimensions.get('window');
+const { width } = Dimensions.get("window");
 
 export default function SettingsScreen() {
   const router = useRouter();
-  const { settings, setSettings, clearAllData, exportData, importData, refresh, Colors } = useDatabase();
+  const {
+    settings,
+    setSettings,
+    clearAllData,
+    exportData,
+    importData,
+    refresh,
+    Colors,
+  } = useDatabase();
   const [isEditingName, setIsEditingName] = useState(false);
   const [userName, setUserName] = useState(settings.userName);
-  
+
   // PIN Setup State
   const [isPinModalVisible, setIsPinModalVisible] = useState(false);
-  const [setupPin, setSetupPin] = useState('');
-  const [confirmPin, setConfirmPin] = useState('');
-  const [setupStep, setSetupStep] = useState<1|2>(1);
+  const [setupPin, setSetupPin] = useState("");
+  const [confirmPin, setConfirmPin] = useState("");
+  const [setupStep, setSetupStep] = useState<1 | 2>(1);
   const [pinError, setPinError] = useState(false);
 
-  const [themeAnim] = useState(new Animated.Value(settings.theme === 'dark' ? 1 : 0));
-  
+  const [themeAnim] = useState(
+    new Animated.Value(settings.theme === "dark" ? 1 : 0),
+  );
+
   const toggleTheme = () => {
-    const nextTheme = settings.theme === 'dark' ? 'light' : 'dark';
+    const nextTheme = settings.theme === "dark" ? "light" : "dark";
     setSettings({ ...settings, theme: nextTheme });
-    
+
     Animated.spring(themeAnim, {
-        toValue: nextTheme === 'dark' ? 1 : 0,
-        useNativeDriver: false,
-        friction: 8,
-        tension: 40
+      toValue: nextTheme === "dark" ? 1 : 0,
+      useNativeDriver: false,
+      friction: 8,
+      tension: 40,
     }).start();
   };
 
@@ -89,372 +96,640 @@ export default function SettingsScreen() {
 
   const handleExport = async () => {
     try {
-        await exportData();
+      await exportData();
     } catch (e) {
-        Alert.alert("Export Failed", "Could not create backup.");
+      Alert.alert("Export Failed", "Could not create backup.");
     }
   };
 
   const handleImport = async () => {
-      try {
-          const result = await DocumentPicker.getDocumentAsync({ type: 'application/json' });
-          if (!result.canceled) {
-              const content = await FileSystem.readAsStringAsync(result.assets[0].uri);
-              await importData(content);
-              Alert.alert("Success", "Data imported successfully! The UI will refresh.", [
-                  { text: "OK", onPress: () => refresh() }
-              ]);
-          }
-      } catch (e) {
-          Alert.alert("Import Failed", "The file might be corrupted or invalid.");
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: "application/json",
+      });
+      if (!result.canceled) {
+        const content = await FileSystem.readAsStringAsync(result.assets[0].uri);
+        await importData(content);
+        Alert.alert(
+          "Success",
+          "Data imported successfully! The UI will refresh.",
+          [{ text: "OK", onPress: () => refresh() }],
+        );
       }
+    } catch (e) {
+      Alert.alert("Import Failed", "The file might be corrupted or invalid.");
+    }
   };
 
   const renderAvatar = (size: number = 120, borderRadius: number = 24) => {
     const GUEST_ICONS = [User, Ghost, Smile, Star, Zap];
-    const GUEST_COLORS = ["#EB6001", "#22C55E", "#3B82F6", "#A855F7", "#F59E0B"];
-    
-    const hash = (settings.userName || "Guest").split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    const GUEST_COLORS = [
+      "#EB6001",
+      "#22C55E",
+      "#3B82F6",
+      "#A855F7",
+      "#F59E0B",
+    ];
+
+    const hash = (settings.userName || "Guest")
+      .split("")
+      .reduce((acc, char) => acc + char.charCodeAt(0), 0);
     const IconComponent = GUEST_ICONS[hash % GUEST_ICONS.length];
     const bgColor = GUEST_COLORS[hash % GUEST_COLORS.length];
 
     if (settings.userImage && settings.userImage.trim() !== "") {
-      return <Image source={{ uri: settings.userImage }} style={{ width: size, height: size, borderRadius }} />;
+      return (
+        <Image
+          source={{ uri: settings.userImage }}
+          style={{ width: size, height: size, borderRadius }}
+        />
+      );
     }
 
     return (
-      <View style={{ width: size, height: size, borderRadius, backgroundColor: bgColor + '25', justifyContent: 'center', alignItems: 'center', borderWidth: 1.5, borderColor: bgColor + '40' }}>
+      <View
+        style={{
+          width: size,
+          height: size,
+          borderRadius,
+          backgroundColor: bgColor + "25",
+          justifyContent: "center",
+          alignItems: "center",
+          borderWidth: 1.5,
+          borderColor: bgColor + "40",
+        }}
+      >
         <IconComponent size={size * 0.45} color={bgColor} strokeWidth={2.5} />
       </View>
     );
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: Colors.background }]}>
-        <View style={[styles.header, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
-            <Text style={[styles.title, { color: Colors.text }]}>Settings</Text>
-            
-            {/* Animated Theme Toggle */}
-            <TouchableOpacity 
-              activeOpacity={0.9}
-              onPress={toggleTheme}
-              style={[styles.animatedToggleContainer, { backgroundColor: Colors.card, borderColor: Colors.border }]}
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: Colors.background }]}
+    >
+      <View
+        style={[
+          styles.header,
+          {
+            flexDirection: "row",
+            justifyContent: "space-between",
+            alignItems: "center",
+          },
+        ]}
+      >
+        <Text style={[styles.title, { color: Colors.text }]}>Settings</Text>
+
+        {/* Animated Theme Toggle */}
+        <TouchableOpacity
+          activeOpacity={0.9}
+          onPress={toggleTheme}
+          style={[
+            styles.animatedToggleContainer,
+            { backgroundColor: Colors.card, borderColor: Colors.border },
+          ]}
+        >
+          <Animated.View
+            style={[
+              styles.toggleThumb,
+              {
+                backgroundColor: Colors.primary,
+                transform: [
+                  {
+                    translateX: themeAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [4, 32],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          />
+          <View style={styles.toggleIconsRow}>
+            <Sun
+              size={14}
+              color={settings.theme === "light" ? "#000" : Colors.textMuted}
+              strokeWidth={settings.theme === "light" ? 3 : 2}
+            />
+            <Moon
+              size={14}
+              color={settings.theme === "dark" ? "#000" : Colors.textMuted}
+              strokeWidth={settings.theme === "dark" ? 3 : 2}
+            />
+          </View>
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView
+        contentContainerStyle={{ paddingBottom: 130 }}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Profile Section */}
+        <View style={styles.profileHeader}>
+          <TouchableOpacity
+            onPress={handlePickImage}
+            style={styles.imageContainer}
+          >
+            {renderAvatar()}
+            <View
+              style={[styles.cameraIcon, { backgroundColor: Colors.primary }]}
             >
-              <Animated.View style={[
-                  styles.toggleThumb, 
-                  { 
-                    backgroundColor: Colors.primary,
-                    transform: [{
-                        translateX: themeAnim.interpolate({
-                            inputRange: [0, 1],
-                            outputRange: [4, 32]
-                        })
-                    }]
-                  }
-              ]} />
-              <View style={styles.toggleIconsRow}>
-                <Sun size={14} color={settings.theme === 'light' ? '#000' : Colors.textMuted} strokeWidth={settings.theme === 'light' ? 3 : 2} />
-                <Moon size={14} color={settings.theme === 'dark' ? '#000' : Colors.textMuted} strokeWidth={settings.theme === 'dark' ? 3 : 2} />
+              <Camera size={14} color="#000" />
+            </View>
+          </TouchableOpacity>
+
+          <View style={styles.nameContainer}>
+            {isEditingName ? (
+              <View style={styles.editRow}>
+                <TextInput
+                  style={[
+                    styles.nameInput,
+                    { color: Colors.text, borderBottomColor: Colors.primary },
+                  ]}
+                  value={userName}
+                  onChangeText={setUserName}
+                  autoFocus
+                />
+                <TouchableOpacity
+                  onPress={handleSaveName}
+                  style={styles.saveBtn}
+                >
+                  <Text style={{ color: Colors.primary, fontWeight: "bold" }}>
+                    SAVE
+                  </Text>
+                </TouchableOpacity>
               </View>
-            </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                onPress={() => setIsEditingName(true)}
+                style={styles.nameRow}
+              >
+                <Text style={[styles.profileName, { color: Colors.text }]}>
+                  {settings.userName || "Guest"}
+                </Text>
+                <View
+                  style={[
+                    styles.editBadge,
+                    { backgroundColor: Colors.primary + "20" },
+                  ]}
+                >
+                  <Edit2 size={12} color={Colors.primary} />
+                </View>
+              </TouchableOpacity>
+            )}
+            <Text
+              style={{ color: Colors.textMuted, fontSize: 12, marginTop: 4 }}
+            >
+              Elite Member
+            </Text>
+          </View>
         </View>
 
-        <ScrollView contentContainerStyle={{ paddingBottom: 130 }} showsVerticalScrollIndicator={false}>
-            {/* Profile Section */}
-            <View style={styles.profileHeader}>
-                <TouchableOpacity onPress={handlePickImage} style={styles.imageContainer}>
-                    {renderAvatar()}
-                    <View style={[styles.cameraIcon, { backgroundColor: Colors.primary }]}>
-                        <Camera size={14} color="#000" />
-                    </View>
+        {/* General Settings */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: Colors.textMuted }]}>
+            PREFERENCES
+          </Text>
+          <View
+            style={[
+              styles.card,
+              { backgroundColor: Colors.card, borderColor: Colors.border },
+            ]}
+          >
+            <View style={styles.settingItem}>
+              <View style={styles.settingLeft}>
+                <View
+                  style={[
+                    styles.iconBox,
+                    { backgroundColor: Colors.primary + "15" },
+                  ]}
+                >
+                  <Lock size={18} color={Colors.primary} />
+                </View>
+                <Text style={[styles.settingLabel, { color: Colors.text }]}>
+                  Data Lock
+                </Text>
+              </View>
+              <Switch
+                value={settings.isLocked}
+                onValueChange={(v) => {
+                  if (v) {
+                    setSetupStep(1);
+                    setSetupPin("");
+                    setConfirmPin("");
+                    setPinError(false);
+                    setIsPinModalVisible(true);
+                  } else {
+                    setSettings({ ...settings, isLocked: false, pin: null });
+                  }
+                }}
+                trackColor={{ false: "#333", true: Colors.primary }}
+              />
+            </View>
+          </View>
+        </View>
+
+        {/* Data Management */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: Colors.textMuted }]}>
+            PORTABILITY
+          </Text>
+          <View
+            style={[
+              styles.card,
+              { backgroundColor: Colors.card, borderColor: Colors.border },
+            ]}
+          >
+            <TouchableOpacity style={styles.settingItem} onPress={handleExport}>
+              <View style={styles.settingLeft}>
+                <View
+                  style={[styles.iconBox, { backgroundColor: "#10B98115" }]}
+                >
+                  <Upload size={18} color="#10B981" />
+                </View>
+                <Text style={[styles.settingLabel, { color: Colors.text }]}>
+                  Export Backup
+                </Text>
+              </View>
+              <ChevronRight size={18} color={Colors.textMuted} />
+            </TouchableOpacity>
+
+            <View
+              style={[styles.divider, { backgroundColor: Colors.border }]}
+            />
+
+            <TouchableOpacity style={styles.settingItem} onPress={handleImport}>
+              <View style={styles.settingLeft}>
+                <View
+                  style={[styles.iconBox, { backgroundColor: "#3B82F615" }]}
+                >
+                  <Download size={18} color="#3B82F6" />
+                </View>
+                <Text style={[styles.settingLabel, { color: Colors.text }]}>
+                  Import JSON
+                </Text>
+              </View>
+              <ChevronRight size={18} color={Colors.textMuted} />
+            </TouchableOpacity>
+
+            <View
+              style={[styles.divider, { backgroundColor: Colors.border }]}
+            />
+
+            <TouchableOpacity
+              style={styles.settingItem}
+              onPress={() => {
+                Alert.alert("Reset App", "This will wipe all data. Continue?", [
+                  { text: "Cancel" },
+                  {
+                    text: "WIPE ALL",
+                    style: "destructive",
+                    onPress: clearAllData,
+                  },
+                ]);
+              }}
+            >
+              <View style={styles.settingLeft}>
+                <View
+                  style={[styles.iconBox, { backgroundColor: "#EF444415" }]}
+                >
+                  <Trash2 size={18} color="#EF4444" />
+                </View>
+                <Text style={[styles.settingLabel, { color: Colors.text }]}>
+                  Factory Reset
+                </Text>
+              </View>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Security Section */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: Colors.textMuted }]}>
+            SECURITY
+          </Text>
+          <View
+            style={[
+              styles.card,
+              { backgroundColor: Colors.card, borderColor: Colors.border },
+            ]}
+          >
+            <TouchableOpacity
+              style={styles.settingItem}
+              onPress={() => router.push("/privacy")}
+            >
+              <View style={styles.settingLeft}>
+                <View
+                  style={[
+                    styles.iconBox,
+                    { backgroundColor: Colors.primary + "15" },
+                  ]}
+                >
+                  <ShieldCheck size={18} color={Colors.primary} />
+                </View>
+                <Text style={[styles.settingLabel, { color: Colors.text }]}>
+                  Privacy Policy
+                </Text>
+              </View>
+              <ChevronRight size={18} color={Colors.textMuted} />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={styles.footer}>
+          <Text style={[styles.versionText, { color: Colors.text }]}>
+            TRACKSY PRO
+          </Text>
+          <Text style={[styles.footerInfo, { color: Colors.textMuted }]}>
+            V 1.0.5 • SECURE & OFFLINE
+          </Text>
+        </View>
+      </ScrollView>
+
+      {/* PIN Setup Modal */}
+      <Modal visible={isPinModalVisible} animationType="slide" transparent>
+        <View
+          style={[
+            styles.pinModalContainer,
+            { backgroundColor: Colors.background },
+          ]}
+        >
+          <SafeAreaView
+            style={{ flex: 1, alignItems: "center", justifyContent: "center" }}
+          >
+            <View style={styles.pinHeader}>
+              <View
+                style={[
+                  styles.iconBox,
+                  {
+                    backgroundColor: Colors.primary + "15",
+                    width: 80,
+                    height: 80,
+                    borderRadius: 40,
+                    marginBottom: 20,
+                  },
+                ]}
+              >
+                <Lock size={32} color={Colors.primary} />
+              </View>
+              <Text style={[styles.title, { color: Colors.text }]}>
+                {setupStep === 1 ? "Set New PIN" : "Confirm PIN"}
+              </Text>
+              <Text
+                style={[
+                  styles.subtitle,
+                  { color: pinError ? "#ef4444" : Colors.textMuted },
+                ]}
+              >
+                {pinError
+                  ? "PINs do not match. Try again."
+                  : setupStep === 1
+                    ? "Enter a 4-digit PIN"
+                    : "Re-enter your PIN to confirm"}
+              </Text>
+            </View>
+
+            <View style={styles.dotsContainer}>
+              {[0, 1, 2, 3].map((i) => (
+                <View
+                  key={i}
+                  style={[
+                    styles.dot,
+                    {
+                      backgroundColor:
+                        i <
+                        (setupStep === 1 ? setupPin.length : confirmPin.length)
+                          ? Colors.primary
+                          : "transparent",
+                      borderColor: pinError ? "#ef4444" : Colors.primary,
+                    },
+                  ]}
+                />
+              ))}
+            </View>
+
+            <View style={styles.pad}>
+              {[
+                ["1", "2", "3"],
+                ["4", "5", "6"],
+                ["7", "8", "9"],
+              ].map((row, rIdx) => (
+                <View key={rIdx} style={styles.row}>
+                  {row.map((num) => (
+                    <TouchableOpacity
+                      key={num}
+                      style={styles.key}
+                      onPress={() => {
+                        if (setupStep === 1) {
+                          if (setupPin.length < 4) {
+                            const np = setupPin + num;
+                            setSetupPin(np);
+                            if (np.length === 4) {
+                              setTimeout(() => setSetupStep(2), 200);
+                            }
+                          }
+                        } else {
+                          if (confirmPin.length < 4) {
+                            const np = confirmPin + num;
+                            setConfirmPin(np);
+                            setPinError(false);
+                            if (np.length === 4) {
+                              if (np === setupPin) {
+                                setSettings({
+                                  ...settings,
+                                  isLocked: true,
+                                  pin: np,
+                                });
+                                setIsPinModalVisible(false);
+                              } else {
+                                setPinError(true);
+                                setTimeout(() => setConfirmPin(""), 500);
+                              }
+                            }
+                          }
+                        }
+                      }}
+                    >
+                      <Text style={[styles.keyText, { color: Colors.text }]}>
+                        {num}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              ))}
+              <View style={styles.row}>
+                <TouchableOpacity
+                  style={styles.key}
+                  onPress={() => {
+                    setIsPinModalVisible(false);
+                  }}
+                >
+                  <Text style={{ color: Colors.textMuted, fontSize: 16 }}>
+                    Cancel
+                  </Text>
                 </TouchableOpacity>
-
-                <View style={styles.nameContainer}>
-                    {isEditingName ? (
-                        <View style={styles.editRow}>
-                            <TextInput 
-                                style={[styles.nameInput, { color: Colors.text, borderBottomColor: Colors.primary }]}
-                                value={userName}
-                                onChangeText={setUserName}
-                                autoFocus
-                            />
-                            <TouchableOpacity onPress={handleSaveName} style={styles.saveBtn}>
-                                <Text style={{ color: Colors.primary, fontWeight: 'bold' }}>SAVE</Text>
-                            </TouchableOpacity>
-                        </View>
-                    ) : (
-                        <TouchableOpacity onPress={() => setIsEditingName(true)} style={styles.nameRow}>
-                            <Text style={[styles.profileName, { color: Colors.text }]}>{settings.userName || "Guest"}</Text>
-                            <View style={[styles.editBadge, { backgroundColor: Colors.primary + '20' }]}>
-                                <Edit2 size={12} color={Colors.primary} />
-                            </View>
-                        </TouchableOpacity>
-                    )}
-                    <Text style={{ color: Colors.textMuted, fontSize: 12, marginTop: 4 }}>Elite Member</Text>
-                </View>
+                <TouchableOpacity
+                  style={styles.key}
+                  onPress={() => {
+                    if (setupStep === 1 && setupPin.length < 4) {
+                      setSetupPin(setupPin + "0");
+                      if (setupPin.length + 1 === 4)
+                        setTimeout(() => setSetupStep(2), 200);
+                    } else if (setupStep === 2 && confirmPin.length < 4) {
+                      const np = confirmPin + "0";
+                      setConfirmPin(np);
+                      if (np.length === 4) {
+                        if (np === setupPin) {
+                          setSettings({ ...settings, isLocked: true, pin: np });
+                          setIsPinModalVisible(false);
+                        } else {
+                          setPinError(true);
+                          setTimeout(() => setConfirmPin(""), 500);
+                        }
+                      }
+                    }
+                  }}
+                >
+                  <Text style={[styles.keyText, { color: Colors.text }]}>
+                    0
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.key}
+                  onPress={() => {
+                    if (setupStep === 1) setSetupPin(setupPin.slice(0, -1));
+                    else setConfirmPin(confirmPin.slice(0, -1));
+                  }}
+                >
+                  <Trash2 size={24} color={Colors.textMuted} />
+                </TouchableOpacity>
+              </View>
             </View>
-
-            {/* General Settings */}
-            <View style={styles.section}>
-                <Text style={[styles.sectionTitle, { color: Colors.textMuted }]}>PREFERENCES</Text>
-                <View style={[styles.card, { backgroundColor: Colors.card, borderColor: Colors.border }]}>
-
-                    <View style={styles.settingItem}>
-                        <View style={styles.settingLeft}>
-                            <View style={[styles.iconBox, { backgroundColor: Colors.primary + '15' }]}>
-                                <Lock size={18} color={Colors.primary} />
-                            </View>
-                            <Text style={[styles.settingLabel, { color: Colors.text }]}>Data Lock</Text>
-                        </View>
-                        <Switch 
-                            value={settings.isLocked} 
-                            onValueChange={(v) => {
-                                if (v) {
-                                    setSetupStep(1);
-                                    setSetupPin('');
-                                    setConfirmPin('');
-                                    setPinError(false);
-                                    setIsPinModalVisible(true);
-                                } else {
-                                    setSettings({ ...settings, isLocked: false, pin: null });
-                                }
-                            }}
-                            trackColor={{ false: '#333', true: Colors.primary }}
-                        />
-                    </View>
-                </View>
-            </View>
-
-            {/* Data Management */}
-            <View style={styles.section}>
-                <Text style={[styles.sectionTitle, { color: Colors.textMuted }]}>PORTABILITY</Text>
-                <View style={[styles.card, { backgroundColor: Colors.card, borderColor: Colors.border }]}>
-                    <TouchableOpacity style={styles.settingItem} onPress={handleExport}>
-                        <View style={styles.settingLeft}>
-                            <View style={[styles.iconBox, { backgroundColor: '#10B98115' }]}>
-                                <Upload size={18} color="#10B981" />
-                            </View>
-                            <Text style={[styles.settingLabel, { color: Colors.text }]}>Export Backup</Text>
-                        </View>
-                        <ChevronRight size={18} color={Colors.textMuted} />
-                    </TouchableOpacity>
-
-                    <View style={[styles.divider, { backgroundColor: Colors.border }]} />
-
-                    <TouchableOpacity style={styles.settingItem} onPress={handleImport}>
-                        <View style={styles.settingLeft}>
-                            <View style={[styles.iconBox, { backgroundColor: '#3B82F615' }]}>
-                                <Download size={18} color="#3B82F6" />
-                            </View>
-                            <Text style={[styles.settingLabel, { color: Colors.text }]}>Import JSON</Text>
-                        </View>
-                        <ChevronRight size={18} color={Colors.textMuted} />
-                    </TouchableOpacity>
-
-                    <View style={[styles.divider, { backgroundColor: Colors.border }]} />
-
-                    <TouchableOpacity style={styles.settingItem} onPress={() => {
-                        Alert.alert("Reset App", "This will wipe all data. Continue?", [
-                            { text: "Cancel" },
-                            { text: "WIPE ALL", style: 'destructive', onPress: clearAllData }
-                        ]);
-                    }}>
-                        <View style={styles.settingLeft}>
-                            <View style={[styles.iconBox, { backgroundColor: '#EF444415' }]}>
-                                <Trash2 size={18} color="#EF4444" />
-                            </View>
-                            <Text style={[styles.settingLabel, { color: Colors.text }]}>Factory Reset</Text>
-                        </View>
-                    </TouchableOpacity>
-                </View>
-            </View>
-
-            {/* Security Section */}
-            <View style={styles.section}>
-                <Text style={[styles.sectionTitle, { color: Colors.textMuted }]}>SECURITY</Text>
-                <View style={[styles.card, { backgroundColor: Colors.card, borderColor: Colors.border }]}>
-                    <TouchableOpacity style={styles.settingItem} onPress={() => router.push('/privacy')}>
-                        <View style={styles.settingLeft}>
-                            <View style={[styles.iconBox, { backgroundColor: Colors.primary + '15' }]}>
-                                <ShieldCheck size={18} color={Colors.primary} />
-                            </View>
-                            <Text style={[styles.settingLabel, { color: Colors.text }]}>Privacy Policy</Text>
-                        </View>
-                        <ChevronRight size={18} color={Colors.textMuted} />
-                    </TouchableOpacity>
-                </View>
-            </View>
-
-            <View style={styles.footer}>
-                <Text style={[styles.versionText, { color: Colors.text }]}>TRACKSY PRO</Text>
-                <Text style={[styles.footerInfo, { color: Colors.textMuted }]}>V 1.0.5 • SECURE & OFFLINE</Text>
-            </View>
-        </ScrollView>
-
-        {/* PIN Setup Modal */}
-        <Modal visible={isPinModalVisible} animationType="slide" transparent>
-            <View style={[styles.pinModalContainer, { backgroundColor: Colors.background }]}>
-                <SafeAreaView style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-                    <View style={styles.pinHeader}>
-                        <View style={[styles.iconBox, { backgroundColor: Colors.primary + '15', width: 80, height: 80, borderRadius: 40, marginBottom: 20 }]}>
-                            <Lock size={32} color={Colors.primary} />
-                        </View>
-                        <Text style={[styles.title, { color: Colors.text }]}>
-                            {setupStep === 1 ? 'Set New PIN' : 'Confirm PIN'}
-                        </Text>
-                        <Text style={[styles.subtitle, { color: pinError ? '#ef4444' : Colors.textMuted }]}>
-                            {pinError ? "PINs do not match. Try again." : (setupStep === 1 ? "Enter a 4-digit PIN" : "Re-enter your PIN to confirm")}
-                        </Text>
-                    </View>
-
-                    <View style={styles.dotsContainer}>
-                        {[0, 1, 2, 3].map(i => (
-                            <View 
-                                key={i} 
-                                style={[
-                                    styles.dot, 
-                                    { 
-                                        backgroundColor: i < (setupStep === 1 ? setupPin.length : confirmPin.length) ? Colors.primary : 'transparent',
-                                        borderColor: pinError ? '#ef4444' : Colors.primary
-                                    }
-                                ]} 
-                            />
-                        ))}
-                    </View>
-
-                    <View style={styles.pad}>
-                        {[['1','2','3'], ['4','5','6'], ['7','8','9']].map((row, rIdx) => (
-                            <View key={rIdx} style={styles.row}>
-                                {row.map(num => (
-                                    <TouchableOpacity 
-                                        key={num} 
-                                        style={styles.key} 
-                                        onPress={() => {
-                                            if (setupStep === 1) {
-                                                if (setupPin.length < 4) {
-                                                    const np = setupPin + num;
-                                                    setSetupPin(np);
-                                                    if (np.length === 4) {
-                                                        setTimeout(() => setSetupStep(2), 200);
-                                                    }
-                                                }
-                                            } else {
-                                                if (confirmPin.length < 4) {
-                                                    const np = confirmPin + num;
-                                                    setConfirmPin(np);
-                                                    setPinError(false);
-                                                    if (np.length === 4) {
-                                                        if (np === setupPin) {
-                                                            setSettings({ ...settings, isLocked: true, pin: np });
-                                                            setIsPinModalVisible(false);
-                                                        } else {
-                                                            setPinError(true);
-                                                            setTimeout(() => setConfirmPin(''), 500);
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }}
-                                    >
-                                        <Text style={[styles.keyText, { color: Colors.text }]}>{num}</Text>
-                                    </TouchableOpacity>
-                                ))}
-                            </View>
-                        ))}
-                        <View style={styles.row}>
-                            <TouchableOpacity style={styles.key} onPress={() => { setIsPinModalVisible(false); }}>
-                                <Text style={{ color: Colors.textMuted, fontSize: 16 }}>Cancel</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity style={styles.key} onPress={() => {
-                                if (setupStep === 1 && setupPin.length < 4) {
-                                    setSetupPin(setupPin + '0');
-                                    if (setupPin.length + 1 === 4) setTimeout(() => setSetupStep(2), 200);
-                                } else if (setupStep === 2 && confirmPin.length < 4) {
-                                    const np = confirmPin + '0';
-                                    setConfirmPin(np);
-                                    if (np.length === 4) {
-                                        if (np === setupPin) {
-                                            setSettings({ ...settings, isLocked: true, pin: np });
-                                            setIsPinModalVisible(false);
-                                        } else {
-                                            setPinError(true);
-                                            setTimeout(() => setConfirmPin(''), 500);
-                                        }
-                                    }
-                                }
-                            }}>
-                                <Text style={[styles.keyText, { color: Colors.text }]}>0</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity style={styles.key} onPress={() => {
-                                if (setupStep === 1) setSetupPin(setupPin.slice(0, -1));
-                                else setConfirmPin(confirmPin.slice(0, -1));
-                            }}>
-                                <Trash2 size={24} color={Colors.textMuted} />
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-                </SafeAreaView>
-            </View>
-        </Modal>
+          </SafeAreaView>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: { padding: 24, paddingBottom: 10 },
-  title: { fontSize: 32, fontWeight: '900', letterSpacing: -1 },
-  profileHeader: { alignItems: 'center', padding: 30, gap: 15 },
-  imageContainer: { width: 120, height: 120, borderRadius: 24, position: 'relative' },
+  header: { padding: 24, paddingBottom: 10, marginTop: 20 },
+  title: { fontSize: 32, fontWeight: "900", letterSpacing: -1 },
+  profileHeader: { alignItems: "center", padding: 30, gap: 15 },
+  imageContainer: {
+    width: 120,
+    height: 120,
+    borderRadius: 24,
+    position: "relative",
+  },
   profilePic: { width: 120, height: 120, borderRadius: 24 },
-  placeholderPic: { width: 120, height: 120, borderRadius: 24, borderWidth: 1, borderStyle: 'dashed', justifyContent: 'center', alignItems: 'center' },
-  cameraIcon: { position: 'absolute', bottom: -10, right: -10, width: 36, height: 36, borderRadius: 14, justifyContent: 'center', alignItems: 'center', borderWidth: 3, borderColor: '#000' },
-  nameContainer: { alignItems: 'center' },
-  profileName: { fontSize: 22, fontWeight: '900', letterSpacing: -0.5 },
-  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  editBadge: { width: 24, height: 24, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
-  editRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  nameInput: { fontSize: 22, fontWeight: '900', borderBottomWidth: 2, minWidth: 140, textAlign: 'center' },
+  placeholderPic: {
+    width: 120,
+    height: 120,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderStyle: "dashed",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  cameraIcon: {
+    position: "absolute",
+    bottom: -10,
+    right: -10,
+    width: 36,
+    height: 36,
+    borderRadius: 14,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 3,
+    borderColor: "#000",
+  },
+  nameContainer: { alignItems: "center" },
+  profileName: { fontSize: 22, fontWeight: "900", letterSpacing: -0.5 },
+  nameRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  editBadge: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  editRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  nameInput: {
+    fontSize: 22,
+    fontWeight: "900",
+    borderBottomWidth: 2,
+    minWidth: 140,
+    textAlign: "center",
+  },
   saveBtn: { padding: 5 },
   section: { paddingHorizontal: 20, marginBottom: 20 },
-  sectionTitle: { fontSize: 10, fontWeight: '900', letterSpacing: 1.5, marginBottom: 10, marginLeft: 5 },
-  card: { borderRadius: 28, borderWidth: 1, overflow: 'hidden' },
-  settingItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 18 },
-  settingLeft: { flexDirection: 'row', alignItems: 'center', gap: 15 },
-  iconBox: { width: 44, height: 44, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
-  settingLabel: { fontSize: 16, fontWeight: '700' },
+  sectionTitle: {
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 1.5,
+    marginBottom: 10,
+    marginLeft: 5,
+  },
+  card: { borderRadius: 28, borderWidth: 1, overflow: "hidden" },
+  settingItem: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 18,
+  },
+  settingLeft: { flexDirection: "row", alignItems: "center", gap: 15 },
+  iconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  settingLabel: { fontSize: 16, fontWeight: "700" },
   divider: { height: 1, marginHorizontal: 16 },
-  footer: { alignItems: 'center', padding: 40, gap: 4 },
-  versionText: { fontSize: 14, fontWeight: '900', letterSpacing: 1 },
-  footerInfo: { fontSize: 9, fontWeight: 'bold', letterSpacing: 2 },
-  
+  footer: { alignItems: "center", padding: 40, gap: 4 },
+  versionText: { fontSize: 14, fontWeight: "900", letterSpacing: 1 },
+  footerInfo: { fontSize: 9, fontWeight: "bold", letterSpacing: 2 },
+
   pinModalContainer: { flex: 1 },
-  pinHeader: { alignItems: 'center', marginBottom: 40 },
+  pinHeader: { alignItems: "center", marginBottom: 40 },
   subtitle: { fontSize: 14, marginTop: 5 },
-  dotsContainer: { flexDirection: 'row', gap: 20, marginBottom: 50 },
+  dotsContainer: { flexDirection: "row", gap: 20, marginBottom: 50 },
   dot: { width: 16, height: 16, borderRadius: 8, borderWidth: 2 },
   pad: { width: width * 0.8, maxWidth: 300 },
-  row: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 15 },
-  key: { width: 70, height: 70, borderRadius: 35, justifyContent: 'center', alignItems: 'center' },
-  keyText: { fontSize: 28, fontWeight: '500' },
+  row: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 15,
+  },
+  key: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  keyText: { fontSize: 28, fontWeight: "500" },
   animatedToggleContainer: {
     width: 64,
     height: 36,
     borderRadius: 18,
     borderWidth: 1,
-    justifyContent: 'center',
-    paddingHorizontal: 0
+    justifyContent: "center",
+    paddingHorizontal: 0,
   },
   toggleThumb: {
-    position: 'absolute',
+    position: "absolute",
     width: 28,
     height: 28,
     borderRadius: 14,
   },
   toggleIconsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-    paddingHorizontal: 6
-  }
+    flexDirection: "row",
+    justifyContent: "space-around",
+    alignItems: "center",
+    paddingHorizontal: 6,
+  },
 });

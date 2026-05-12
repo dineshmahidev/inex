@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Theme } from '@/constants/theme';
 import * as Sharing from 'expo-sharing';
-import * as FileSystem from 'expo-file-system/legacy';
+import * as FileSystem from 'expo-file-system';
 import * as Notifications from 'expo-notifications';
 import { parseFinancialText } from '@/utils/billParser';
 
@@ -252,7 +252,7 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
 
   const loadFromSafetyFile = async () => {
     try {
-        const fileUri = FileSystem.documentDirectory + 'tracksy_safety_backup.json';
+        const fileUri = `${FileSystem.documentDirectory}tracksy_safety_backup.json`;
         const info = await FileSystem.getInfoAsync(fileUri);
         if (info.exists) {
             const content = await FileSystem.readAsStringAsync(fileUri);
@@ -267,11 +267,8 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
   const saveToSafetyFile = async () => {
       try {
           const backup = { transactions, categories, reminders, settings, notes, todos, habits, voiceNotes };
-          const fileUri = FileSystem.documentDirectory + 'tracksy_safety_backup.json';
+          const fileUri = `${FileSystem.documentDirectory}tracksy_safety_backup.json`;
           await FileSystem.writeAsStringAsync(fileUri, JSON.stringify(backup));
-          
-          // On Android, we try to write to a more persistent location if possible
-          // For now, documentDirectory is the most stable across all devices.
       } catch (e) {
           console.error("Safety backup failed:", e);
       }
@@ -467,9 +464,7 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
       const fileName = `tracksy_backup_${new Date().getTime()}.json`;
       const fileUri = `${FileSystem.cacheDirectory}${fileName}`;
       
-      await FileSystem.writeAsStringAsync(fileUri, JSON.stringify(backup), {
-        encoding: 'utf8'
-      });
+      await FileSystem.writeAsStringAsync(fileUri, JSON.stringify(backup));
       
       await Sharing.shareAsync(fileUri, {
         mimeType: 'application/json',
