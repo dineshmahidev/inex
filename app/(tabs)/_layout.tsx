@@ -25,20 +25,18 @@ export default function TabLayout() {
         tabBarShowLabel: false,
         tabBarStyle: {
           backgroundColor: Colors.card,
-          height: 60,
+          height: 65 + insets.bottom,
           borderTopWidth: 1,
           borderTopColor: Colors.border,
-          elevation: 12,
-          paddingTop: 10,
+          elevation: 15,
+          paddingBottom: insets.bottom,
         },
         tabBarItemStyle: {
-          justifyContent: 'center',
-          alignItems: 'center',
-          height: 60,
+          paddingTop: 10,
         },
         tabBarIconStyle: {
-          width: 30,
-          height: 30,
+          width: 32,
+          height: 32,
         },
       }}
     >

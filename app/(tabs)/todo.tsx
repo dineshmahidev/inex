@@ -54,7 +54,7 @@ import {
     Platform,
     KeyboardAvoidingView,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { 
   requestNotificationPermissions, 
   scheduleTodoNotification,
@@ -114,6 +114,7 @@ const HABIT_ICONS: any = {
 };
 
 export default function TodoScreen() {
+  const insets = useSafeAreaInsets();
   const {
     Colors,
     settings,
@@ -1054,8 +1055,8 @@ export default function TodoScreen() {
             </View>
           </ScrollView>
 
-          {isSelectionMode && (
-            <View style={[styles.bottomActionBar, { backgroundColor: ThemeColors.card, borderTopColor: ThemeColors.border }]}>
+          {isSelectionMode ? (
+            <View style={[styles.bottomActionBar, { backgroundColor: Colors.card, borderTopColor: Colors.border, height: 80 + insets.bottom, paddingBottom: insets.bottom + 10 }]}>
                <TouchableOpacity 
                   style={[styles.batchBtn, { backgroundColor: Colors.primary }]} 
                   onPress={() => {
@@ -1076,6 +1077,13 @@ export default function TodoScreen() {
                   <Text style={[styles.batchBtnText, { color: '#fff' }]}>DELETE</Text>
                </TouchableOpacity>
             </View>
+          ) : (
+            <TouchableOpacity
+              onPress={() => setIsModalVisible(true)}
+              style={[styles.mainFab, { backgroundColor: Colors.primary, bottom: 20 + insets.bottom }]}
+            >
+              <Plus size={32} color="#000" />
+            </TouchableOpacity>
           )}
         </View>
       )}
@@ -1223,8 +1231,7 @@ export default function TodoScreen() {
                   );
               })
           )}
-
-          <View style={[styles.recordControls, { position: 'relative', marginTop: 40, paddingBottom: 20 }]}>
+          <View style={[styles.recordControls, { position: 'relative', marginTop: 40, paddingBottom: 20 + insets.bottom }]}>
               <View style={[styles.recordingVisual, isRecording && { borderColor: '#EF4444', backgroundColor: '#EF444410' }]}>
                   {isRecording ? (
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
@@ -1254,6 +1261,13 @@ export default function TodoScreen() {
               <FlowBannerAd />
           </View>
         </ScrollView>
+
+        <TouchableOpacity
+          onPress={() => handleOpenNote()}
+          style={[styles.mainFab, { backgroundColor: Colors.primary, bottom: 20 + insets.bottom }]}
+        >
+          <Plus size={32} color="#000" />
+        </TouchableOpacity>
       )}
 
       {mainTab === "habits" && (
@@ -1484,6 +1498,13 @@ export default function TodoScreen() {
               <FlowBannerAd />
           </View>
         </ScrollView>
+
+        <TouchableOpacity
+          onPress={() => handleOpenHabitModal()}
+          style={[styles.mainFab, { backgroundColor: Colors.primary, bottom: 20 + insets.bottom }]}
+        >
+          <Plus size={32} color="#000" />
+        </TouchableOpacity>
       )}
 
       {mainTab === "sms" && (
@@ -2739,19 +2760,32 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    height: 120,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 15,
     paddingHorizontal: 20,
     borderTopWidth: 1,
-    paddingBottom: 50,
     elevation: 30,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -10 },
     shadowOpacity: 0.3,
     shadowRadius: 15,
+  },
+  mainFab: {
+    position: 'absolute',
+    right: 20,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    zIndex: 1000,
   },
   batchBtn: {
     flex: 1,
@@ -2852,8 +2886,6 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     alignItems: 'center',
-    paddingBottom: 40,
-    paddingTop: 20,
     backgroundColor: 'transparent',
   },
   recordBtn: {
