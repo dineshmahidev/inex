@@ -9,7 +9,7 @@ import {
 } from "@/utils/notifications";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { Audio } from "expo-av";
-import * as FileSystem from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
 import * as Haptics from "expo-haptics";
 import LottieView from "lottie-react-native";
 import {
@@ -55,7 +55,6 @@ import {
   KeyboardAvoidingView,
   Modal,
   Platform,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
@@ -63,6 +62,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const TODO_KEY = "@productivity_todos_v5";
