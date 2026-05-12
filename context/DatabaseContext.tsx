@@ -14,6 +14,7 @@ const KEYS = {
   NOTES: '@smart_notes_v1',
   TODOS: '@smart_todos_v1',
   HABITS: '@smart_habits_v1',
+  VOICE: '@smart_voice_v1',
 };
 
 export interface Category {
@@ -84,6 +85,17 @@ export interface Habit {
   color: string;
   icon: string;
   logs: string[]; // ['2024-04-01', ...]
+  reminderTime?: string; // HH:mm
+}
+
+export interface VoiceNote {
+  id: string;
+  title: string;
+  uri: string;
+  date: string;
+  time: string;
+  reminderDate?: string;
+  duration?: number;
 }
 
 const DEFAULT_CATS: Category[] = [
@@ -103,6 +115,7 @@ interface DatabaseContextType {
   notes: Note[];
   todos: Todo[];
   habits: Habit[];
+  voiceNotes: VoiceNote[];
   isLoading: boolean;
   Colors: any;
   addTransaction: (tx: Omit<Transaction, 'id'>) => Promise<void>;
@@ -121,6 +134,8 @@ interface DatabaseContextType {
   addHabit: (h: Omit<Habit, 'id' | 'logs'>) => Promise<void>;
   updateHabit: (id: string, h: Partial<Habit>) => Promise<void>;
   deleteHabit: (id: string) => void;
+  addVoiceNote: (vn: Omit<VoiceNote, 'id'>) => Promise<string>;
+  deleteVoiceNote: (id: string) => void;
   setSettings: (s: UserSettings) => void;
   refresh: () => void;
   clearAllData: () => Promise<void>;
@@ -143,6 +158,7 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
   const [notes, setNotes] = useState<Note[]>([]);
   const [todos, setTodos] = useState<Todo[]>([]);
   const [habits, setHabits] = useState<Habit[]>([]);
+  const [voiceNotes, setVoiceNotes] = useState<VoiceNote[]>([]);
   const [smsBills, setSmsBills] = useState<{ id: string; name: string; amount: number; dueDay: number; type: 'bill'|'emi'|'loan' }[]>([]);
   const [settings, setSettings] = useState<UserSettings>({ 
     isLocked: false, 
@@ -170,6 +186,7 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
         AsyncStorage.getItem(KEYS.NOTES),
         AsyncStorage.getItem(KEYS.TODOS),
         AsyncStorage.getItem(KEYS.HABITS),
+        AsyncStorage.getItem(KEYS.VOICE),
         AsyncStorage.getItem('tracksy_sms'),
       ]);
 
@@ -185,6 +202,7 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
               setNotes(safetyData.notes || []);
               setTodos(safetyData.todos || []);
               setHabits(safetyData.habits || []);
+              setVoiceNotes(safetyData.voiceNotes || []);
               if (safetyData.settings) setSettings(prev => ({...prev, ...safetyData.settings}));
           } else {
               // Fallback to legacy migration
@@ -218,6 +236,7 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
       if (n) setNotes(JSON.parse(n));
       if (td) setTodos(JSON.parse(td));
       if (h) setHabits(JSON.parse(h));
+      if (vn) setVoiceNotes(JSON.parse(vn));
       if (sms) setSmsBills(JSON.parse(sms));
       
       if (s) {
@@ -247,7 +266,7 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
 
   const saveToSafetyFile = async () => {
       try {
-          const backup = { transactions, categories, reminders, settings, notes, todos, habits };
+          const backup = { transactions, categories, reminders, settings, notes, todos, habits, voiceNotes };
           const fileUri = FileSystem.documentDirectory + 'tracksy_safety_backup.json';
           await FileSystem.writeAsStringAsync(fileUri, JSON.stringify(backup));
           
@@ -262,7 +281,7 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
       if (!isLoading) {
           saveToSafetyFile();
       }
-  }, [transactions, reminders, notes, todos, habits, settings]);
+  }, [transactions, reminders, notes, todos, habits, voiceNotes, settings]);
 
   useEffect(() => { load(); }, []);
 
@@ -383,6 +402,7 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
     const updated = [newHabit, ...habits];
     setHabits(updated);
     await AsyncStorage.setItem(KEYS.HABITS, JSON.stringify(updated));
+    return newHabit.id;
   };
 
   const updateHabit = async (id: string, h: Partial<Habit>) => {
@@ -395,6 +415,27 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
     const updated = habits.filter(h => h.id !== id);
     setHabits(updated);
     AsyncStorage.setItem(KEYS.HABITS, JSON.stringify(updated));
+  };
+
+  const addVoiceNote = async (vn: Omit<VoiceNote, 'id'>) => {
+    const id = Date.now().toString();
+    const newVn = { ...vn, id };
+    const updated = [newVn, ...voiceNotes];
+    setVoiceNotes(updated);
+    await AsyncStorage.setItem(KEYS.VOICE, JSON.stringify(updated));
+    return id;
+  };
+
+  const deleteVoiceNote = async (id: string) => {
+    const vn = voiceNotes.find(v => v.id === id);
+    if (vn) {
+        try {
+            await FileSystem.deleteAsync(vn.uri);
+        } catch (e) {}
+    }
+    const updated = voiceNotes.filter(v => v.id !== id);
+    setVoiceNotes(updated);
+    await AsyncStorage.setItem(KEYS.VOICE, JSON.stringify(updated));
   };
 
   const updateSettings = (s: UserSettings) => {
@@ -417,6 +458,7 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
         notes, 
         todos, 
         habits,
+        voiceNotes,
         exportDate: new Date().toISOString(),
         appName: 'Tracksy'
       };
@@ -458,7 +500,8 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
           AsyncStorage.setItem(KEYS.SETTINGS, JSON.stringify(data.settings || settings)),
           AsyncStorage.setItem(KEYS.NOTES, JSON.stringify(data.notes || [])),
           AsyncStorage.setItem(KEYS.TODOS, JSON.stringify(data.todos || [])),
-          AsyncStorage.setItem(KEYS.HABITS, JSON.stringify(data.habits || []))
+          AsyncStorage.setItem(KEYS.HABITS, JSON.stringify(data.habits || [])),
+          AsyncStorage.setItem(KEYS.VOICE, JSON.stringify(data.voiceNotes || []))
       ]);
     } catch (e) {
         throw new Error("Invalid backup file");
@@ -467,7 +510,7 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
 
   const clearAllData = async () => {
     await AsyncStorage.multiRemove(Object.values(KEYS));
-    setTransactions([]); setReminders([]); setNotes([]); setTodos([]); setHabits([]); setCategories(DEFAULT_CATS); 
+    setTransactions([]); setReminders([]); setNotes([]); setTodos([]); setHabits([]); setVoiceNotes([]); setCategories(DEFAULT_CATS); 
     setSettings({ 
         isLocked: false, 
         pin: null, 
@@ -532,6 +575,7 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
         addNote, updateNote, deleteNote,
         addTodo, updateTodo, saveTodos,
         addHabit, updateHabit, deleteHabit,
+        voiceNotes, addVoiceNote, deleteVoiceNote,
         settings, setSettings: updateSettings, refresh: load,
         clearAllData, exportData, importData, detectCategory,
         globalMonth, setGlobalMonth,

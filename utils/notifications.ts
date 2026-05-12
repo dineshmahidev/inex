@@ -71,11 +71,11 @@ export async function scheduleMonthlyReminderNotification(id: string, name: stri
         sound: Platform.OS === 'ios' ? 'mixkit_bell_notification_933.wav' : 'mixkit_bell_notification_933',
       },
       trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.CALENDAR,
-        repeats: true,
         day: safeDay,
         hour: 9,
         minute: 0,
+        repeats: true,
+        ...(Platform.OS === 'android' ? { channelId: 'default' } : { type: Notifications.SchedulableTriggerInputTypes.CALENDAR })
       },
     });
   };
@@ -107,7 +107,60 @@ export async function scheduleTodoNotification(id: string, text: string, date: D
   });
 }
 
+export async function scheduleVoiceNoteNotification(id: string, title: string, date: Date) {
+  if (date.getTime() <= Date.now() + 1000) return;
+
+  await Notifications.scheduleNotificationAsync({
+    identifier: 'vn_' + id,
+    content: {
+      title: 'Voice Note Reminder 🎙️',
+      body: `Listen to: ${title || "Untitled Note"}`,
+      data: { id, type: 'voice' },
+      sound: Platform.OS === 'ios' ? 'mixkit_bell_notification_933.wav' : 'mixkit_bell_notification_933',
+    },
+    trigger: {
+      type: Notifications.SchedulableTriggerInputTypes.DATE,
+      date: date,
+      channelId: 'default',
+    },
+  });
+}
+
+const HABIT_QUOTES = [
+  "We are what we repeatedly do. Excellence, then, is not an act, but a habit. - Aristotle",
+  "Motivation is what gets you started. Habit is what keeps you going. - Jim Ryun",
+  "Success is the product of daily habits—not once-in-a-lifetime transformations. - James Clear",
+  "The chains of habit are too weak to be felt until they are too strong to be broken.",
+  "Small daily improvements over time lead to stunning results. - Robin Sharma",
+  "First forget inspiration. Habit is more dependable. - Octavia Butler",
+  "Success is buried in your daily routine.",
+  "Your future is found in your daily habits."
+];
+
+export async function scheduleHabitNotification(id: string, name: string, time: string) {
+  // time format "HH:mm"
+  const [hour, minute] = time.split(':').map(Number);
+  const quote = HABIT_QUOTES[Math.floor(Math.random() * HABIT_QUOTES.length)];
+
+  await Notifications.scheduleNotificationAsync({
+    identifier: 'habit_' + id,
+    content: {
+      title: `Habit Time: ${name} ✨`,
+      body: `${quote}`,
+      data: { id, type: 'habit' },
+      sound: Platform.OS === 'ios' ? 'mixkit_bell_notification_933.wav' : 'mixkit_bell_notification_933',
+    },
+    trigger: {
+      hour,
+      minute,
+      repeats: true,
+      ...(Platform.OS === 'android' ? { channelId: 'default' } : { type: Notifications.SchedulableTriggerInputTypes.CALENDAR })
+    },
+  });
+}
+
 export async function cancelReminderNotification(id: string) {
   await Notifications.cancelScheduledNotificationAsync(id);
   await Notifications.cancelScheduledNotificationAsync(id + '_early');
+  await Notifications.cancelScheduledNotificationAsync('habit_' + id);
 }

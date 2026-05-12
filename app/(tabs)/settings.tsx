@@ -10,7 +10,8 @@ import {
   Alert,
   Dimensions,
   Modal,
-  Image
+  Image,
+  Animated
 } from 'react-native';
 import { useDatabase } from '@/hooks/useDatabase';
 import { 
@@ -54,8 +55,18 @@ export default function SettingsScreen() {
   const [setupStep, setSetupStep] = useState<1|2>(1);
   const [pinError, setPinError] = useState(false);
 
+  const [themeAnim] = useState(new Animated.Value(settings.theme === 'dark' ? 1 : 0));
+  
   const toggleTheme = () => {
-    setSettings({ ...settings, theme: settings.theme === 'dark' ? 'light' : 'dark' });
+    const nextTheme = settings.theme === 'dark' ? 'light' : 'dark';
+    setSettings({ ...settings, theme: nextTheme });
+    
+    Animated.spring(themeAnim, {
+        toValue: nextTheme === 'dark' ? 1 : 0,
+        useNativeDriver: false,
+        friction: 8,
+        tension: 40
+    }).start();
   };
 
   const handlePickImage = async () => {
@@ -99,7 +110,7 @@ export default function SettingsScreen() {
       }
   };
 
-  const renderAvatar = (size: number = 90, borderRadius: number = 45) => {
+  const renderAvatar = (size: number = 120, borderRadius: number = 24) => {
     const GUEST_ICONS = [User, Ghost, Smile, Star, Zap];
     const GUEST_COLORS = ["#EB6001", "#22C55E", "#3B82F6", "#A855F7", "#F59E0B"];
     
@@ -120,11 +131,35 @@ export default function SettingsScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: Colors.background }]}>
-        <View style={styles.header}>
+        <View style={[styles.header, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
             <Text style={[styles.title, { color: Colors.text }]}>Settings</Text>
+            
+            {/* Animated Theme Toggle */}
+            <TouchableOpacity 
+              activeOpacity={0.9}
+              onPress={toggleTheme}
+              style={[styles.animatedToggleContainer, { backgroundColor: Colors.card, borderColor: Colors.border }]}
+            >
+              <Animated.View style={[
+                  styles.toggleThumb, 
+                  { 
+                    backgroundColor: Colors.primary,
+                    transform: [{
+                        translateX: themeAnim.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [4, 32]
+                        })
+                    }]
+                  }
+              ]} />
+              <View style={styles.toggleIconsRow}>
+                <Sun size={14} color={settings.theme === 'light' ? '#000' : Colors.textMuted} strokeWidth={settings.theme === 'light' ? 3 : 2} />
+                <Moon size={14} color={settings.theme === 'dark' ? '#000' : Colors.textMuted} strokeWidth={settings.theme === 'dark' ? 3 : 2} />
+              </View>
+            </TouchableOpacity>
         </View>
 
-        <ScrollView contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={{ paddingBottom: 130 }} showsVerticalScrollIndicator={false}>
             {/* Profile Section */}
             <View style={styles.profileHeader}>
                 <TouchableOpacity onPress={handlePickImage} style={styles.imageContainer}>
@@ -163,33 +198,6 @@ export default function SettingsScreen() {
             <View style={styles.section}>
                 <Text style={[styles.sectionTitle, { color: Colors.textMuted }]}>PREFERENCES</Text>
                 <View style={[styles.card, { backgroundColor: Colors.card, borderColor: Colors.border }]}>
-                    <View style={styles.settingItem}>
-                        <View style={styles.settingLeft}>
-                            <View style={[styles.iconBox, { backgroundColor: Colors.primary + '15' }]}>
-                                {settings.theme === 'dark' ? <Moon size={18} color={Colors.primary} /> : <Sun size={18} color={Colors.primary} />}
-                            </View>
-                            <Text style={[styles.settingLabel, { color: Colors.text }]}>Dark Mode</Text>
-                        </View>
-                        <Switch 
-                            value={settings.theme === 'dark'} 
-                            onValueChange={toggleTheme}
-                            trackColor={{ false: '#333', true: Colors.primary }}
-                        />
-                    </View>
-
-                    <View style={[styles.divider, { backgroundColor: Colors.border }]} />
-
-                    <TouchableOpacity style={styles.settingItem} onPress={() => setIsEditingName(true)}>
-                        <View style={styles.settingLeft}>
-                             <View style={[styles.iconBox, { backgroundColor: Colors.primary + '15' }]}>
-                                <User size={18} color={Colors.primary} />
-                            </View>
-                            <Text style={[styles.settingLabel, { color: Colors.text }]}>Change Name</Text>
-                        </View>
-                        <ChevronRight size={18} color={Colors.textMuted} />
-                    </TouchableOpacity>
-
-                    <View style={[styles.divider, { backgroundColor: Colors.border }]} />
 
                     <View style={styles.settingItem}>
                         <View style={styles.settingLeft}>
@@ -397,10 +405,10 @@ const styles = StyleSheet.create({
   header: { padding: 24, paddingBottom: 10 },
   title: { fontSize: 32, fontWeight: '900', letterSpacing: -1 },
   profileHeader: { alignItems: 'center', padding: 30, gap: 15 },
-  imageContainer: { width: 90, height: 90, borderRadius: 45, position: 'relative' },
-  profilePic: { width: 90, height: 90, borderRadius: 45 },
-  placeholderPic: { width: 90, height: 90, borderRadius: 45, borderWidth: 1, borderStyle: 'dashed', justifyContent: 'center', alignItems: 'center' },
-  cameraIcon: { position: 'absolute', bottom: -5, right: -5, width: 28, height: 28, borderRadius: 14, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#000' },
+  imageContainer: { width: 120, height: 120, borderRadius: 24, position: 'relative' },
+  profilePic: { width: 120, height: 120, borderRadius: 24 },
+  placeholderPic: { width: 120, height: 120, borderRadius: 24, borderWidth: 1, borderStyle: 'dashed', justifyContent: 'center', alignItems: 'center' },
+  cameraIcon: { position: 'absolute', bottom: -10, right: -10, width: 36, height: 36, borderRadius: 14, justifyContent: 'center', alignItems: 'center', borderWidth: 3, borderColor: '#000' },
   nameContainer: { alignItems: 'center' },
   profileName: { fontSize: 22, fontWeight: '900', letterSpacing: -0.5 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
@@ -429,4 +437,24 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 15 },
   key: { width: 70, height: 70, borderRadius: 35, justifyContent: 'center', alignItems: 'center' },
   keyText: { fontSize: 28, fontWeight: '500' },
+  animatedToggleContainer: {
+    width: 64,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    justifyContent: 'center',
+    paddingHorizontal: 0
+  },
+  toggleThumb: {
+    position: 'absolute',
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+  },
+  toggleIconsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    paddingHorizontal: 6
+  }
 });

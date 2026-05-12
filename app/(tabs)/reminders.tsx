@@ -7,7 +7,9 @@ import {
   ScrollView, 
   Alert,
   Modal,
-  TextInput
+  TextInput,
+  Platform,
+  KeyboardAvoidingView
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useDatabase, Reminder } from '@/hooks/useDatabase';
@@ -466,132 +468,141 @@ export default function RemindersScreen() {
 
       <Modal visible={isModalVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: Colors.card, borderColor: Colors.border }]}>
-            <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: Colors.text }]}>{editingRemId ? 'Edit Bill' : 'New Reminder'}</Text>
-              <TouchableOpacity onPress={() => setIsModalVisible(false)}><X color={Colors.text} size={24} /></TouchableOpacity>
-            </View>
+          <KeyboardAvoidingView 
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            style={[styles.modalContent, { backgroundColor: Colors.card, borderColor: Colors.border }]}
+          >
+            <ScrollView 
+              contentContainerStyle={{ flexGrow: 1, paddingBottom: 30 }} 
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              <View style={styles.modalHeader}>
+                <Text style={[styles.modalTitle, { color: Colors.text }]}>{editingRemId ? 'Edit Bill' : 'New Reminder'}</Text>
+                <TouchableOpacity onPress={() => setIsModalVisible(false)}><X color={Colors.text} size={24} /></TouchableOpacity>
+              </View>
 
-            <View style={{ marginBottom: 20, padding: 12, backgroundColor: Colors.background, borderRadius: 15, borderStyle: 'dashed', borderWidth: 1.5, borderColor: Colors.primary + '60' }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-                    <Sparkles size={14} color={Colors.primary} />
-                    <Text style={{ color: Colors.primary, fontSize: 11, fontWeight: '900', letterSpacing: 0.5 }}>PASTE SMS TO AUTO-FILL 🅾️</Text>
-                </View>
-                <TextInput
-                    placeholder="Paste bank/bill notification text here..."
-                    placeholderTextColor={Colors.textMuted}
-                    multiline
-                    numberOfLines={2}
-                    style={{ color: Colors.text, fontSize: 13, padding: 5 }}
-                    onChangeText={(text) => {
-                        if (text.length > 10) {
-                            const parsed = parseFinancialText(text);
-                            if (parsed) {
-                                setName(parsed.name);
-                                setAmount(parsed.amount.toString());
-                                setDueDay(parsed.date.getDate().toString());
-                                setType(parsed.type);
-                                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                            }
-                        }
-                    }}
-                />
-            </View>
-            
-            <TextInput style={[styles.input, { backgroundColor: Colors.background, color: Colors.text, borderColor: Colors.border }]} placeholder="Bill Name" placeholderTextColor={Colors.textMuted} value={name} onChangeText={setName} />
-            <View style={{ flexDirection: 'row', gap: 10, marginTop: 15 }}>
-              <TextInput style={[styles.input, { flex: 1, backgroundColor: Colors.background, color: Colors.text, borderColor: Colors.border }]} placeholder="Amount" placeholderTextColor={Colors.textMuted} keyboardType="numeric" value={amount} onChangeText={setAmount} />
-              <TextInput style={[styles.input, { width: 80, backgroundColor: Colors.background, color: Colors.text, borderColor: Colors.border }]} placeholder="Day" placeholderTextColor={Colors.textMuted} keyboardType="numeric" value={dueDay} onChangeText={setDueDay} maxLength={2} />
-            </View>
-
-            <View style={{ marginTop: 15 }}>
-              <TextInput style={[styles.input, { backgroundColor: Colors.background, color: Colors.text, borderColor: Colors.border }]} placeholder="Total Duration (Months) - Optional" placeholderTextColor={Colors.textMuted} keyboardType="numeric" value={totalMonths} onChangeText={setTotalMonths} />
-            </View>
-            
-            <View style={{ marginTop: 20 }}>
-                <Text style={[styles.sectionTitle, { color: Colors.textMuted }]}>Reminder Options</Text>
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
-                    {['none', 'on_day', '2_days_before', 'both', 'custom'].map((opt) => (
-                        <TouchableOpacity
-                            key={opt}
-                            style={[
-                                styles.pickerBtn, 
-                                { flex: 1, minWidth: '28%', backgroundColor: alertType === opt ? Colors.primary : Colors.background, borderColor: alertType === opt ? Colors.primary : Colors.border }
-                            ]}
-                            onPress={() => setAlertType(opt as any)}
-                        >
-                            <Text style={{ 
-                                color: alertType === opt ? '#000' : Colors.text, 
-                                fontSize: 11, 
-                                fontWeight: '700' 
-                            }}>
-                                {opt === 'none' ? 'None' : opt === 'on_day' ? 'Due Date' : opt === '2_days_before' ? '2 Days Prior' : opt === 'both' ? 'Both' : 'Strict Date'}
-                            </Text>
-                        </TouchableOpacity>
-                    ))}
-                </View>
-
-                {alertType === 'custom' && (
-                  <View style={{ flexDirection: 'row', gap: 10, marginTop: 15 }}>
-                      <TouchableOpacity 
-                          style={[styles.pickerBtn, { backgroundColor: Colors.background, borderColor: Colors.border }]}
-                          onPress={() => setShowDate(true)}
-                      >
-                          <Calendar size={18} color={Colors.primary} />
-                          <Text style={{ color: Colors.text, fontSize: 13, fontWeight: '700' }}>{date.toLocaleDateString()}</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity 
-                          style={[styles.pickerBtn, { backgroundColor: Colors.background, borderColor: Colors.border }]}
-                          onPress={() => setShowTime(true)}
-                      >
-                          <Clock size={18} color={Colors.primary} />
-                          <Text style={{ color: Colors.text, fontSize: 13, fontWeight: '700' }}>{date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text>
-                      </TouchableOpacity>
+              <View style={{ marginBottom: 20, padding: 12, backgroundColor: Colors.background, borderRadius: 15, borderStyle: 'dashed', borderWidth: 1.5, borderColor: Colors.primary + '60' }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                      <Sparkles size={14} color={Colors.primary} />
+                      <Text style={{ color: Colors.primary, fontSize: 11, fontWeight: '900', letterSpacing: 0.5 }}>PASTE SMS TO AUTO-FILL 🅾️</Text>
                   </View>
-                )}
-            </View>
+                  <TextInput
+                      placeholder="Paste bank/bill notification text here..."
+                      placeholderTextColor={Colors.textMuted}
+                      multiline
+                      numberOfLines={2}
+                      style={{ color: Colors.text, fontSize: 13, padding: 5 }}
+                      onChangeText={(text) => {
+                          if (text.length > 10) {
+                              const parsed = parseFinancialText(text);
+                              if (parsed) {
+                                  setName(parsed.name);
+                                  setAmount(parsed.amount.toString());
+                                  setDueDay(parsed.date.getDate().toString());
+                                  setType(parsed.type);
+                                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                              }
+                          }
+                      }}
+                  />
+              </View>
+              
+              <TextInput style={[styles.input, { backgroundColor: Colors.background, color: Colors.text, borderColor: Colors.border }]} placeholder="Bill Name" placeholderTextColor={Colors.textMuted} value={name} onChangeText={setName} />
+              <View style={{ flexDirection: 'row', gap: 10, marginTop: 15 }}>
+                <TextInput style={[styles.input, { flex: 1, backgroundColor: Colors.background, color: Colors.text, borderColor: Colors.border }]} placeholder="Amount" placeholderTextColor={Colors.textMuted} keyboardType="numeric" value={amount} onChangeText={setAmount} />
+                <TextInput style={[styles.input, { width: 80, backgroundColor: Colors.background, color: Colors.text, borderColor: Colors.border }]} placeholder="Day" placeholderTextColor={Colors.textMuted} keyboardType="numeric" value={dueDay} onChangeText={setDueDay} maxLength={2} />
+              </View>
 
-            {showDate && (
-                <DateTimePicker
-                    value={date}
-                    mode="date"
-                    display="default"
-                    onChange={(e, d) => {
-                        setShowDate(false);
-                        if(d) {
-                            const next = new Date(date);
-                            next.setFullYear(d.getFullYear());
-                            next.setMonth(d.getMonth());
-                            next.setDate(d.getDate());
-                            setDate(next);
-                        }
-                    }}
-                />
-            )}
-            {showTime && (
-                <DateTimePicker
-                    value={date}
-                    mode="time"
-                    display="default"
-                    onChange={(e, d) => {
-                        setShowTime(false);
-                        if(d) {
-                            const next = new Date(date);
-                            next.setHours(d.getHours());
-                            next.setMinutes(d.getMinutes());
-                            next.setSeconds(0);
-                            setDate(next);
-                        }
-                    }}
-                />
-            )}
-            
-            <TouchableOpacity style={[styles.saveBtn, { backgroundColor: Colors.primary }]} onPress={handleSave}>
-              <Text style={{ color: '#fff', fontSize: 18, fontWeight: 'bold' }}>Save Goal</Text>
-            </TouchableOpacity>
+              <View style={{ marginTop: 15 }}>
+                <TextInput style={[styles.input, { backgroundColor: Colors.background, color: Colors.text, borderColor: Colors.border }]} placeholder="Total Duration (Months) - Optional" placeholderTextColor={Colors.textMuted} keyboardType="numeric" value={totalMonths} onChangeText={setTotalMonths} />
+              </View>
+              
+              <View style={{ marginTop: 20 }}>
+                  <Text style={[styles.sectionTitle, { color: Colors.textMuted }]}>Reminder Options</Text>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+                      {['none', 'on_day', '2_days_before', 'both', 'custom'].map((opt) => (
+                          <TouchableOpacity
+                              key={opt}
+                              style={[
+                                  styles.pickerBtn, 
+                                  { flex: 1, minWidth: '28%', backgroundColor: alertType === opt ? Colors.primary : Colors.background, borderColor: alertType === opt ? Colors.primary : Colors.border }
+                              ]}
+                              onPress={() => setAlertType(opt as any)}
+                          >
+                              <Text style={{ 
+                                  color: alertType === opt ? '#000' : Colors.text, 
+                                  fontSize: 11, 
+                                  fontWeight: '700' 
+                              }}>
+                                  {opt === 'none' ? 'None' : opt === 'on_day' ? 'Due Date' : opt === '2_days_before' ? '2 Days Prior' : opt === 'both' ? 'Both' : 'Strict Date'}
+                              </Text>
+                          </TouchableOpacity>
+                      ))}
+                  </View>
 
-            <FlowBannerAd />
-          </View>
+                  {alertType === 'custom' && (
+                    <View style={{ flexDirection: 'row', gap: 10, marginTop: 15 }}>
+                        <TouchableOpacity 
+                            style={[styles.pickerBtn, { backgroundColor: Colors.background, borderColor: Colors.border }]}
+                            onPress={() => setShowDate(true)}
+                        >
+                            <Calendar size={18} color={Colors.primary} />
+                            <Text style={{ color: Colors.text, fontSize: 13, fontWeight: '700' }}>{date.toLocaleDateString()}</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity 
+                            style={[styles.pickerBtn, { backgroundColor: Colors.background, borderColor: Colors.border }]}
+                            onPress={() => setShowTime(true)}
+                        >
+                            <Clock size={18} color={Colors.primary} />
+                            <Text style={{ color: Colors.text, fontSize: 13, fontWeight: '700' }}>{date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text>
+                        </TouchableOpacity>
+                    </View>
+                  )}
+              </View>
+
+              {showDate && (
+                  <DateTimePicker
+                      value={date}
+                      mode="date"
+                      display="default"
+                      onChange={(e, d) => {
+                          setShowDate(false);
+                          if(d) {
+                              const next = new Date(date);
+                              next.setFullYear(d.getFullYear());
+                              next.setMonth(d.getMonth());
+                              next.setDate(d.getDate());
+                              setDate(next);
+                          }
+                      }}
+                  />
+              )}
+              {showTime && (
+                  <DateTimePicker
+                      value={date}
+                      mode="time"
+                      display="default"
+                      onChange={(e, d) => {
+                          setShowTime(false);
+                          if(d) {
+                              const next = new Date(date);
+                              next.setHours(d.getHours());
+                              next.setMinutes(d.getMinutes());
+                              next.setSeconds(0);
+                              setDate(next);
+                          }
+                      }}
+                  />
+              )}
+              
+              <TouchableOpacity style={[styles.saveBtn, { backgroundColor: Colors.primary }]} onPress={handleSave}>
+                <Text style={{ color: '#fff', fontSize: 18, fontWeight: 'bold' }}>Save Goal</Text>
+              </TouchableOpacity>
+
+              <FlowBannerAd />
+            </ScrollView>
+          </KeyboardAvoidingView>
         </View>
       </Modal>
 

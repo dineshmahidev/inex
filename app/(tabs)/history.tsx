@@ -267,7 +267,7 @@ export default function HistoryScreen() {
                   );
               })
           )}
-          <View style={{ height: 100 }} />
+          <View style={{ height: 130 }} />
       </ScrollView>
 
       {/* FAB Button */}
@@ -314,7 +314,7 @@ const styles = StyleSheet.create({
   filterRow: { flexDirection: 'row', gap: 10 },
   typeChip: { paddingVertical: 8, paddingHorizontal: 16, borderRadius: 12, borderWidth: 1 },
   typeText: { fontSize: 11, fontWeight: 'BOLD', letterSpacing: 1 },
-  content: { padding: 20 },
+  content: { padding: 20, paddingBottom: 50 },
   card: { flexDirection: 'row', alignItems: 'center', padding: 16, borderRadius: 24, marginBottom: 12, borderWidth: 1 },
   iconBox: { width: 48, height: 48, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
   cardMain: { flex: 1, marginLeft: 15 },
@@ -326,7 +326,7 @@ const styles = StyleSheet.create({
   empty: { padding: 80, alignItems: 'center' },
   fab: {
     position: "absolute",
-    bottom: 30,
+    bottom: 50,
     right: 30,
     width: 68,
     height: 68,

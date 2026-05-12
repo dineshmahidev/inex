@@ -18,6 +18,10 @@ export default function LockScreen() {
     const [newPin, setNewPin] = useState('');
     const isAuthenticating = useRef(false);
 
+    useEffect(() => {
+        // Biometrics auto-prompt removed as per user request
+    }, []);
+
     const handleBiometricAuth = async () => {
         if (isAuthenticating.current) return;
         
@@ -152,9 +156,7 @@ export default function LockScreen() {
                     </View>
                 ))}
                 <View style={styles.row}>
-                    <TouchableOpacity style={styles.key} onPress={handleBiometricAuth}>
-                        <Fingerprint size={32} color={Colors.primary} />
-                    </TouchableOpacity>
+                    <View style={styles.key} />
                     <TouchableOpacity style={styles.key} onPress={() => handleKeyPress('0')}>
                         <Text style={[styles.keyText, { color: Colors.text }]}>0</Text>
                     </TouchableOpacity>

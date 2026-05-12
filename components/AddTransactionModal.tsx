@@ -90,68 +90,77 @@ export function AddTransactionModal({ visible, onClose, onAdd, initialData, onUp
   return (
     <Modal visible={visible} animationType="slide" transparent>
       <View style={styles.overlay}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={[styles.content, { backgroundColor: Colors.card }]}>
-          <View style={styles.header}>
-            <Text style={[styles.title, { color: Colors.text }]}>{initialData ? 'Edit Transaction' : 'New Transaction'}</Text>
-            <TouchableOpacity onPress={onClose}><X color={Colors.text} size={24} /></TouchableOpacity>
-          </View>
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined} 
+          style={[styles.content, { backgroundColor: Colors.card }]}
+        >
+          <ScrollView 
+            contentContainerStyle={{ flexGrow: 1, paddingBottom: 20 }} 
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            <View style={styles.header}>
+              <Text style={[styles.title, { color: Colors.text }]}>{initialData ? 'Edit Transaction' : 'New Transaction'}</Text>
+              <TouchableOpacity onPress={onClose}><X color={Colors.text} size={24} /></TouchableOpacity>
+            </View>
 
-          <View style={[styles.typeSwitcher, { backgroundColor: Colors.background }]}>
-            <TouchableOpacity style={[styles.typeBtn, type === 'income' && styles.typeBtnActiveIn]} onPress={() => setType('income')}>
-              <Text style={[styles.typeBtnText, type === 'income' ? styles.textWhite : { color: Colors.textMuted }]}>Income</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.typeBtn, type === 'expense' && styles.typeBtnActiveEx]} onPress={() => setType('expense')}>
-              <Text style={[styles.typeBtnText, type === 'expense' ? styles.textWhite : { color: Colors.textMuted }]}>Expense</Text>
-            </TouchableOpacity>
-          </View>
-
-          <TextInput 
-            style={[styles.amountInput, { color: Colors.text }]}
-            placeholder="₹0.00"
-            placeholderTextColor={Colors.textMuted}
-            keyboardType="decimal-pad"
-            value={amount}
-            onChangeText={setAmount}
-            autoFocus
-          />
-
-          <View style={styles.noteContainer}>
-            <TextInput 
-              style={[styles.noteInput, { color: Colors.text, borderColor: Colors.border }]}
-              placeholder="What was this for? (e.g. Pizza with friends)"
-              placeholderTextColor={Colors.textMuted}
-              value={note}
-              onChangeText={setNote}
-              multiline
-            />
-            {isAiSuggesting && (
-              <View style={styles.aiLabel}>
-                <Sparkles size={10} color={Colors.primary} />
-                <Text style={[styles.aiLabelText, { color: Colors.primary }]}>AI Categorized</Text>
-              </View>
-            )}
-          </View>
-
-          <Text style={[styles.sectionLabel, { color: Colors.textMuted }]}>Select Category</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.catScroll}>
-            {categories.filter(c => c.type === type).map(cat => (
-              <TouchableOpacity 
-                key={cat.id} 
-                style={[styles.catItem, { backgroundColor: Colors.background, borderColor: Colors.border }, categoryId === cat.id && { backgroundColor: cat.color + '20', borderColor: cat.color }]}
-                onPress={() => setCategoryId(cat.id)}
-              >
-                <Text style={[styles.catText, { color: Colors.textMuted }, categoryId === cat.id && { color: cat.color }]}>{cat.name}</Text>
+            <View style={[styles.typeSwitcher, { backgroundColor: Colors.background }]}>
+              <TouchableOpacity style={[styles.typeBtn, type === 'income' && styles.typeBtnActiveIn]} onPress={() => setType('income')}>
+                <Text style={[styles.typeBtnText, type === 'income' ? styles.textWhite : { color: Colors.textMuted }]}>Income</Text>
               </TouchableOpacity>
-            ))}
+              <TouchableOpacity style={[styles.typeBtn, type === 'expense' && styles.typeBtnActiveEx]} onPress={() => setType('expense')}>
+                <Text style={[styles.typeBtnText, type === 'expense' ? styles.textWhite : { color: Colors.textMuted }]}>Expense</Text>
+              </TouchableOpacity>
+            </View>
+
+            <TextInput 
+              style={[styles.amountInput, { color: Colors.text }]}
+              placeholder="₹0.00"
+              placeholderTextColor={Colors.textMuted}
+              keyboardType="decimal-pad"
+              value={amount}
+              onChangeText={setAmount}
+              autoFocus
+            />
+
+            <View style={styles.noteContainer}>
+              <TextInput 
+                style={[styles.noteInput, { color: Colors.text, borderColor: Colors.border }]}
+                placeholder="What was this for? (e.g. Pizza with friends)"
+                placeholderTextColor={Colors.textMuted}
+                value={note}
+                onChangeText={setNote}
+                multiline
+              />
+              {isAiSuggesting && (
+                <View style={styles.aiLabel}>
+                  <Sparkles size={10} color={Colors.primary} />
+                  <Text style={[styles.aiLabelText, { color: Colors.primary }]}>AI Categorized</Text>
+                </View>
+              )}
+            </View>
+
+            <Text style={[styles.sectionLabel, { color: Colors.textMuted }]}>Select Category</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.catScroll}>
+              {categories.filter(c => c.type === type).map(cat => (
+                <TouchableOpacity 
+                  key={cat.id} 
+                  style={[styles.catItem, { backgroundColor: Colors.background, borderColor: Colors.border }, categoryId === cat.id && { backgroundColor: cat.color + '20', borderColor: cat.color }]}
+                  onPress={() => setCategoryId(cat.id)}
+                >
+                  <Text style={[styles.catText, { color: Colors.textMuted }, categoryId === cat.id && { color: cat.color }]}>{cat.name}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            <TouchableOpacity style={[styles.saveBtn, { backgroundColor: Colors.primary }]} onPress={handleAdd}>
+              <Text style={[styles.saveBtnText, { color: Colors.background }]}>
+                {initialData ? 'Update Transaction' : 'Record Transaction'}
+              </Text>
+            </TouchableOpacity>
+
+            <FlowBannerAd />
           </ScrollView>
-
-          <TouchableOpacity style={[styles.saveBtn, { backgroundColor: Colors.primary }]} onPress={handleAdd}>
-            <Text style={[styles.saveBtnText, { color: Colors.background }]}>
-              {initialData ? 'Update Transaction' : 'Record Transaction'}
-            </Text>
-          </TouchableOpacity>
-
-          <FlowBannerAd />
         </KeyboardAvoidingView>
       </View>
     </Modal>
@@ -159,8 +168,8 @@ export function AddTransactionModal({ visible, onClose, onAdd, initialData, onUp
 }
 
 const styles = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'flex-end' },
-  content: { borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 24 },
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,1)' },
+  content: { flex: 1, padding: 24, paddingTop: Platform.OS === 'ios' ? 60 : 40 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
   title: { fontSize: 20, fontWeight: 'bold' },
   typeSwitcher: { flexDirection: 'row', borderRadius: 16, padding: 4, marginBottom: 24 },
@@ -169,15 +178,15 @@ const styles = StyleSheet.create({
   typeBtnActiveEx: { backgroundColor: '#EF4444' },
   typeBtnText: { fontWeight: '700' },
   textWhite: { color: '#fff' },
-  amountInput: { fontSize: 48, fontWeight: '800', textAlign: 'center', marginBottom: 24 },
-  noteContainer: { marginBottom: 24 },
+  amountInput: { fontSize: 48, fontWeight: '800', textAlign: 'center', marginBottom: 8 },
+  noteContainer: { marginBottom: 16 },
   noteInput: { fontSize: 16, borderBottomWidth: 1, paddingVertical: 12 },
   aiLabel: { flexDirection: 'row', alignItems: 'center', gap: 4, position: 'absolute', right: 0, bottom: -20 },
   aiLabelText: { fontSize: 10, fontWeight: '600' },
-  sectionLabel: { fontSize: 14, fontWeight: '600', marginBottom: 12 },
-  catScroll: { marginBottom: 32 },
-  catItem: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, marginRight: 8, borderWidth: 1 },
-  catText: { fontWeight: '600' },
+  sectionLabel: { fontSize: 14, fontWeight: '600', marginBottom: 8 },
+  catScroll: { marginBottom: 24 },
+  catItem: { paddingHorizontal: 12, height: 32, justifyContent: 'center', borderRadius: 10, marginRight: 8, borderWidth: 1 },
+  catText: { fontWeight: '700', fontSize: 12 },
   saveBtn: { paddingVertical: 18, borderRadius: 16, alignItems: 'center', marginBottom: 20 },
   saveBtnText: { fontSize: 16, fontWeight: 'bold' },
   adPlaceholder: {

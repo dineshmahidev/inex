@@ -25,10 +25,20 @@ export default function TabLayout() {
         tabBarShowLabel: false,
         tabBarStyle: {
           backgroundColor: Colors.card,
-          height: Platform.OS === "ios" ? 60 + insets.bottom : 65,
+          height: 60,
           borderTopWidth: 1,
           borderTopColor: Colors.border,
-          elevation: 0,
+          elevation: 12,
+          paddingTop: 10,
+        },
+        tabBarItemStyle: {
+          justifyContent: 'center',
+          alignItems: 'center',
+          height: 60,
+        },
+        tabBarIconStyle: {
+          width: 30,
+          height: 30,
         },
       }}
     >
@@ -36,12 +46,8 @@ export default function TabLayout() {
         name="index"
         options={{
           tabBarIcon: ({ color, focused }) => (
-            <View style={styles.tabIconContainer}>
-              {focused && (
-                <View
-                  style={[styles.topLine, { backgroundColor: Colors.primary }]}
-                />
-              )}
+            <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+              {focused && <View style={styles.indicator} />}
               <LayoutDashboard
                 size={26}
                 color={color}
@@ -65,12 +71,8 @@ export default function TabLayout() {
         name="history"
         options={{
           tabBarIcon: ({ color, focused }) => (
-            <View style={styles.tabIconContainer}>
-              {focused && (
-                <View
-                  style={[styles.topLine, { backgroundColor: Colors.primary }]}
-                />
-              )}
+            <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+              {focused && <View style={styles.indicator} />}
               <History
                 size={26}
                 color={color}
@@ -94,12 +96,8 @@ export default function TabLayout() {
         name="reminders"
         options={{
           tabBarIcon: ({ color, focused }) => (
-            <View style={styles.tabIconContainer}>
-              {focused && (
-                <View
-                  style={[styles.topLine, { backgroundColor: Colors.primary }]}
-                />
-              )}
+            <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+              {focused && <View style={styles.indicator} />}
               <BellRing
                 size={26}
                 color={color}
@@ -123,12 +121,8 @@ export default function TabLayout() {
         name="todo"
         options={{
           tabBarIcon: ({ color, focused }) => (
-            <View style={styles.tabIconContainer}>
-              {focused && (
-                <View
-                  style={[styles.topLine, { backgroundColor: Colors.primary }]}
-                />
-              )}
+            <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+              {focused && <View style={styles.indicator} />}
               <LayoutList
                 size={26}
                 color={color}
@@ -152,12 +146,8 @@ export default function TabLayout() {
         name="settings"
         options={{
           tabBarIcon: ({ color, focused }) => (
-            <View style={styles.tabIconContainer}>
-              {focused && (
-                <View
-                  style={[styles.topLine, { backgroundColor: Colors.primary }]}
-                />
-              )}
+            <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+              {focused && <View style={styles.indicator} />}
               <Settings
                 size={26}
                 color={color}
@@ -182,19 +172,12 @@ export default function TabLayout() {
 }
 
 const styles = StyleSheet.create({
-  tabIconContainer: {
-    width: 44,
-    height: "100%",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingTop: 20, // Significantly increased space
-  },
-  topLine: {
+  indicator: {
     position: "absolute",
-    top: 0,
-    width: 24,
-    height: 4, // Slightly thicker for better visibility
-    borderBottomLeftRadius: 4,
-    borderBottomRightRadius: 4,
+    top: -8, // 2px gap above the icon
+    width: 20,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: "#EB6001", // Hardcoded primary for styles or use inline
   },
 });

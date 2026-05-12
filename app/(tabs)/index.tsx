@@ -174,7 +174,6 @@ export default function DashboardScreen() {
       <StatusBar
         barStyle={settings.theme === "dark" ? "light-content" : "dark-content"}
       />
-      <SecurityLock settings={settings} onUnlock={() => setIsLocked(false)} />
 
       {/* Brand & Profile Header */}
       <View style={styles.brandHeader}>
@@ -457,7 +456,7 @@ const styles = StyleSheet.create({
   monthBox: { alignItems: "center" },
   monthText: { fontSize: 18, fontWeight: "800", textTransform: "uppercase" },
   yearText: { fontSize: 10, fontWeight: "bold" },
-  scrollContent: { padding: 20, paddingBottom: 110 },
+  scrollContent: { padding: 20, paddingBottom: 130 },
   aiContainer: {
     marginVertical: 10,
     borderRadius: 28,
@@ -516,7 +515,7 @@ const styles = StyleSheet.create({
   txAmount: { fontSize: 16, fontWeight: "900" },
   fab: {
     position: 'absolute',
-    bottom: 30,
+    bottom: 50,
     right: 30,
     zIndex: 100,
   },
