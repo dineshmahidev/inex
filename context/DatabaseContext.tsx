@@ -178,7 +178,7 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
   const load = async () => {
     try {
       // 1. Load Current Version Data
-      const [t, c, r, s, n, td, h, sms] = await Promise.all([
+      const [t, c, r, s, n, td, h, vn, sms] = await Promise.all([
         AsyncStorage.getItem(KEYS.DATA),
         AsyncStorage.getItem(KEYS.CATS),
         AsyncStorage.getItem(KEYS.REMINDERS),
@@ -492,6 +492,7 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
       if (data.notes) setNotes(data.notes);
       if (data.todos) setTodos(data.todos);
       if (data.habits) setHabits(data.habits);
+      if (data.voiceNotes) setVoiceNotes(data.voiceNotes);
       
       await Promise.all([
           AsyncStorage.setItem(KEYS.DATA, JSON.stringify(data.transactions || [])),

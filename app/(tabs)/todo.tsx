@@ -1089,7 +1089,8 @@ export default function TodoScreen() {
       )}
 
       {mainTab === "notes" && (
-        <ScrollView
+        <>
+          <ScrollView
           contentContainerStyle={styles.content}
           showsVerticalScrollIndicator={false}
         >
@@ -1268,10 +1269,12 @@ export default function TodoScreen() {
         >
           <Plus size={32} color="#000" />
         </TouchableOpacity>
+        </>
       )}
 
       {mainTab === "habits" && (
-        <ScrollView
+        <>
+          <ScrollView
           contentContainerStyle={styles.content}
           showsVerticalScrollIndicator={false}
         >
@@ -1505,6 +1508,7 @@ export default function TodoScreen() {
         >
           <Plus size={32} color="#000" />
         </TouchableOpacity>
+        </>
       )}
 
       {mainTab === "sms" && (
