@@ -153,6 +153,7 @@ export default function RemindersScreen() {
       setAlertType("none");
       setDate(new Date(Date.now() + 5 * 60000));
     }
+    setIsSubmitting(false);
     setIsModalVisible(true);
   };
 
@@ -178,8 +179,12 @@ export default function RemindersScreen() {
     return reminders?.filter((r) => r.isCompleted) || [];
   }, [reminders]);
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const handleSave = async () => {
+    if (isSubmitting) return;
     if (!name || !amount || !dueDay) return;
+    setIsSubmitting(true);
 
     const parsedAmount = parseFloat(amount);
     const parsedDueDay = parseInt(dueDay);

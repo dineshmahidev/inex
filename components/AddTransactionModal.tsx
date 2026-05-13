@@ -55,11 +55,22 @@ export function AddTransactionModal({ visible, onClose, onAdd, initialData, onUp
     }
   }, [note]);
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (visible) {
+      setIsSubmitting(false);
+    }
+  }, [visible]);
+
   const handleAdd = () => {
+    if (isSubmitting) return;
     if (!amount || !categoryId) {
       Alert.alert("Missing Info", "Please enter amount and category");
       return;
     }
+    
+    setIsSubmitting(true);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     if (initialData && onUpdate) {
         onUpdate(initialData.id, {

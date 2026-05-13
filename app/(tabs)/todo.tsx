@@ -191,6 +191,7 @@ export default function TodoScreen() {
   const [sound, setSound] = useState<Audio.Sound | null>(null);
   const [isPlayingId, setIsPlayingId] = useState<string | null>(null);
   const [isVoiceModalVisible, setIsVoiceModalVisible] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [vnTitle, setVnTitle] = useState("");
   const [vnDate, setVnDate] = useState(new Date());
   const [showVnDate, setShowVnDate] = useState(false);
@@ -253,7 +254,8 @@ export default function TodoScreen() {
   };
 
   const addTodo = async () => {
-    if (!task) return;
+    if (isSubmitting || !task) return;
+    setIsSubmitting(true);
 
     if (editingTodoId) {
       await updateTodo(editingTodoId, {
@@ -301,6 +303,7 @@ export default function TodoScreen() {
     setTodoDate(new Date(Date.now() + 5 * 60000));
     setIsStarred(false);
     setEditingTodoId(null);
+    setIsSubmitting(false);
     setIsModalVisible(false);
   };
 
@@ -320,6 +323,7 @@ export default function TodoScreen() {
           if (todo.reminderDate) {
             setTodoDate(new Date(todo.reminderDate));
           }
+          setIsSubmitting(false);
           setIsModalVisible(true);
         },
       },
@@ -366,7 +370,8 @@ export default function TodoScreen() {
   };
 
   const handleAddNote = async () => {
-    if (!noteTitle || !noteText) return;
+    if (isSubmitting || !noteTitle || !noteText) return;
+    setIsSubmitting(true);
 
     if (editingNoteId) {
       await updateNote(editingNoteId, {
@@ -388,6 +393,7 @@ export default function TodoScreen() {
     setNoteTitle("");
     setNoteText("");
     setEditingNoteId(null);
+    setIsSubmitting(false);
     setIsNoteModalVisible(false);
   };
 
@@ -402,7 +408,8 @@ export default function TodoScreen() {
   };
 
   const handleCreateHabit = async () => {
-    if (!hName) return;
+    if (isSubmitting || !hName) return;
+    setIsSubmitting(true);
 
     if (editingHabitId) {
       await updateHabit(editingHabitId, {
@@ -436,6 +443,7 @@ export default function TodoScreen() {
     setHName("");
     setHTime("");
     setEditingHabitId(null);
+    setIsSubmitting(false);
     setIsHabitModalVisible(false);
   };
 
@@ -453,6 +461,7 @@ export default function TodoScreen() {
       setHIcon("Zap");
       setHTime("");
     }
+    setIsSubmitting(false);
     setIsHabitModalVisible(true);
   };
 
@@ -593,6 +602,7 @@ export default function TodoScreen() {
       setRecordedUri(uri || null);
       setRecording(null);
       if (uri) {
+        setIsSubmitting(false);
         setIsVoiceModalVisible(true);
       }
     } catch (err) {
@@ -644,7 +654,8 @@ export default function TodoScreen() {
   };
 
   const handleSaveVoiceNote = async () => {
-    if (!recordedUri) return;
+    if (isSubmitting || !recordedUri) return;
+    setIsSubmitting(true);
 
     try {
       const fileName = `voice_${Date.now()}.m4a`;
@@ -682,6 +693,7 @@ export default function TodoScreen() {
       setRecordedUri(null);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (error) {
+      setIsSubmitting(false);
       console.error("Failed to save voice note:", error);
       Alert.alert("Save Failed", "Could not persist the audio mission.");
     }
@@ -698,8 +710,7 @@ export default function TodoScreen() {
           if (uri) {
             try {
               // Ensure we delete the actual file
-              const fileToDelete = new FileSystem.File(uri);
-              await fileToDelete.delete();
+              await FileSystem.deleteAsync(uri, { idempotent: true });
             } catch (err) {
               console.warn("Failed to delete audio file:", err);
             }
@@ -1173,7 +1184,10 @@ export default function TodoScreen() {
 
           {!isSelectionMode && (
             <TouchableOpacity
-              onPress={() => setIsModalVisible(true)}
+              onPress={() => {
+                setIsSubmitting(false);
+                setIsModalVisible(true);
+              }}
               style={[
                 styles.mainFab,
                 { backgroundColor: Colors.primary, bottom: 20 + insets.bottom },
