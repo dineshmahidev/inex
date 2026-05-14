@@ -8,9 +8,27 @@ import {
     LayoutList,
     Settings,
 } from "lucide-react-native";
-import React from "react";
-import { StyleSheet, TouchableOpacity } from "react-native";
+import React, { useEffect, useRef } from "react";
+import { StyleSheet, TouchableOpacity, Animated } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+const AnimatedIcon = ({ focused, children }: any) => {
+  const scale = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    Animated.spring(scale, {
+      toValue: focused ? 1.2 : 1,
+      useNativeDriver: true,
+      friction: 4,
+    }).start();
+  }, [focused]);
+
+  return (
+    <Animated.View style={{ transform: [{ scale }] }}>
+      {children}
+    </Animated.View>
+  );
+};
 
 export default function TabLayout() {
   const { Colors } = useDatabase();
@@ -42,11 +60,13 @@ export default function TabLayout() {
         name="index"
         options={{
           tabBarIcon: ({ color, focused }) => (
-            <LayoutDashboard
-              size={26}
-              color={color}
-              strokeWidth={focused ? 2.5 : 2}
-            />
+            <AnimatedIcon focused={focused}>
+              <LayoutDashboard
+                size={26}
+                color={color}
+                strokeWidth={focused ? 2.5 : 2}
+              />
+            </AnimatedIcon>
           ),
           tabBarButton: (props) => (
             <TouchableOpacity
@@ -64,7 +84,9 @@ export default function TabLayout() {
         name="history"
         options={{
           tabBarIcon: ({ color, focused }) => (
-            <History size={26} color={color} strokeWidth={focused ? 2.5 : 2} />
+            <AnimatedIcon focused={focused}>
+              <History size={26} color={color} strokeWidth={focused ? 2.5 : 2} />
+            </AnimatedIcon>
           ),
           tabBarButton: (props) => (
             <TouchableOpacity
@@ -82,7 +104,9 @@ export default function TabLayout() {
         name="reminders"
         options={{
           tabBarIcon: ({ color, focused }) => (
-            <BellRing size={26} color={color} strokeWidth={focused ? 2.5 : 2} />
+            <AnimatedIcon focused={focused}>
+              <BellRing size={26} color={color} strokeWidth={focused ? 2.5 : 2} />
+            </AnimatedIcon>
           ),
           tabBarButton: (props) => (
             <TouchableOpacity
@@ -100,11 +124,13 @@ export default function TabLayout() {
         name="todo"
         options={{
           tabBarIcon: ({ color, focused }) => (
-            <LayoutList
-              size={26}
-              color={color}
-              strokeWidth={focused ? 2.5 : 2}
-            />
+            <AnimatedIcon focused={focused}>
+              <LayoutList
+                size={26}
+                color={color}
+                strokeWidth={focused ? 2.5 : 2}
+              />
+            </AnimatedIcon>
           ),
           tabBarButton: (props) => (
             <TouchableOpacity
@@ -122,7 +148,9 @@ export default function TabLayout() {
         name="settings"
         options={{
           tabBarIcon: ({ color, focused }) => (
-            <Settings size={26} color={color} strokeWidth={focused ? 2.5 : 2} />
+            <AnimatedIcon focused={focused}>
+              <Settings size={26} color={color} strokeWidth={focused ? 2.5 : 2} />
+            </AnimatedIcon>
           ),
           tabBarButton: (props) => (
             <TouchableOpacity

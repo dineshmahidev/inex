@@ -199,7 +199,7 @@ export default function DashboardScreen() {
       {/* Screen Header */}
       <View style={styles.header}>
         <View>
-          <Text style={[styles.title, { color: Colors.text }]}>Dashboard</Text>
+          <Text style={[styles.title, { color: Colors.text }]}>Tracksy</Text>
           <View style={styles.scoreRow}>
             <Sparkles size={12} color={Colors.primary} />
             <Text style={[styles.brandElite, { color: Colors.primary }]}>
@@ -333,7 +333,7 @@ export default function DashboardScreen() {
             <View
               style={[styles.gridIcon, { backgroundColor: Colors.background }]}
             >
-              <Zap size={18} color={Colors.accent} />
+              <Text style={{ fontSize: 18 }}>📈</Text>
             </View>
             <Text style={[styles.gridLabel, { color: Colors.textMuted }]}>
               Savings Rate
@@ -354,7 +354,7 @@ export default function DashboardScreen() {
             <View
               style={[styles.gridIcon, { backgroundColor: Colors.background }]}
             >
-              <Target size={18} color={Colors.primary} />
+              <Text style={{ fontSize: 18 }}>🔔</Text>
             </View>
             <Text style={[styles.gridLabel, { color: Colors.textMuted }]}>
               Reminders

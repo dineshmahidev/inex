@@ -121,8 +121,8 @@ export default function SettingsScreen() {
     }
   };
 
-  const renderAvatar = (size: number = 120, borderRadius: number = 24) => {
-    const GUEST_ICONS = [User, Ghost, Smile, Star, Zap];
+  const renderAvatar = (size: number = 120, borderRadius: number = 60) => {
+    const GUEST_ICONS = ["👤", "👻", "😀", "⭐", "⚡"];
     const GUEST_COLORS = [
       "#EB6001",
       "#22C55E",
@@ -134,7 +134,7 @@ export default function SettingsScreen() {
     const hash = (settings.userName || "Guest")
       .split("")
       .reduce((acc, char) => acc + char.charCodeAt(0), 0);
-    const IconComponent = GUEST_ICONS[hash % GUEST_ICONS.length];
+    const emoji = GUEST_ICONS[hash % GUEST_ICONS.length];
     const bgColor = GUEST_COLORS[hash % GUEST_COLORS.length];
 
     if (settings.userImage && settings.userImage.trim() !== "") {
@@ -159,7 +159,7 @@ export default function SettingsScreen() {
           borderColor: bgColor + "40",
         }}
       >
-        <IconComponent size={size * 0.45} color={bgColor} strokeWidth={2.5} />
+        <Text style={{ fontSize: size * 0.45 }}>{emoji}</Text>
       </View>
     );
   };
@@ -273,7 +273,7 @@ export default function SettingsScreen() {
                     { backgroundColor: Colors.primary + "20" },
                   ]}
                 >
-                  <Edit2 size={12} color={Colors.primary} />
+                  <Text style={{ fontSize: 12 }}>✏️</Text>
                 </View>
               </TouchableOpacity>
             )}
@@ -304,7 +304,7 @@ export default function SettingsScreen() {
                     { backgroundColor: Colors.primary + "15" },
                   ]}
                 >
-                  <Lock size={18} color={Colors.primary} />
+                  <Text style={{ fontSize: 18 }}>🔒</Text>
                 </View>
                 <Text style={[styles.settingLabel, { color: Colors.text }]}>
                   Data Lock
@@ -345,7 +345,7 @@ export default function SettingsScreen() {
                 <View
                   style={[styles.iconBox, { backgroundColor: "#10B98115" }]}
                 >
-                  <Upload size={18} color="#10B981" />
+                  <Text style={{ fontSize: 18 }}>📤</Text>
                 </View>
                 <Text style={[styles.settingLabel, { color: Colors.text }]}>
                   Export Backup
@@ -363,7 +363,7 @@ export default function SettingsScreen() {
                 <View
                   style={[styles.iconBox, { backgroundColor: "#3B82F615" }]}
                 >
-                  <Download size={18} color="#3B82F6" />
+                  <Text style={{ fontSize: 18 }}>📥</Text>
                 </View>
                 <Text style={[styles.settingLabel, { color: Colors.text }]}>
                   Import JSON
@@ -393,7 +393,7 @@ export default function SettingsScreen() {
                 <View
                   style={[styles.iconBox, { backgroundColor: "#EF444415" }]}
                 >
-                  <Trash2 size={18} color="#EF4444" />
+                  <Text style={{ fontSize: 18 }}>🗑️</Text>
                 </View>
                 <Text style={[styles.settingLabel, { color: Colors.text }]}>
                   Factory Reset
@@ -425,7 +425,7 @@ export default function SettingsScreen() {
                     { backgroundColor: Colors.primary + "15" },
                   ]}
                 >
-                  <ShieldCheck size={18} color={Colors.primary} />
+                  <Text style={{ fontSize: 18 }}>🛡️</Text>
                 </View>
                 <Text style={[styles.settingLabel, { color: Colors.text }]}>
                   Privacy Policy
@@ -470,7 +470,7 @@ export default function SettingsScreen() {
                   },
                 ]}
               >
-                <Lock size={32} color={Colors.primary} />
+                <Text style={{ fontSize: 32 }}>🔒</Text>
               </View>
               <Text style={[styles.title, { color: Colors.text }]}>
                 {setupStep === 1 ? "Set New PIN" : "Confirm PIN"}
@@ -601,7 +601,7 @@ export default function SettingsScreen() {
                     else setConfirmPin(confirmPin.slice(0, -1));
                   }}
                 >
-                  <Trash2 size={24} color={Colors.textMuted} />
+                  <Text style={{ fontSize: 24, color: Colors.textMuted }}>⌫</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -620,14 +620,14 @@ const styles = StyleSheet.create({
   imageContainer: {
     width: 120,
     height: 120,
-    borderRadius: 24,
+    borderRadius: 60,
     position: "relative",
   },
-  profilePic: { width: 120, height: 120, borderRadius: 24 },
+  profilePic: { width: 120, height: 120, borderRadius: 60 },
   placeholderPic: {
     width: 120,
     height: 120,
-    borderRadius: 24,
+    borderRadius: 60,
     borderWidth: 1,
     borderStyle: "dashed",
     justifyContent: "center",

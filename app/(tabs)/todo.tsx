@@ -61,8 +61,8 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  SafeAreaView,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const TODO_KEY = "@productivity_todos_v5";
@@ -92,10 +92,10 @@ interface Todo {
 }
 
 const CATEGORIES = [
-  { id: "work", label: "Work", icon: Briefcase, color: "#EF4444" },
-  { id: "personal", label: "Personal", icon: User, color: "#F87171" },
-  { id: "shopping", label: "Shopping", icon: ShoppingCart, color: "#DC2626" },
-  { id: "finance", label: "Finance", icon: Wallet, color: "#991B1B" },
+  { id: "work", label: "Work", icon: Briefcase, emoji: "💼", color: "#EF4444" },
+  { id: "personal", label: "Personal", icon: User, emoji: "👤", color: "#F87171" },
+  { id: "shopping", label: "Shopping", icon: ShoppingCart, emoji: "🛒", color: "#DC2626" },
+  { id: "finance", label: "Finance", icon: Wallet, emoji: "💰", color: "#991B1B" },
 ];
 
 const HABIT_ICONS: any = {
@@ -130,6 +130,7 @@ export default function TodoScreen() {
     deleteHabit,
     voiceNotes,
     addVoiceNote,
+    updateVoiceNote,
     deleteVoiceNote,
   } = useDatabase();
 
@@ -200,6 +201,7 @@ export default function TodoScreen() {
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [playbackPosition, setPlaybackPosition] = useState(0);
   const [playbackDuration, setPlaybackDuration] = useState(0);
+  const [editingVnId, setEditingVnId] = useState<string | null>(null);
 
   React.useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -653,49 +655,79 @@ export default function TodoScreen() {
     }
   };
 
+  const handleEditVoiceNote = (vn: any) => {
+    setEditingVnId(vn.id);
+    setVnTitle(vn.title);
+    setVnDate(vn.reminderDate ? new Date(vn.reminderDate) : new Date());
+    setRecordedUri(vn.uri);
+    setRecordingDuration(vn.duration || 0);
+    setIsVoiceModalVisible(true);
+  };
+
   const handleSaveVoiceNote = async () => {
     if (isSubmitting || !recordedUri) return;
     setIsSubmitting(true);
 
     try {
-      const fileName = `voice_${Date.now()}.m4a`;
-      const permanentUri = `${FileSystem.documentDirectory}${fileName}`;
+      if (editingVnId) {
+        await updateVoiceNote(editingVnId, {
+          title: vnTitle || "Voice Note",
+          date: vnDate.toLocaleDateString(),
+          time: vnDate.toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+          reminderDate: vnDate.toISOString(),
+        });
+        
+        await cancelReminderNotification(editingVnId);
+        if (vnDate.getTime() > Date.now()) {
+          await scheduleVoiceNoteNotification(
+            editingVnId,
+            vnTitle || "Voice Note",
+            vnDate,
+          );
+        }
+      } else {
+        const fileName = `voice_${Date.now()}.m4a`;
+        const permanentUri = `${FileSystem.documentDirectory}${fileName}`;
 
-      // Move file from cache to permanent storage
-      await FileSystem.moveAsync({
-        from: recordedUri,
-        to: permanentUri,
-      });
+        await FileSystem.moveAsync({
+          from: recordedUri,
+          to: permanentUri,
+        });
 
-      const vnId = await addVoiceNote({
-        title: vnTitle || "Voice Note",
-        uri: permanentUri,
-        date: vnDate.toLocaleDateString(),
-        time: vnDate.toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
-        reminderDate: vnDate.toISOString(),
-        duration: recordingDuration,
-      });
+        const vnId = await addVoiceNote({
+          title: vnTitle || "Voice Note",
+          uri: permanentUri,
+          date: vnDate.toLocaleDateString(),
+          time: vnDate.toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+          reminderDate: vnDate.toISOString(),
+          duration: recordingDuration,
+        });
 
-      // Schedule Notification
-      if (vnDate.getTime() > Date.now()) {
-        await scheduleVoiceNoteNotification(
-          vnId,
-          vnTitle || "Voice Note",
-          vnDate,
-        );
+        if (vnDate.getTime() > Date.now()) {
+          await scheduleVoiceNoteNotification(
+            vnId,
+            vnTitle || "Voice Note",
+            vnDate,
+          );
+        }
       }
 
       setIsVoiceModalVisible(false);
       setVnTitle("");
       setRecordedUri(null);
+      setEditingVnId(null);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (error) {
-      setIsSubmitting(false);
       console.error("Failed to save voice note:", error);
       Alert.alert("Save Failed", "Could not persist the audio mission.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -944,35 +976,32 @@ export default function TodoScreen() {
               contentContainerStyle={{ paddingHorizontal: 20, gap: 12 }}
             >
               {[
-                "all",
-                "starred",
-                "work",
-                "personal",
-                "shopping",
-                "finance",
+                { id: "all", label: "All", emoji: "📋" },
+                { id: "starred", label: "Starred", emoji: "⭐" },
+                ...CATEGORIES,
               ].map((tab) => (
                 <TouchableOpacity
-                  key={tab}
+                  key={tab.id}
                   style={[
                     styles.litTab,
                     {
                       backgroundColor:
-                        selectedTab === tab ? Colors.primary : Colors.card,
+                        selectedTab === tab.id ? Colors.primary : Colors.card,
                       borderColor:
-                        selectedTab === tab ? Colors.primary : Colors.border,
+                        selectedTab === tab.id ? Colors.primary : Colors.border,
                     },
                   ]}
-                  onPress={() => setSelectedTab(tab as any)}
+                  onPress={() => setSelectedTab(tab.id as any)}
                 >
                   <Text
                     style={[
                       styles.litTabText,
                       {
-                        color: selectedTab === tab ? "black" : Colors.textMuted,
+                        color: selectedTab === tab.id ? "black" : Colors.textMuted,
                       },
                     ]}
                   >
-                    {tab.toUpperCase()}
+                    {tab.emoji} {tab.label.toUpperCase()}
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -1457,11 +1486,18 @@ export default function TodoScreen() {
                         </View>
                       </View>
                     </View>
-                    <TouchableOpacity
-                      onPress={() => deleteVoice(vn.id, vn.uri)}
-                    >
-                      <Trash2 size={18} color="#EF4444" opacity={0.8} />
-                    </TouchableOpacity>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 15 }}>
+                      <TouchableOpacity
+                        onPress={() => handleEditVoiceNote(vn)}
+                      >
+                        <Edit2 size={16} color={Colors.textMuted} />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() => deleteVoice(vn.id, vn.uri)}
+                      >
+                        <Trash2 size={18} color="#EF4444" opacity={0.8} />
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 );
               })
@@ -1939,10 +1975,10 @@ export default function TodoScreen() {
       <Modal visible={isModalVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <KeyboardAvoidingView
-            behavior={Platform.OS === "ios" ? "padding" : undefined}
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
             style={[
               styles.modalContent,
-              { backgroundColor: Colors.card, borderColor: Colors.border },
+              { backgroundColor: Colors.card, borderColor: Colors.border, width: "100%", height: "100%" },
             ]}
           >
             <ScrollView
@@ -2128,10 +2164,7 @@ export default function TodoScreen() {
                     ]}
                     onPress={() => setCat(c.id as any)}
                   >
-                    <c.icon
-                      size={22}
-                      color={cat === c.id ? c.color : Colors.textMuted}
-                    />
+                    <Text style={{ fontSize: 22 }}>{c.emoji}</Text>
                     <Text
                       style={{
                         color: cat === c.id ? c.color : Colors.textMuted,
@@ -2740,7 +2773,12 @@ export default function TodoScreen() {
                   </View>
                 </View>
                 <TouchableOpacity
-                  onPress={() => setIsVoiceModalVisible(false)}
+                  onPress={() => {
+                    setIsVoiceModalVisible(false);
+                    setEditingVnId(null);
+                    setVnTitle("");
+                    if (!editingVnId) setRecordedUri(null);
+                  }}
                   style={styles.closeBtn}
                 >
                   <X size={20} color={Colors.textMuted} />
@@ -2914,12 +2952,62 @@ export default function TodoScreen() {
 
                 <TouchableOpacity
                   style={styles.cancelBtn}
-                  onPress={() => setIsVoiceModalVisible(false)}
+                  onPress={() => {
+                    setIsVoiceModalVisible(false);
+                    setEditingVnId(null);
+                    setVnTitle("");
+                    if (!editingVnId) setRecordedUri(null);
+                  }}
                 >
                   <Text style={{ color: Colors.textMuted, fontWeight: "700" }}>
                     DISCARD RECORDING
                   </Text>
                 </TouchableOpacity>
+
+              {showVnDate && (
+                <DateTimePicker
+                  value={vnDate}
+                  mode="date"
+                  display={Platform.OS === "android" ? "default" : "default"}
+                  onChange={(event, d) => {
+                    if (Platform.OS === "android") {
+                      setShowVnDate(false);
+                    }
+                    if (event.type === "set" && d) {
+                      const next = new Date(vnDate);
+                      next.setFullYear(d.getFullYear());
+                      next.setMonth(d.getMonth());
+                      next.setDate(d.getDate());
+                      setVnDate(next);
+                    }
+                    if (Platform.OS === "ios") {
+                      setShowVnDate(false);
+                    }
+                  }}
+                />
+              )}
+              {showVnTime && (
+                <DateTimePicker
+                  value={vnDate}
+                  mode="time"
+                  display={Platform.OS === "android" ? "clock" : "default"}
+                  is24Hour={false}
+                  onChange={(event, d) => {
+                    if (Platform.OS === "android") {
+                      setShowVnTime(false);
+                    }
+                    if (event.type === "set" && d) {
+                      const next = new Date(vnDate);
+                      next.setHours(d.getHours());
+                      next.setMinutes(d.getMinutes());
+                      setVnDate(next);
+                    }
+                    if (Platform.OS === "ios") {
+                      setShowVnTime(false);
+                    }
+                  }}
+                />
+              )}
               </ScrollView>
             </View>
           </KeyboardAvoidingView>

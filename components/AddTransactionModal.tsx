@@ -17,6 +17,15 @@ import { X, Mic, Sparkles } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { FlowBannerAd } from './FlowBannerAd';
 
+const EMOJI_MAP: Record<string, string> = {
+  'Food & Dining': '🍔',
+  'Travel & Cabs': '🚕',
+  'Home Bills': '🏠',
+  'EMI & Loans': '💳',
+  'Salary': '💰',
+  'Other Income': '✨',
+};
+
 interface AddTransactionModalProps {
   visible: boolean;
   onClose: () => void;
@@ -152,14 +161,16 @@ export function AddTransactionModal({ visible, onClose, onAdd, initialData, onUp
             </View>
 
             <Text style={[styles.sectionLabel, { color: Colors.textMuted }]}>Select Category</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.catScroll}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={[styles.catScroll, { marginHorizontal: -24 }]} contentContainerStyle={{ paddingHorizontal: 24 }}>
               {categories.filter(c => c.type === type).map(cat => (
                 <TouchableOpacity 
                   key={cat.id} 
                   style={[styles.catItem, { backgroundColor: Colors.background, borderColor: Colors.border }, categoryId === cat.id && { backgroundColor: cat.color + '20', borderColor: cat.color }]}
                   onPress={() => setCategoryId(cat.id)}
                 >
-                  <Text style={[styles.catText, { color: Colors.textMuted }, categoryId === cat.id && { color: cat.color }]}>{cat.name}</Text>
+                  <Text style={[styles.catText, { color: Colors.textMuted }, categoryId === cat.id && { color: cat.color }]}>
+                    {EMOJI_MAP[cat.name] || '📌'} {cat.name}
+                  </Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -196,8 +207,8 @@ const styles = StyleSheet.create({
   aiLabelText: { fontSize: 10, fontWeight: '600' },
   sectionLabel: { fontSize: 14, fontWeight: '600', marginBottom: 8 },
   catScroll: { marginBottom: 24 },
-  catItem: { paddingHorizontal: 12, height: 32, justifyContent: 'center', borderRadius: 10, marginRight: 8, borderWidth: 1 },
-  catText: { fontWeight: '700', fontSize: 12 },
+  catItem: { paddingHorizontal: 18, height: 44, justifyContent: 'center', borderRadius: 22, marginRight: 10, borderWidth: 1 },
+  catText: { fontWeight: '700', fontSize: 14 },
   saveBtn: { paddingVertical: 18, borderRadius: 16, alignItems: 'center', marginBottom: 20 },
   saveBtnText: { fontSize: 16, fontWeight: 'bold' },
   adPlaceholder: {

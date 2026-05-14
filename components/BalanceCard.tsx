@@ -47,7 +47,7 @@ export function BalanceCard({ total, income, expense }: BalanceCardProps) {
       <View style={styles.footer}>
         <View style={styles.stat}>
           <View style={styles.iconCircle}>
-            <TrendingUp size={14} color="#10b981" />
+            <Text style={{ fontSize: 14 }}>📈</Text>
           </View>
           <View>
             <Text style={styles.statLabel}>Income</Text>
@@ -67,7 +67,7 @@ export function BalanceCard({ total, income, expense }: BalanceCardProps) {
               { backgroundColor: "rgba(244, 63, 94, 0.1)" },
             ]}
           >
-            <TrendingDown size={14} color="#f43f5e" />
+            <Text style={{ fontSize: 14 }}>📉</Text>
           </View>
           <View>
             <Text style={styles.statLabel}>Expense</Text>

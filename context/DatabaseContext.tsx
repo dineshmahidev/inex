@@ -135,6 +135,7 @@ interface DatabaseContextType {
   updateHabit: (id: string, h: Partial<Habit>) => Promise<void>;
   deleteHabit: (id: string) => void;
   addVoiceNote: (vn: Omit<VoiceNote, 'id'>) => Promise<string>;
+  updateVoiceNote: (id: string, vn: Partial<VoiceNote>) => Promise<void>;
   deleteVoiceNote: (id: string) => void;
   setSettings: (s: UserSettings) => void;
   refresh: () => void;
@@ -423,6 +424,12 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
     return id;
   };
 
+  const updateVoiceNote = async (id: string, vn: Partial<VoiceNote>) => {
+    const updated = voiceNotes.map(v => v.id === id ? { ...v, ...vn } : v);
+    setVoiceNotes(updated);
+    await AsyncStorage.setItem(KEYS.VOICE, JSON.stringify(updated));
+  };
+
   const deleteVoiceNote = async (id: string) => {
     const vn = voiceNotes.find(v => v.id === id);
     if (vn) {
@@ -571,7 +578,7 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
         addNote, updateNote, deleteNote,
         addTodo, updateTodo, saveTodos,
         addHabit, updateHabit, deleteHabit,
-        voiceNotes, addVoiceNote, deleteVoiceNote,
+        voiceNotes, addVoiceNote, updateVoiceNote, deleteVoiceNote,
         settings, setSettings: updateSettings, refresh: load,
         clearAllData, exportData, importData, detectCategory,
         globalMonth, setGlobalMonth,
