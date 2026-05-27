@@ -7,7 +7,7 @@
     "icon": "./assets/app_logo.png",
     "notification": {
       "icon": "./assets/notification_icon.png",
-      "color": "#EB6001"
+      "color": "#facc15"
     },
     "scheme": "flowledger",
     "userInterfaceStyle": "automatic",
@@ -15,7 +15,7 @@
     "splash": {
       "image": "./assets/app_logo.png",
       "resizeMode": "contain",
-      "backgroundColor": "#EB6001"
+      "backgroundColor": "#facc15"
     },
     "ios": {
       "supportsTablet": true,
@@ -29,10 +29,10 @@
       "splash": {
         "image": "./assets/app_logo.png",
         "resizeMode": "contain",
-        "backgroundColor": "#EB6001"
+        "backgroundColor": "#facc15"
       },
       "adaptiveIcon": {
-        "backgroundColor": "#EB6001",
+        "backgroundColor": "#facc15",
         "foregroundImage": "./assets/app_logo.png",
         "backgroundImage": "./assets/app_logo.png",
         "monochromeImage": "./assets/app_logo.png"
@@ -59,7 +59,7 @@
           "image": "./assets/app_logo.png",
           "imageWidth": 250,
           "resizeMode": "contain",
-          "backgroundColor": "#EB6001"
+          "backgroundColor": "#facc15"
         }
       ],
       "@react-native-community/datetimepicker",
@@ -76,7 +76,7 @@
         "expo-notifications",
         {
           "icon": "./assets/notification_icon.png",
-          "color": "#EB6001",
+          "color": "#facc15",
           "sounds": [
             "./assets/mixkit_bell_notification_933.wav"
           ]

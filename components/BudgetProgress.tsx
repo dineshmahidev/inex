@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Colors, Currency } from '@/constants/theme';
-import { GlassCard } from './GlassCard';
+import { NeoCard } from './NeoCard';
 
 interface BudgetProgressProps {
   spent: number;
@@ -14,7 +14,7 @@ export function BudgetProgress({ spent, limit }: BudgetProgressProps) {
   const color = percentage > 90 ? Colors.secondary : percentage > 70 ? '#F59E0B' : Colors.primary;
 
   return (
-    <GlassCard style={styles.card}>
+    <NeoCard style={styles.card}>
       <View style={styles.header}>
         <Text style={styles.title}>Monthly Budget</Text>
         <Text style={styles.amount}>{Currency}{limit.toLocaleString()}</Text>
@@ -28,7 +28,7 @@ export function BudgetProgress({ spent, limit }: BudgetProgressProps) {
         <Text style={styles.footerText}>Spent: {Currency}{spent.toLocaleString()}</Text>
         <Text style={styles.footerText}>Remains: {Currency}{remaining.toLocaleString()}</Text>
       </View>
-    </GlassCard>
+    </NeoCard>
   );
 }
 
@@ -53,9 +53,11 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   progressBg: {
-    height: 12,
+    height: 16,
     backgroundColor: Colors.background,
-    borderRadius: 6,
+    borderRadius: 8,
+    borderWidth: 2.5,
+    borderColor: '#171717',
     overflow: 'hidden',
     marginBottom: 12,
   },

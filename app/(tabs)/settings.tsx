@@ -10,11 +10,9 @@ import {
     Edit2,
     Ghost,
     Lock,
-    Moon,
     ShieldCheck,
     Smile,
     Star,
-    Sun,
     Trash2,
     Upload,
     User,
@@ -60,21 +58,7 @@ export default function SettingsScreen() {
   const [setupStep, setSetupStep] = useState<1 | 2>(1);
   const [pinError, setPinError] = useState(false);
 
-  const [themeAnim] = useState(
-    new Animated.Value(settings.theme === "dark" ? 1 : 0),
-  );
 
-  const toggleTheme = () => {
-    const nextTheme = settings.theme === "dark" ? "light" : "dark";
-    setSettings({ ...settings, theme: nextTheme });
-
-    Animated.spring(themeAnim, {
-      toValue: nextTheme === "dark" ? 1 : 0,
-      useNativeDriver: false,
-      friction: 8,
-      tension: 40,
-    }).start();
-  };
 
   const handlePickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -179,45 +163,6 @@ export default function SettingsScreen() {
         ]}
       >
         <Text style={[styles.title, { color: Colors.text }]}>Settings</Text>
-
-        {/* Animated Theme Toggle */}
-        <TouchableOpacity
-          activeOpacity={0.9}
-          onPress={toggleTheme}
-          style={[
-            styles.animatedToggleContainer,
-            { backgroundColor: Colors.card, borderColor: Colors.border },
-          ]}
-        >
-          <Animated.View
-            style={[
-              styles.toggleThumb,
-              {
-                backgroundColor: Colors.primary,
-                transform: [
-                  {
-                    translateX: themeAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [4, 32],
-                    }),
-                  },
-                ],
-              },
-            ]}
-          />
-          <View style={styles.toggleIconsRow}>
-            <Sun
-              size={14}
-              color={settings.theme === "light" ? "#000" : Colors.textMuted}
-              strokeWidth={settings.theme === "light" ? 3 : 2}
-            />
-            <Moon
-              size={14}
-              color={settings.theme === "dark" ? "#000" : Colors.textMuted}
-              strokeWidth={settings.theme === "dark" ? 3 : 2}
-            />
-          </View>
-        </TouchableOpacity>
       </View>
 
       <ScrollView
@@ -642,8 +587,8 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     justifyContent: "center",
     alignItems: "center",
-    borderWidth: 3,
-    borderColor: "#000",
+    borderWidth: 2.5,
+    borderColor: "#171717",
   },
   nameContainer: { alignItems: "center" },
   profileName: { fontSize: 22, fontWeight: "900", letterSpacing: -0.5 },
@@ -672,7 +617,17 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     marginLeft: 5,
   },
-  card: { borderRadius: 28, borderWidth: 1, overflow: "hidden" },
+  card: { 
+    borderRadius: 16, 
+    borderWidth: 2.5, 
+    borderColor: '#171717', 
+    shadowColor: '#171717', 
+    shadowOffset: { width: 4, height: 4 }, 
+    shadowOpacity: 1, 
+    shadowRadius: 0, 
+    elevation: 0, 
+    overflow: "hidden" 
+  },
   settingItem: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -686,6 +641,8 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     justifyContent: "center",
     alignItems: "center",
+    borderWidth: 2.5,
+    borderColor: '#171717',
   },
   settingLabel: { fontSize: 16, fontWeight: "700" },
   divider: { height: 1, marginHorizontal: 16 },
@@ -712,24 +669,4 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   keyText: { fontSize: 28, fontWeight: "500" },
-  animatedToggleContainer: {
-    width: 64,
-    height: 36,
-    borderRadius: 18,
-    borderWidth: 1,
-    justifyContent: "center",
-    paddingHorizontal: 0,
-  },
-  toggleThumb: {
-    position: "absolute",
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-  },
-  toggleIconsRow: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    alignItems: "center",
-    paddingHorizontal: 6,
-  },
 });

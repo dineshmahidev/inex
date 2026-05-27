@@ -30,7 +30,7 @@ function AppContent() {
     async function nativeInit() {
       try {
         // System UI background
-        await SystemUI.setBackgroundColorAsync('#000000').catch(() => {});
+        await SystemUI.setBackgroundColorAsync('#facc15').catch(() => {});
         
         // Notifications
         try {
@@ -81,7 +81,7 @@ function AppContent() {
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="lock" />
       </Stack>
-      <StatusBar style="auto" />
+      <StatusBar style="dark" />
     </ThemeProvider>
   );
 }

@@ -1,5 +1,4 @@
 import { Colors, Currency } from "@/constants/theme";
-import { LinearGradient } from "expo-linear-gradient";
 import { TrendingDown, TrendingUp } from "lucide-react-native";
 import React from "react";
 import { Dimensions, StyleSheet, Text, View } from "react-native";
@@ -16,11 +15,8 @@ const { width } = Dimensions.get("window");
 
 export function BalanceCard({ total, income, expense }: BalanceCardProps) {
   return (
-    <LinearGradient
-      colors={Colors.gradient}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={styles.container}
+    <View
+      style={[styles.container, { backgroundColor: '#f97316' }]}
     >
       <View style={styles.topRow}>
         <View style={{ flex: 1 }}>
@@ -78,7 +74,7 @@ export function BalanceCard({ total, income, expense }: BalanceCardProps) {
           </View>
         </View>
       </View>
-    </LinearGradient>
+    </View>
   );
 }
 
@@ -87,15 +83,17 @@ export function BalanceCard({ total, income, expense }: BalanceCardProps) {
 const styles = StyleSheet.create({
   container: {
     width: "100%",
-    borderRadius: 32,
+    borderRadius: 16,
     padding: 24,
     height: 200,
     justifyContent: "space-between",
-    shadowColor: Colors.primary,
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
-    elevation: 10,
+    borderWidth: 2.5,
+    borderColor: '#171717',
+    shadowColor: '#171717',
+    shadowOffset: { width: 4, height: 4 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 0,
     marginBottom: 24,
   },
   topRow: {
@@ -137,10 +135,12 @@ const styles = StyleSheet.create({
     marginHorizontal: -24,
     marginBottom: -24,
     padding: 20,
-    borderBottomLeftRadius: 32,
-    borderBottomRightRadius: 32,
+    borderBottomLeftRadius: 13, // 16 - 2.5
+    borderBottomRightRadius: 13,
     justifyContent: "space-between",
     alignItems: "center",
+    borderTopWidth: 2.5,
+    borderTopColor: '#171717',
   },
   stat: {
     flexDirection: "row",

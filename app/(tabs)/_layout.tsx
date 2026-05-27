@@ -9,7 +9,7 @@ import {
     Settings,
 } from "lucide-react-native";
 import React, { useEffect, useRef } from "react";
-import { StyleSheet, TouchableOpacity, Animated } from "react-native";
+import { StyleSheet, TouchableOpacity, Animated, Platform } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const AnimatedIcon = ({ focused, children }: any) => {
@@ -42,13 +42,29 @@ export default function TabLayout() {
         tabBarInactiveTintColor: Colors.textMuted,
         tabBarShowLabel: false,
         tabBarStyle: {
+          position: 'absolute',
+          bottom: Math.max(insets.bottom, 20),
+          alignSelf: 'center',
+          width: '90%',
+          marginHorizontal: '5%',
           backgroundColor: Colors.card,
-          height: 65 + insets.bottom,
-          elevation: 15,
-          paddingBottom: insets.bottom,
+          height: 70,
+          borderRadius: 24,
+          borderWidth: 2.5,
+          borderColor: Colors.border,
+          borderTopWidth: 2.5,
+          borderTopColor: Colors.border,
+          paddingBottom: 0,
+          elevation: 0,
+          shadowColor: "#171717",
+          shadowOffset: { width: 4, height: 4 },
+          shadowOpacity: 1,
+          shadowRadius: 0,
         },
         tabBarItemStyle: {
-          paddingTop: 10,
+          justifyContent: 'center',
+          alignItems: 'center',
+          top: Platform.OS === 'ios' ? 15 : 10,
         },
         tabBarIconStyle: {
           width: 32,
@@ -63,8 +79,9 @@ export default function TabLayout() {
             <AnimatedIcon focused={focused}>
               <LayoutDashboard
                 size={26}
-                color={color}
+                color={focused ? Colors.background : color}
                 strokeWidth={focused ? 2.5 : 2}
+                fill={focused ? color : "transparent"}
               />
             </AnimatedIcon>
           ),
@@ -85,7 +102,12 @@ export default function TabLayout() {
         options={{
           tabBarIcon: ({ color, focused }) => (
             <AnimatedIcon focused={focused}>
-              <History size={26} color={color} strokeWidth={focused ? 2.5 : 2} />
+              <History 
+                size={26} 
+                color={focused ? Colors.background : color} 
+                strokeWidth={focused ? 2.5 : 2} 
+                fill={focused ? color : "transparent"}
+              />
             </AnimatedIcon>
           ),
           tabBarButton: (props) => (
@@ -105,7 +127,12 @@ export default function TabLayout() {
         options={{
           tabBarIcon: ({ color, focused }) => (
             <AnimatedIcon focused={focused}>
-              <BellRing size={26} color={color} strokeWidth={focused ? 2.5 : 2} />
+              <BellRing 
+                size={26} 
+                color={focused ? Colors.background : color} 
+                strokeWidth={focused ? 2.5 : 2} 
+                fill={focused ? color : "transparent"}
+              />
             </AnimatedIcon>
           ),
           tabBarButton: (props) => (
@@ -127,8 +154,9 @@ export default function TabLayout() {
             <AnimatedIcon focused={focused}>
               <LayoutList
                 size={26}
-                color={color}
+                color={focused ? Colors.background : color}
                 strokeWidth={focused ? 2.5 : 2}
+                fill={focused ? color : "transparent"}
               />
             </AnimatedIcon>
           ),
@@ -149,7 +177,12 @@ export default function TabLayout() {
         options={{
           tabBarIcon: ({ color, focused }) => (
             <AnimatedIcon focused={focused}>
-              <Settings size={26} color={color} strokeWidth={focused ? 2.5 : 2} />
+              <Settings 
+                size={26} 
+                color={focused ? Colors.background : color} 
+                strokeWidth={focused ? 2.5 : 2} 
+                fill={focused ? color : "transparent"}
+              />
             </AnimatedIcon>
           ),
           tabBarButton: (props) => (

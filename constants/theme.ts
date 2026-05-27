@@ -1,27 +1,27 @@
 export const Theme = {
   dark: {
-    background: '#000000',
-    card: '#121212',
-    text: '#FFFFFF',
-    textMuted: '#A0A0A0',
-    primary: '#FF7A00', // Vivid Orange
-    secondary: '#FF4500', 
-    accent: '#FF7A00',
-    border: '#262626',
-    glass: 'rgba(255, 122, 0, 0.05)',
-    gradient: ['#FF7A00', '#FF7A00'] as [string, string, ...string[]],
+    background: '#facc15', // Yellow
+    card: '#ffffff', // Pure White
+    text: '#171717', // Near Black
+    textMuted: '#525252', // Dark Gray
+    primary: '#16a34a', // Darker Green
+    secondary: '#8b5cf6', // Purple
+    accent: '#eab308', // Yellow
+    border: '#171717',
+    glass: 'rgba(23, 23, 23, 0.05)',
+    gradient: ['#16a34a', '#8b5cf6'] as [string, string, ...string[]],
   },
   light: {
-    background: '#FFFFFF',
-    card: '#F8F8F8',
-    text: '#000000',
-    textMuted: '#666666',
-    primary: '#FF7A00',
-    secondary: '#FF4500',
-    accent: '#FF7A00',
-    border: '#E8E8E8',
-    glass: 'rgba(255, 122, 0, 0.05)',
-    gradient: ['#FF7A00', '#FF7A00'] as [string, string, ...string[]],
+    background: '#facc15', // Yellow
+    card: '#ffffff',
+    text: '#171717',
+    textMuted: '#525252',
+    primary: '#16a34a',
+    secondary: '#8b5cf6',
+    accent: '#eab308',
+    border: '#171717',
+    glass: 'rgba(23, 23, 23, 0.05)',
+    gradient: ['#16a34a', '#8b5cf6'] as [string, string, ...string[]],
   }
 };
 

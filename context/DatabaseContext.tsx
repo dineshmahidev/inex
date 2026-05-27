@@ -86,6 +86,7 @@ export interface Habit {
   icon: string;
   logs: string[]; // ['2024-04-01', ...]
   reminderTime?: string; // HH:mm
+  challenge?: string; // e.g. "10 Days", "30 Days"
 }
 
 export interface VoiceNote {

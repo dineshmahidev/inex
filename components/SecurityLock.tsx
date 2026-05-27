@@ -112,8 +112,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 32,
     color: Colors.text, // FIXED: Changed from default to white
-    borderWidth: 1,
-    borderColor: Colors.border,
+    borderWidth: 2.5,
+    borderColor: '#171717',
     letterSpacing: 20,
     paddingLeft: 20,
   },

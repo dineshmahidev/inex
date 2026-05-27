@@ -11,6 +11,9 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import { Audio } from "expo-av";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Haptics from "expo-haptics";
+import * as Print from "expo-print";
+import * as Sharing from "expo-sharing";
+import { captureRef } from "react-native-view-shot";
 import LottieView from "lottie-react-native";
 import {
   Activity,
@@ -20,9 +23,11 @@ import {
   Calendar,
   CheckCircle2,
   ChevronLeft,
+  ChevronRight,
   Circle,
   Clock,
   Coffee,
+  Download,
   Dumbbell,
   Edit2,
   FileText,
@@ -35,6 +40,7 @@ import {
   Play,
   Plus,
   Search,
+  Share2,
   ShoppingCart,
   Smile,
   Sparkles,
@@ -48,8 +54,10 @@ import {
   X,
   Zap
 } from "lucide-react-native";
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useRef, useEffect } from "react";
 import {
+  Animated,
+  PanResponder,
   Alert,
   Dimensions,
   KeyboardAvoidingView,
@@ -62,6 +70,7 @@ import {
   TouchableOpacity,
   View,
   SafeAreaView,
+  Image,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -111,7 +120,226 @@ const HABIT_ICONS: any = {
   Wallet,
 };
 
+const SwipeToMark = ({
+  isDone,
+  onToggle,
+  color,
+}: {
+  isDone: boolean;
+  onToggle: () => void;
+  color: string;
+}) => {
+  const [containerWidth, setContainerWidth] = React.useState(0);
+  const handleWidth = 42;
+  const padding = 3;
+  const maxDrag = containerWidth ? containerWidth - handleWidth - 2 * padding - 5 : 0;
+
+  const panX = React.useRef(new Animated.Value(0)).current;
+  const isDragging = React.useRef(false);
+
+  // Keep state mutable reference to avoid PanResponder closure captures
+  const latestState = React.useRef({ isDone, maxDrag, containerWidth });
+  React.useEffect(() => {
+    latestState.current = { isDone, maxDrag, containerWidth };
+  }, [isDone, maxDrag, containerWidth]);
+
+  // Synchronize panX with isDone state when not dragging
+  React.useEffect(() => {
+    if (containerWidth > 0 && !isDragging.current) {
+      Animated.spring(panX, {
+        toValue: isDone ? maxDrag : 0,
+        useNativeDriver: false,
+        tension: 80,
+        friction: 8,
+      }).start();
+    }
+  }, [isDone, containerWidth, maxDrag]);
+
+  const panResponder = React.useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onStartShouldSetPanResponderCapture: () => false,
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        // Only capture horizontal swipes, don't steal vertical scrolling
+        return (
+          Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.5 &&
+          Math.abs(gestureState.dx) > 10
+        );
+      },
+      onPanResponderGrant: () => {
+        isDragging.current = true;
+        panX.stopAnimation();
+      },
+      onPanResponderMove: (_, gestureState) => {
+        const { maxDrag: latestMax, containerWidth: latestWidth, isDone: latestDone } = latestState.current;
+        if (!latestWidth) return;
+        let newX = latestDone ? latestMax + gestureState.dx : gestureState.dx;
+        // Clamp between 0 and maxDrag
+        newX = Math.max(0, Math.min(latestMax, newX));
+        panX.setValue(newX);
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        isDragging.current = false;
+        const { maxDrag: latestMax, containerWidth: latestWidth, isDone: latestDone } = latestState.current;
+        if (!latestWidth) return;
+
+        const currentVal = latestDone ? latestMax + gestureState.dx : gestureState.dx;
+        
+        if (!latestDone) {
+          // If not completed and swiped right past 70%
+          if (currentVal > latestMax * 0.7) {
+            // Success: animate to end and toggle
+            Animated.timing(panX, {
+              toValue: latestMax,
+              duration: 150,
+              useNativeDriver: false,
+            }).start(() => {
+              onToggle();
+            });
+          } else {
+            // Snap back
+            Animated.spring(panX, {
+              toValue: 0,
+              useNativeDriver: false,
+              tension: 100,
+              friction: 10,
+            }).start();
+          }
+        } else {
+          // If completed and swiped left past 70%
+          if (currentVal < latestMax * 0.3) {
+            // Success: animate to 0 and toggle (unmark)
+            Animated.timing(panX, {
+              toValue: 0,
+              duration: 150,
+              useNativeDriver: false,
+            }).start(() => {
+              onToggle();
+            });
+          } else {
+            // Snap back to completed position
+            Animated.spring(panX, {
+              toValue: latestMax,
+              useNativeDriver: false,
+              tension: 100,
+              friction: 10,
+            }).start();
+          }
+        }
+      },
+    })
+  ).current;
+
+  // Slide percentage for background track gradient/fill color
+  const progressPercent = panX.interpolate({
+    inputRange: [0, Math.max(1, maxDrag)],
+    outputRange: ['0%', '100%'],
+  });
+
+  return (
+    <View
+      onLayout={(e) => setContainerWidth(e.nativeEvent.layout.width)}
+      style={{
+        height: 50,
+        backgroundColor: '#ffffff',
+        borderWidth: 2.5,
+        borderColor: '#000000',
+        borderRadius: 25,
+        justifyContent: 'center',
+        position: 'relative',
+        overflow: 'hidden',
+        width: '100%',
+        shadowColor: '#000',
+        shadowOffset: { width: 2, height: 2 },
+        shadowOpacity: 1,
+        shadowRadius: 0,
+        elevation: 2,
+      }}
+    >
+      {/* Background Active Fill (Smooth dynamic slider fill) */}
+      <Animated.View
+        style={{
+          position: 'absolute',
+          left: 0,
+          top: 0,
+          bottom: 0,
+          width: progressPercent,
+          backgroundColor: color + '30',
+        }}
+      />
+
+      {/* Guide text inside track */}
+      <View
+        style={{
+          position: 'absolute',
+          left: 0,
+          right: 0,
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexDirection: 'row',
+          pointerEvents: 'none',
+        }}
+      >
+        <Text
+          style={{
+            fontSize: 11,
+            fontWeight: '900',
+            color: isDone ? '#111827' : '#4B5563',
+            letterSpacing: 1.5,
+            textTransform: 'uppercase',
+          }}
+        >
+          {isDone ? '🎉 DONE FOR TODAY (SWIPE LEFT TO UNDO)' : '👉 SWIPE TO MARK DONE'}
+        </Text>
+      </View>
+
+      {/* Sliding Handle */}
+      <Animated.View
+        {...panResponder.panHandlers}
+        hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+        style={{
+          width: handleWidth,
+          height: handleWidth,
+          borderRadius: handleWidth / 2,
+          backgroundColor: isDone ? '#000000' : color,
+          borderWidth: 2,
+          borderColor: '#000000',
+          position: 'absolute',
+          left: padding,
+          transform: [{ translateX: panX }],
+          justifyContent: 'center',
+          alignItems: 'center',
+          shadowColor: '#000',
+          shadowOffset: { width: 1, height: 1 },
+          shadowOpacity: 1,
+          shadowRadius: 0,
+          elevation: 3,
+        }}
+      >
+        {isDone ? (
+          <ChevronLeft size={20} color="#FFFFFF" strokeWidth={3.5} />
+        ) : (
+          <ChevronRight size={20} color="#000000" strokeWidth={3.5} />
+        )}
+      </Animated.View>
+    </View>
+  );
+};
+
+const parseChallengeDays = (challenge?: string) => {
+  if (!challenge) return null;
+  const cleaned = String(challenge).trim();
+  if (cleaned.toLowerCase() === "regular" || cleaned === "") return null;
+  const match = cleaned.match(/\d+/);
+  if (match) {
+    const val = parseInt(match[0], 10);
+    return isNaN(val) || val <= 0 ? null : val;
+  }
+  return null;
+};
+
 export default function TodoScreen() {
+  const shareCardRef = React.useRef<any>(null);
   const insets = useSafeAreaInsets();
   const {
     Colors,
@@ -178,13 +406,22 @@ export default function TodoScreen() {
   const [isNotePinned, setIsNotePinned] = useState(false);
 
   // Habit Form State
+  const [habitSelectedDate, setHabitSelectedDate] = useState<Date>(new Date());
+  const [habitSubTab, setHabitSubTab] = useState<string>("All");
+  const [habitCalendarDate, setHabitCalendarDate] = useState<Date>(new Date());
+  const [progressHabit, setProgressHabit] = useState<any>(null);
   const [isHabitModalVisible, setIsHabitModalVisible] = useState(false);
   const [hName, setHName] = useState("");
   const [hColor, setHColor] = useState("#FF7A00");
-  const [hIcon, setHIcon] = useState("Zap");
+  const [hIcon, setHIcon] = useState("🔥");
+  const [hChallenge, setHChallenge] = useState("Regular");
   const [hTime, setHTime] = useState("");
   const [showHTime, setShowHTime] = useState(false);
   const [editingHabitId, setEditingHabitId] = useState<string | null>(null);
+
+  // Share Progress Card States
+  const [sharingHabit, setSharingHabit] = useState<any>(null);
+  const [shareUserName, setShareUserName] = useState("Challenger");
 
   // Voice Note State
   const [recording, setRecording] = useState<Audio.Recording | null>(null);
@@ -219,6 +456,32 @@ export default function TodoScreen() {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, "0")}`;
+  };
+
+  const exportShareCard = async () => {
+    if (!sharingHabit) return;
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+      
+      // Capture the React Native View directly as a pixel-perfect PNG!
+      const uri = await captureRef(shareCardRef, {
+        format: "png",
+        quality: 1.0,
+      });
+
+      // Share the PNG image directly using expo-sharing!
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(uri, {
+          mimeType: 'image/png',
+          dialogTitle: `Share ${sharingHabit.name} Progress`,
+        });
+      } else {
+        Alert.alert("Error", "Sharing is not available on this device.");
+      }
+    } catch (error) {
+      console.error(error);
+      Alert.alert("Export Failed", "Unable to capture and share progress card image.");
+    }
   };
 
   const [editingTodoId, setEditingTodoId] = useState<string | null>(null);
@@ -409,6 +672,12 @@ export default function TodoScreen() {
     await updateHabit(habit.id, { logs: updatedLogs });
   };
 
+  const changeHabitMonth = (delta: number) => {
+    const newDate = new Date(habitCalendarDate);
+    newDate.setMonth(newDate.getMonth() + delta);
+    setHabitCalendarDate(newDate);
+  };
+
   const handleCreateHabit = async () => {
     if (isSubmitting || !hName) return;
     setIsSubmitting(true);
@@ -419,6 +688,7 @@ export default function TodoScreen() {
         color: hColor,
         icon: hIcon,
         reminderTime: hTime || undefined,
+        challenge: hChallenge !== "Regular" ? hChallenge : undefined,
       });
       await cancelReminderNotification(editingHabitId);
       if (hTime) {
@@ -433,6 +703,7 @@ export default function TodoScreen() {
         color: hColor,
         icon: hIcon,
         reminderTime: hTime || undefined,
+        challenge: hChallenge !== "Regular" ? hChallenge : undefined,
       });
       if (hTime) {
         const hasPermission = await requestNotificationPermissions();
@@ -455,12 +726,14 @@ export default function TodoScreen() {
       setHName(habit.name);
       setHColor(habit.color);
       setHIcon(habit.icon);
+      setHChallenge(habit.challenge || "Regular");
       setHTime(habit.reminderTime || "");
     } else {
       setEditingHabitId(null);
       setHName("");
       setHColor("#FF7A00");
-      setHIcon("Zap");
+      setHIcon("🔥");
+      setHChallenge("Regular");
       setHTime("");
     }
     setIsSubmitting(false);
@@ -500,8 +773,20 @@ export default function TodoScreen() {
         h.name.toLowerCase().includes(searchQuery.toLowerCase()),
       );
     }
+    if (habitSubTab === "Missed") {
+      const dateStr = `${habitSelectedDate.getFullYear()}-${String(habitSelectedDate.getMonth() + 1).padStart(2, '0')}-${String(habitSelectedDate.getDate()).padStart(2, '0')}`;
+      const today = new Date();
+      const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+      f = f.filter(h => {
+        const isLogged = h.logs.includes(dateStr);
+        const isPast = habitSelectedDate.getTime() < new Date(todayStr).getTime();
+        return !isLogged && isPast;
+      });
+    } else if (habitSubTab !== "All") {
+      f = f.filter(h => h.name === habitSubTab);
+    }
     return f;
-  }, [habits, searchQuery]);
+  }, [habits, searchQuery, habitSubTab, habitSelectedDate]);
 
   const getHabitStreak = (logs: string[]) => {
     if (!logs || logs.length === 0) return 0;
@@ -1219,10 +1504,10 @@ export default function TodoScreen() {
               }}
               style={[
                 styles.mainFab,
-                { backgroundColor: Colors.primary, bottom: 20 + insets.bottom },
+                { backgroundColor: Colors.primary, bottom: 120 },
               ]}
             >
-              <Plus size={32} color="#000" />
+              <Plus size={32} color="#000" strokeWidth={3.5} />
             </TouchableOpacity>
           )}
         </View>
@@ -1591,372 +1876,511 @@ export default function TodoScreen() {
             onPress={() => handleOpenNote()}
             style={[
               styles.mainFab,
-              { backgroundColor: Colors.primary, bottom: 20 + insets.bottom },
+              { backgroundColor: Colors.primary, bottom: 120 },
             ]}
           >
-            <Plus size={32} color="#000" />
+            <Plus size={32} color="#000" strokeWidth={3.5} />
           </TouchableOpacity>
         </>
       )}
 
       {mainTab === "habits" && (
         <>
-          <ScrollView
-            contentContainerStyle={styles.content}
-            showsVerticalScrollIndicator={false}
+          <View
+            style={{ flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 20, gap: 8, marginTop: 15, marginBottom: 10 }}
           >
-            <View
-              style={[
-                styles.levelCard,
-                {
-                  backgroundColor: Colors.card,
-                  borderColor: Colors.primary + "30",
-                },
-              ]}
-            >
-              <View style={styles.levelInfo}>
-                <Text style={[styles.levelSub, { color: Colors.primary }]}>
-                  YOUR STATUS: {level.icon}
-                </Text>
-                <Text style={[styles.levelTitle, { color: Colors.text }]}>
-                  {level.stage.toUpperCase()}
-                </Text>
-                <Text style={[styles.levelMsg, { color: Colors.textMuted }]}>
-                  {level.msg}
-                </Text>
-
-                <View style={styles.levelProgressRow}>
-                  <Zap size={10} color={Colors.primary} fill={Colors.primary} />
-                  <Text
-                    style={{
-                      color: Colors.text,
-                      fontSize: 10,
-                      fontWeight: "bold",
-                    }}
-                  >
-                    {totalMonthlyLogs} MONTHLY TICKS
-                  </Text>
-                </View>
-              </View>
-              <LottieView
-                source={require("@/assets/tomato_plant.json")}
-                style={styles.levelLottie}
-                autoPlay
-                loop
-                initialSegment={level.segments}
-              />
-            </View>
-
-            <View
-              style={{
-                marginBottom: 20,
-                backgroundColor: Colors.card,
-                padding: 18,
-                borderRadius: 16,
-                borderLeftWidth: 4,
-                borderLeftColor: Colors.primary,
-              }}
-            >
-              <Text
-                style={{
-                  color: Colors.textMuted,
-                  fontStyle: "italic",
-                  fontSize: 13,
-                  lineHeight: 20,
-                }}
+            {[
+              { id: "All", label: "All", emoji: "📋" },
+              ...habits.map(h => ({ id: h.name, label: h.name || "Habit", emoji: h.icon || "🔥" })),
+            ].map((tab) => (
+              <TouchableOpacity
+                key={tab.id}
+                style={[
+                  styles.litTab,
+                  {
+                    backgroundColor:
+                      habitSubTab === tab.id ? Colors.primary : Colors.card,
+                    borderColor:
+                      habitSubTab === tab.id ? Colors.primary : Colors.border,
+                  },
+                ]}
+                onPress={() => setHabitSubTab(tab.id)}
               >
-                "{dailyQuote.split(" - ")[0]}"
-              </Text>
-              <Text
-                style={{
-                  color: Colors.text,
-                  fontSize: 11,
-                  fontWeight: "900",
-                  marginTop: 10,
-                  textAlign: "right",
-                  letterSpacing: 0.5,
-                }}
-              >
-                — {dailyQuote.split(" - ")[1].toUpperCase()}
-              </Text>
-            </View>
-
-            {filteredHabits.length === 0 ? (
-              <View style={[styles.empty, { marginTop: 60 }]}>
-                <Activity size={80} color={Colors.primary} opacity={0.2} />
-                <Text style={[styles.emptyTitle, { color: Colors.text }]}>
-                  {searchQuery
-                    ? "No habits found matching search."
-                    : "Master Your Routine."}
-                </Text>
-                <Text style={[styles.emptySub, { color: Colors.textMuted }]}>
-                  Small daily wins lead to big financial freedom. Start a habit
-                  today.
-                </Text>
-                <TouchableOpacity
-                  style={[styles.emptyBtn, { backgroundColor: Colors.primary }]}
-                  onPress={() => handleOpenHabitModal()}
+                <Text
+                  style={[
+                    styles.litTabText,
+                    {
+                      color: habitSubTab === tab.id ? "black" : Colors.textMuted,
+                    },
+                  ]}
                 >
-                  <Plus size={20} color="#000" />
-                  <Text style={{ fontWeight: "bold", color: "#000" }}>
-                    ADD HABIT
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              filteredHabits.map((habit) => {
-                const today = new Date();
-                const todayYear = today.getFullYear();
-                const todayMonthStr = String(today.getMonth() + 1).padStart(
-                  2,
-                  "0",
-                );
-                const todayDayNum = today.getDate();
-                const daysInMonth = new Date(
-                  todayYear,
-                  today.getMonth() + 1,
-                  0,
-                ).getDate();
-                const currentMonthPrefix = `${todayYear}-${todayMonthStr}-`;
-                const Icon = HABIT_ICONS[habit.icon] || Zap;
+                  {tab.emoji} {tab.label.toUpperCase()}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
 
-                return (
-                  <View
-                    key={habit.id}
-                    style={[
-                      styles.habitCard,
-                      {
-                        backgroundColor: Colors.card,
-                        borderColor: Colors.border,
-                      },
-                    ]}
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: 20, gap: 12, paddingBottom: 180 }}
+          >
+            {habitSubTab === "All" ? (
+              habits.length === 0 ? (
+                <View style={[styles.empty, { marginTop: 60 }]}>
+                  <Activity size={80} color={Colors.primary} opacity={0.2} />
+                  <Text style={[styles.emptyTitle, { color: Colors.text }]}>
+                    No habits created yet.
+                  </Text>
+                  <Text style={[styles.emptySub, { color: Colors.textMuted }]}>
+                    Start tracking your habits to see them here!
+                  </Text>
+                  <TouchableOpacity
+                    style={[styles.emptyBtn, { backgroundColor: Colors.primary }]}
+                    onPress={() => handleOpenHabitModal()}
                   >
-                    <View style={styles.habitHeader}>
-                      <View
-                        style={{
-                          flexDirection: "row",
-                          alignItems: "center",
-                          gap: 12,
-                        }}
+                    <Plus size={20} color="#000" />
+                    <Text style={{ fontWeight: "bold", color: "#000" }}>
+                      ADD HABIT
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                habits.map((habit, idx) => {
+                  const today = new Date();
+                  const todayYear = today.getFullYear();
+                  const todayMonthStr = String(today.getMonth() + 1).padStart(2, "0");
+                  const daysInMonth = new Date(todayYear, today.getMonth() + 1, 0).getDate();
+                  const currentMonthPrefix = `${todayYear}-${todayMonthStr}-`;
+                  const completedDays = habit.logs.filter((l) => l.startsWith(currentMonthPrefix)).length;
+                  const bgColors = ["#FF6B6B", "#4ECDC4", "#FFE66D", "#A78BFA", "#FF7A00", "#34D399", "#F472B6", "#60A5FA"];
+                  const bg = bgColors[idx % bgColors.length];
+                  const challengeDaysVal = parseChallengeDays(habit.challenge);
+                  const isChallenge = challengeDaysVal !== null;
+                  const challengeDays = isChallenge ? challengeDaysVal : daysInMonth;
+                  const completedCount = isChallenge ? habit.logs.length : completedDays;
+                  const pct = daysInMonth > 0 ? Math.min((completedDays / daysInMonth) * 100, 100) : 0;
+                  const todayDateStr = `${todayYear}-${todayMonthStr}-${String(today.getDate()).padStart(2, "0")}`;
+                  const isDoneToday = habit.logs.includes(todayDateStr);
+
+                  return (
+                    <View
+                      key={habit.id}
+                      style={{
+                        backgroundColor: bg,
+                        borderWidth: 2.5,
+                        borderColor: '#000',
+                        padding: 18,
+                        width: '100%',
+                        shadowColor: '#000',
+                        shadowOffset: { width: 4, height: 4 },
+                        shadowOpacity: 1,
+                        shadowRadius: 0,
+                        elevation: 5,
+                        marginBottom: 4,
+                      }}
+                    >
+                      <TouchableOpacity
+                        onPress={() => setHabitSubTab(habit.name)}
+                        activeOpacity={0.85}
                       >
-                        <View
-                          style={[
-                            styles.habitIconBox,
-                            { backgroundColor: habit.color + "20" },
-                          ]}
-                        >
-                          <Icon size={18} color={habit.color} />
-                        </View>
-                        <View>
-                          <Text
-                            style={[styles.habitName, { color: Colors.text }]}
-                          >
-                            {habit.name}
-                          </Text>
-                          <View
-                            style={{
-                              flexDirection: "row",
-                              alignItems: "center",
-                              gap: 5,
-                              marginTop: 2,
-                            }}
-                          >
-                            <Text
-                              style={{
-                                color: Colors.textMuted,
-                                fontSize: 10,
-                                fontWeight: "800",
-                                letterSpacing: 0.5,
-                              }}
-                            >
-                              🔥 {getHabitStreak(habit.logs)} DAY STREAK
-                            </Text>
-                            {habit.reminderTime && (
-                              <>
-                                <View
-                                  style={{
-                                    width: 3,
-                                    height: 3,
-                                    borderRadius: 1.5,
-                                    backgroundColor: Colors.textMuted,
-                                    opacity: 0.5,
-                                  }}
-                                />
-                                <View
-                                  style={{
-                                    flexDirection: "row",
-                                    alignItems: "center",
-                                    gap: 3,
-                                  }}
-                                >
-                                  <Bell size={10} color={Colors.primary} />
-                                  <Text
-                                    style={{
-                                      color: Colors.primary,
-                                      fontSize: 10,
-                                      fontWeight: "900",
-                                    }}
-                                  >
-                                    {habit.reminderTime}
-                                  </Text>
-                                </View>
-                              </>
-                            )}
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 16 }}>
+                          <View style={{ width: 44, height: 44, backgroundColor: '#ffffff', borderWidth: 2, borderColor: '#000', borderRadius: 8, alignItems: 'center', justifyContent: 'center' }}>
+                            <Text style={{ fontSize: 24 }}>{habit.icon || "🔥"}</Text>
                           </View>
+                          <Text style={{ color: '#000', fontWeight: '900', fontSize: 16, letterSpacing: 0.5, flex: 1 }} numberOfLines={2}>{habit.name.toUpperCase()}</Text>
                         </View>
-                      </View>
-                      <View
-                        style={{
-                          flexDirection: "row",
-                          alignItems: "center",
-                          gap: 15,
-                        }}
-                      >
-                        <TouchableOpacity
-                          onPress={() => handleOpenHabitModal(habit)}
-                        >
-                          <Edit2 size={16} color={Colors.textMuted} />
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          onPress={async () => {
-                            Alert.alert(
-                              "Delete Habit",
-                              "Remove this habit and its daily reminders?",
-                              [
-                                { text: "Keep" },
-                                {
-                                  text: "Delete",
-                                  style: "destructive",
-                                  onPress: async () => {
-                                    deleteHabit(habit.id);
-                                    await cancelReminderNotification(habit.id);
-                                    Haptics.notificationAsync(
-                                      Haptics.NotificationFeedbackType.Warning,
-                                    );
-                                  },
-                                },
-                              ],
+                        <Text style={{ color: '#000', fontSize: 12, fontWeight: '900', marginBottom: 8, letterSpacing: 0.5 }}>{completedCount}/{challengeDays} DAYS COMPLETED</Text>
+                      </TouchableOpacity>
+
+                      <View style={{ marginTop: 6 }}>
+                        <SwipeToMark
+                          isDone={isDoneToday}
+                          onToggle={() => {
+                            toggleHabitDay(habit, todayDateStr);
+                            Haptics.notificationAsync(
+                              isDoneToday
+                                ? Haptics.NotificationFeedbackType.Warning
+                                : Haptics.NotificationFeedbackType.Success
                             );
                           }}
+                          color={bg}
+                        />
+                      </View>
+
+                      <TouchableOpacity
+                        onPress={() => {
+                          setSharingHabit(habit);
+                          setShareUserName(settings.userName || "Challenger");
+                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                        }}
+                        activeOpacity={0.8}
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: 8,
+                          marginTop: 12,
+                          backgroundColor: '#ffffff',
+                          borderWidth: 2,
+                          borderColor: '#000000',
+                          borderRadius: 14,
+                          height: 40,
+                          shadowColor: '#000000',
+                          shadowOffset: { width: 2, height: 2 },
+                          shadowOpacity: 1,
+                          shadowRadius: 0,
+                          elevation: 1,
+                        }}
+                      >
+                        <Share2 size={16} color="#000000" strokeWidth={3} />
+                        <Text style={{ color: '#000000', fontSize: 11, fontWeight: '900', letterSpacing: 0.5 }}>SHARE PROGRESS</Text>
+                      </TouchableOpacity>
+                    </View>
+                  );
+                })
+              )
+            ) : (
+              filteredHabits.length === 0 ? (
+                <View style={[styles.empty, { marginTop: 60 }]}>
+                  <Activity size={80} color={Colors.primary} opacity={0.2} />
+                  <Text style={[styles.emptyTitle, { color: Colors.text }]}>
+                    {searchQuery
+                      ? "No habits found matching search."
+                      : "Master Your Routine."}
+                  </Text>
+                  <Text style={[styles.emptySub, { color: Colors.textMuted }]}>
+                    Small daily wins lead to big financial freedom. Start a habit
+                    today.
+                  </Text>
+                  <TouchableOpacity
+                    style={[styles.emptyBtn, { backgroundColor: Colors.primary }]}
+                    onPress={() => handleOpenHabitModal()}
+                  >
+                    <Plus size={20} color="#000" />
+                    <Text style={{ fontWeight: "bold", color: "#000" }}>
+                      ADD HABIT
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                filteredHabits.map((habit) => {
+                  const today = new Date();
+                  const todayYear = today.getFullYear();
+                  const todayMonthStr = String(today.getMonth() + 1).padStart(
+                    2,
+                    "0",
+                  );
+                  const todayDayNum = today.getDate();
+                  
+                  const calYear = habitCalendarDate.getFullYear();
+                  const calMonth = habitCalendarDate.getMonth();
+                  const calMonthStr = String(calMonth + 1).padStart(2, "0");
+                  const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+                  const firstDayOfMonth = new Date(calYear, calMonth, 1).getDay();
+                  
+                  const currentMonthPrefix = `${calYear}-${calMonthStr}-`;
+                  const Icon = HABIT_ICONS[habit.icon] || Zap;
+                  const challengeDaysVal = parseChallengeDays(habit.challenge);
+                  const isChallenge = challengeDaysVal !== null;
+                  const challengeDays = isChallenge ? challengeDaysVal : 90;
+                  const challengeLabel = isChallenge ? `${challengeDays}-DAY CHALLENGE` : "90-DAY MASTERY";
+                  const scoreNumerator = isChallenge ? habit.logs.length : habit.logs.filter((l) => l.startsWith(currentMonthPrefix)).length;
+                  const scoreDenominator = isChallenge ? challengeDays : daysInMonth;
+
+                  return (
+                    <View
+                      key={habit.id}
+                      style={[
+                        styles.habitCard,
+                        {
+                          backgroundColor: Colors.card,
+                          borderColor: Colors.border,
+                        },
+                      ]}
+                    >
+                      <View style={styles.habitHeader}>
+                        <View
+                          style={{
+                            flexDirection: "row",
+                            alignItems: "center",
+                            gap: 12,
+                          }}
                         >
-                          <Trash2 size={16} color={Colors.textMuted} />
+                          <View
+                            style={[
+                              styles.habitIconBox,
+                              { backgroundColor: habit.color + "20" },
+                            ]}
+                          >
+                            {Icon === Zap && habit.icon && !HABIT_ICONS[habit.icon] ? (
+                              <Text style={{ fontSize: 18 }}>{habit.icon}</Text>
+                            ) : (
+                              <Icon size={18} color={habit.color} />
+                            )}
+                          </View>
+                          <View>
+                            <Text
+                              style={[styles.habitName, { color: Colors.text }]}
+                            >
+                              {habit.name}
+                            </Text>
+                            <View
+                              style={{
+                                flexDirection: "row",
+                                alignItems: "center",
+                                gap: 5,
+                                marginTop: 2,
+                              }}
+                            >
+                              <Text
+                                style={{
+                                  color: Colors.textMuted,
+                                  fontSize: 10,
+                                  fontWeight: "800",
+                                  letterSpacing: 0.5,
+                                }}
+                              >
+                                🔥 {getHabitStreak(habit.logs)} DAY STREAK
+                              </Text>
+                              {habit.challenge && (
+                                <Text
+                                  style={{
+                                    color: Colors.primary,
+                                    fontSize: 10,
+                                    fontWeight: "900",
+                                    letterSpacing: 0.5,
+                                    backgroundColor: Colors.primary + "20",
+                                    paddingHorizontal: 6,
+                                    paddingVertical: 2,
+                                    borderRadius: 8,
+                                  }}
+                                >
+                                  {habit.challenge.toUpperCase()}
+                                </Text>
+                              )}
+                              {habit.reminderTime && (
+                                <>
+                                  <View
+                                    style={{
+                                      width: 3,
+                                      height: 3,
+                                      borderRadius: 1.5,
+                                      backgroundColor: Colors.textMuted,
+                                      opacity: 0.5,
+                                    }}
+                                  />
+                                  <View
+                                    style={{
+                                      flexDirection: "row",
+                                      alignItems: "center",
+                                      gap: 3,
+                                    }}
+                                  >
+                                    <Bell size={10} color={Colors.primary} />
+                                    <Text
+                                      style={{
+                                        color: Colors.primary,
+                                        fontSize: 10,
+                                        fontWeight: "900",
+                                      }}
+                                    >
+                                      {habit.reminderTime}
+                                    </Text>
+                                  </View>
+                                </>
+                              )}
+                            </View>
+                          </View>
+                        </View>
+                        <View
+                          style={{
+                            flexDirection: "row",
+                            alignItems: "center",
+                            gap: 15,
+                          }}
+                        >
+                          <TouchableOpacity
+                            onPress={() => handleOpenHabitModal(habit)}
+                          >
+                            <Edit2 size={16} color={Colors.textMuted} />
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            onPress={async () => {
+                              Alert.alert(
+                                "Delete Habit",
+                                "Remove this habit and its daily reminders?",
+                                [
+                                  { text: "Keep" },
+                                  {
+                                    text: "Delete",
+                                    style: "destructive",
+                                    onPress: async () => {
+                                      deleteHabit(habit.id);
+                                      await cancelReminderNotification(habit.id);
+                                      Haptics.notificationAsync(
+                                        Haptics.NotificationFeedbackType.Warning,
+                                      );
+                                    },
+                                  },
+                                ],
+                              );
+                            }}
+                          >
+                            <Trash2 size={16} color={Colors.textMuted} />
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+
+                      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 15, marginTop: 10, paddingHorizontal: 5 }}>
+                        <TouchableOpacity onPress={() => changeHabitMonth(-1)}>
+                          <ChevronLeft size={20} color={Colors.text} strokeWidth={3} />
+                        </TouchableOpacity>
+                        <Text style={{ fontWeight: "900", fontSize: 14, color: Colors.text, letterSpacing: 1 }}>
+                          {habitCalendarDate.toLocaleString("default", { month: "long" }).toUpperCase()} {calYear}
+                        </Text>
+                        <TouchableOpacity onPress={() => changeHabitMonth(1)}>
+                          <ChevronRight size={20} color={Colors.text} strokeWidth={3} />
                         </TouchableOpacity>
                       </View>
-                    </View>
 
-                    <View style={styles.habitGrid}>
-                      {Array.from({ length: daysInMonth }).map((_, i) => {
-                        const day = i + 1;
-                        const dateStr = `${currentMonthPrefix}${day.toString().padStart(2, "0")}`;
-                        const isDone = habit.logs.includes(dateStr);
-                        const isToday = day === todayDayNum;
-                        const isPast = day < todayDayNum;
-                        const disabled = !isToday;
+                      <View style={{ flexDirection: "row", marginBottom: 5 }}>
+                        {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => (
+                          <Text key={i} style={{ width: "14.285%", textAlign: "center", fontSize: 10, fontWeight: "900", color: Colors.textMuted }}>{d}</Text>
+                        ))}
+                      </View>
 
-                        return (
-                          <TouchableOpacity
-                            key={day}
-                            disabled={disabled}
-                            style={[
-                              styles.habitDay,
-                              {
-                                borderColor: isToday
-                                  ? Colors.primary
-                                  : Colors.border,
-                              },
-                              isToday &&
-                                !isDone && {
-                                  backgroundColor: Colors.primary + "15",
+                      <View style={styles.habitGrid}>
+                        {Array.from({ length: firstDayOfMonth }).map((_, i) => (
+                          <View key={`empty-${i}`} style={styles.habitDay} />
+                        ))}
+                        {Array.from({ length: daysInMonth }).map((_, i) => {
+                          const day = i + 1;
+                          const dateStr = `${currentMonthPrefix}${day.toString().padStart(2, "0")}`;
+                          const isDone = habit.logs.includes(dateStr);
+                          const isToday = day === todayDayNum && calYear === todayYear && calMonth === today.getMonth();
+                          const isPast = (calYear < todayYear) || (calYear === todayYear && calMonth < today.getMonth()) || (calYear === todayYear && calMonth === today.getMonth() && day < todayDayNum);
+                          const disabled = !isToday;
+
+                          return (
+                            <TouchableOpacity
+                              key={day}
+                              disabled={disabled}
+                              style={[
+                                styles.habitDay,
+                                {
+                                  borderColor: "#171717",
                                 },
-                              isDone && {
-                                backgroundColor: habit.color,
-                                borderColor: habit.color,
-                              },
-                            ]}
-                            onPress={() => toggleHabitDay(habit, dateStr)}
-                          >
-                            {isDone ? (
-                              <Text style={{ fontSize: 10 }}>😊</Text>
-                            ) : isPast ? (
-                              <Text style={{ fontSize: 10 }}>😵</Text>
-                            ) : (
+                                isToday &&
+                                  !isDone && {
+                                    backgroundColor: Colors.primary + "30",
+                                  },
+                                isDone && {
+                                  backgroundColor: habit.color,
+                                  borderColor: "#171717",
+                                },
+                              ]}
+                              onPress={() => toggleHabitDay(habit, dateStr)}
+                            >
                               <Text
                                 style={[
                                   styles.habitDayText,
                                   {
-                                    color: isToday
-                                      ? Colors.primary
-                                      : Colors.textMuted,
+                                    color: isDone ? "#fff" : isToday ? Colors.primary : Colors.textMuted,
                                   },
                                 ]}
                               >
-                                {day}
+                                {day}{isDone ? " ✓" : ""}
                               </Text>
-                            )}
-                          </TouchableOpacity>
-                        );
-                      })}
-                    </View>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
 
-                    <View
-                      style={[
-                        styles.habitFooter,
-                        { flexDirection: "row", alignItems: "center" },
-                      ]}
-                    >
-                      <View style={{ flex: 1 }}>
-                        <Text
-                          style={[
-                            styles.habitStat,
-                            { color: Colors.textMuted, marginBottom: 6 },
-                          ]}
-                        >
-                          90-DAY MASTERY:{" "}
-                          <Text style={{ color: habit.color }}>
-                            {getHabitStreak(habit.logs)}
-                          </Text>{" "}
-                          / 90
-                        </Text>
-                        <View
-                          style={{
-                            width: "100%",
-                            height: 6,
-                            backgroundColor: Colors.border,
-                            borderRadius: 3,
-                            overflow: "hidden",
-                          }}
-                        >
+                      <View
+                        style={[
+                          styles.habitFooter,
+                          { flexDirection: "row", alignItems: "center" },
+                        ]}
+                      >
+                        <View style={{ flex: 1 }}>
+                          <Text
+                            style={[
+                              styles.habitStat,
+                              { color: Colors.textMuted, marginBottom: 6 },
+                            ]}
+                          >
+                            {challengeLabel.toUpperCase()}:{" "}
+                            <Text style={{ color: habit.color }}>
+                              {getHabitStreak(habit.logs)}
+                            </Text>{" "}
+                            / {challengeDays}
+                          </Text>
                           <View
                             style={{
-                              width: `${Math.min((getHabitStreak(habit.logs) / 90) * 100, 100)}%`,
-                              height: "100%",
-                              backgroundColor: habit.color,
+                              width: "100%",
+                              height: 6,
+                              backgroundColor: Colors.border,
+                              borderRadius: 3,
+                              overflow: "hidden",
                             }}
-                          />
+                          >
+                            <View
+                              style={{
+                                width: `${Math.min((getHabitStreak(habit.logs) / challengeDays) * 100, 100)}%`,
+                                height: "100%",
+                                backgroundColor: habit.color,
+                              }}
+                            />
+                          </View>
+                        </View>
+                        <View style={{ marginLeft: 20, alignItems: "flex-end" }}>
+                          <Text
+                            style={[
+                              styles.habitStat,
+                              { color: Colors.textMuted },
+                            ]}
+                          >
+                            SCORE:{" "}
+                            <Text style={{ color: habit.color, fontSize: 12 }}>
+                              {scoreNumerator}
+                            </Text>{" "}
+                            / {scoreDenominator}
+                          </Text>
                         </View>
                       </View>
-                      <View style={{ marginLeft: 20, alignItems: "flex-end" }}>
-                        <Text
-                          style={[
-                            styles.habitStat,
-                            { color: Colors.textMuted },
-                          ]}
-                        >
-                          SCORE:{" "}
-                          <Text style={{ color: habit.color, fontSize: 12 }}>
-                            {
-                              habit.logs.filter((l) =>
-                                l.startsWith(currentMonthPrefix),
-                              ).length
-                            }
-                          </Text>{" "}
-                          / {daysInMonth}
-                        </Text>
-                      </View>
+
+                      <TouchableOpacity
+                        onPress={() => {
+                          setSharingHabit(habit);
+                          setShareUserName(settings.userName || "Challenger");
+                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                        }}
+                        activeOpacity={0.8}
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: 8,
+                          marginTop: 15,
+                          backgroundColor: Colors.primary,
+                          borderWidth: 2.5,
+                          borderColor: '#171717',
+                          borderRadius: 18,
+                          height: 48,
+                          shadowColor: '#171717',
+                          shadowOffset: { width: 3, height: 3 },
+                          shadowOpacity: 1,
+                          shadowRadius: 0,
+                          elevation: 2,
+                        }}
+                      >
+                        <Share2 size={18} color="#000000" strokeWidth={3} />
+                        <Text style={{ color: '#000000', fontSize: 13, fontWeight: '900', letterSpacing: 1 }}>SHARE PROGRESS</Text>
+                      </TouchableOpacity>
                     </View>
-                  </View>
-                );
-              })
+                  );
+                })
+              )
             )}
           </ScrollView>
 
@@ -1964,13 +2388,381 @@ export default function TodoScreen() {
             onPress={() => handleOpenHabitModal()}
             style={[
               styles.mainFab,
-              { backgroundColor: Colors.primary, bottom: 20 + insets.bottom },
+              { backgroundColor: Colors.primary, bottom: 120 },
             ]}
           >
-            <Plus size={32} color="#000" />
+            <Plus size={32} color="#000" strokeWidth={3.5} />
           </TouchableOpacity>
         </>
       )}
+
+      
+      <Modal visible={!!progressHabit} animationType="fade" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { padding: 0, overflow: 'hidden', backgroundColor: Colors.card }]}>
+            <View style={{
+              backgroundColor: progressHabit?.color || Colors.primary,
+              padding: 20,
+              alignItems: 'center',
+              borderBottomWidth: 2,
+              borderColor: '#171717'
+            }}>
+              <Text style={{ color: '#fff', fontSize: 24, fontWeight: '900', letterSpacing: 1 }}>{progressHabit?.name.toUpperCase()}</Text>
+              <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12, fontWeight: '800', marginTop: 5 }}>MONTHLY PROGRESS</Text>
+            </View>
+            <View style={{ padding: 20 }}>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8 }}>
+                {progressHabit && Array.from({ length: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate() }).map((_, i) => {
+                  const day = i + 1;
+                  const dateStr = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                  const isDone = progressHabit.logs.includes(dateStr);
+                  const isToday = day === new Date().getDate();
+                  const isPast = day < new Date().getDate();
+                  
+                  return (
+                    <View key={day} style={{
+                      width: 40,
+                      height: 40,
+                      borderRadius: 10,
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      backgroundColor: isDone ? progressHabit.color : (isPast ? Colors.border : 'transparent'),
+                      borderWidth: 2,
+                      borderColor: isDone ? '#171717' : Colors.border,
+                      shadowColor: "#000",
+                      shadowOffset: { width: 2, height: 2 },
+                      shadowOpacity: isDone ? 1 : 0,
+                      shadowRadius: 0,
+                    }}>
+                      <Text style={{
+                        color: isDone ? '#fff' : (isPast ? Colors.textMuted : Colors.text),
+                        fontWeight: '900',
+                        fontSize: 14
+                      }}>{day}</Text>
+                    </View>
+                  )
+                })}
+              </View>
+              
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 25, paddingHorizontal: 10 }}>
+                <View style={{ alignItems: 'center' }}>
+                  <Text style={{ color: Colors.textMuted, fontSize: 10, fontWeight: '800' }}>TOTAL</Text>
+                  <Text style={{ color: Colors.text, fontSize: 24, fontWeight: '900' }}>
+                    {progressHabit?.logs.filter(l => l.startsWith(`${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`)).length || 0}
+                  </Text>
+                </View>
+                <View style={{ alignItems: 'center' }}>
+                  <Text style={{ color: Colors.textMuted, fontSize: 10, fontWeight: '800' }}>STREAK</Text>
+                  <Text style={{ color: progressHabit?.color || Colors.primary, fontSize: 24, fontWeight: '900' }}>
+                    🔥 {progressHabit ? getHabitStreak(progressHabit.logs) : 0}
+                  </Text>
+                </View>
+              </View>
+
+              <TouchableOpacity
+                onPress={() => setProgressHabit(null)}
+                style={{
+                  marginTop: 30,
+                  backgroundColor: '#171717',
+                  paddingVertical: 15,
+                  borderRadius: 20,
+                  alignItems: 'center',
+                  shadowColor: progressHabit?.color || Colors.primary,
+                  shadowOffset: { width: 4, height: 4 },
+                  shadowOpacity: 1,
+                  shadowRadius: 0,
+                }}
+              >
+                <Text style={{ color: '#fff', fontWeight: '900', fontSize: 16, letterSpacing: 1 }}>CLOSE</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={!!sharingHabit} animationType="slide" transparent statusBarTranslucent>
+        <View style={[styles.modalOverlay, { backgroundColor: "rgba(0,0,0,0.85)" }]}>
+          <SafeAreaView style={{ flex: 1, justifyContent: 'center', alignItems: 'center', width: '100%' }}>
+            
+            {/* Modal Header */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '90%', marginBottom: 15 }}>
+              <Text style={{ color: '#ffffff', fontSize: 18, fontWeight: '900', letterSpacing: 0.5 }}>SHARE YOUR PROGRESS</Text>
+              <TouchableOpacity
+                onPress={() => setSharingHabit(null)}
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: 16,
+                  backgroundColor: '#ef4444',
+                  borderWidth: 2,
+                  borderColor: '#000000',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                }}
+              >
+                <X color="#ffffff" size={16} strokeWidth={3.5} />
+              </TouchableOpacity>
+            </View>
+
+            {/* View container for 9:16 Card Mockup */}
+            <View
+              ref={shareCardRef}
+              collapsable={false}
+              style={{
+                width: Dimensions.get('window').width * 0.8,
+                aspectRatio: 9 / 16,
+                maxHeight: Dimensions.get('window').height * 0.65,
+                backgroundColor: '#facc15',
+                borderWidth: 3,
+                borderColor: '#171717',
+                borderRadius: 24,
+                padding: 20,
+                justifyContent: 'space-between',
+                shadowColor: '#000000',
+                shadowOffset: { width: 5, height: 5 },
+                shadowOpacity: 1,
+                shadowRadius: 0,
+                elevation: 8,
+                overflow: 'hidden',
+                position: 'relative',
+              }}
+            >
+              {/* Neubrutalist grid dots overlay */}
+              <View style={{
+                position: 'absolute',
+                top: 0, left: 0, right: 0, bottom: 0,
+                opacity: 0.1,
+                flexDirection: 'row',
+                flexWrap: 'wrap',
+                padding: 5,
+              }} pointerEvents="none">
+                {Array.from({ length: 200 }).map((_, i) => (
+                  <View key={i} style={{ width: 2, height: 2, borderRadius: 1, backgroundColor: '#000000', margin: 12 }} />
+                ))}
+              </View>
+
+              {/* Top Row: Tracksy Logo & Username with Avatars */}
+              <View style={{ zIndex: 5, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 3, borderColor: '#171717', paddingBottom: 10 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Image
+                    source={require("../../assets/app_logo.png")}
+                    style={{
+                      width: 28,
+                      height: 28,
+                      borderRadius: 8,
+                      borderWidth: 1.5,
+                      borderColor: '#171717',
+                    }}
+                  />
+                  <View style={{
+                    backgroundColor: '#171717',
+                    paddingHorizontal: 10,
+                    paddingVertical: 4,
+                    transform: [{ rotate: '-1.5deg' }],
+                    borderWidth: 1.5,
+                    borderColor: '#171717',
+                    shadowColor: '#000000',
+                    shadowOffset: { width: 1, height: 1 },
+                    shadowOpacity: 1,
+                    shadowRadius: 0,
+                  }}>
+                    <Text style={{ color: '#facc15', fontSize: 11, fontWeight: '900', letterSpacing: 0.5 }}>TRACKSY</Text>
+                  </View>
+                </View>
+                
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Text style={{ color: '#171717', fontSize: 11, fontWeight: '900', letterSpacing: 0.5 }}>@{shareUserName.toUpperCase()}</Text>
+                  {settings.userImage ? (
+                    <Image
+                      source={{ uri: settings.userImage }}
+                      style={{
+                        width: 28,
+                        height: 28,
+                        borderRadius: 14,
+                        borderWidth: 1.5,
+                        borderColor: '#171717',
+                      }}
+                    />
+                  ) : null}
+                </View>
+              </View>
+
+              {/* Hero Habit Panel */}
+              <View style={{
+                zIndex: 5,
+                backgroundColor: '#ffffff',
+                borderWidth: 3,
+                borderColor: '#171717',
+                borderRadius: 16,
+                padding: 15,
+                shadowColor: '#171717',
+                shadowOffset: { width: 3, height: 3 },
+                shadowOpacity: 1,
+                shadowRadius: 0,
+                transform: [{ rotate: '1deg' }],
+                marginTop: 10,
+              }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                  <View style={{
+                    width: 38,
+                    height: 38,
+                    backgroundColor: '#facc15',
+                    borderWidth: 2,
+                    borderColor: '#171717',
+                    borderRadius: 8,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}>
+                    <Text style={{ fontSize: 20 }}>{sharingHabit?.icon || "🔥"}</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: '#171717', fontSize: 16, fontWeight: '900', letterSpacing: -0.5 }} numberOfLines={1}>
+                      {sharingHabit?.name.toUpperCase()}
+                    </Text>
+                    <Text style={{ color: '#a3a3a3', fontSize: 9, fontWeight: '900', letterSpacing: 1 }}>
+                      DAILY EVOLUTION
+                    </Text>
+                  </View>
+                </View>
+              </View>
+
+              {/* Stats Panel */}
+              <View style={{ zIndex: 5, flexDirection: 'row', gap: 10, marginTop: 10 }}>
+                {/* Streak Box */}
+                <View style={{
+                  flex: 1,
+                  backgroundColor: '#171717',
+                  borderWidth: 2.5,
+                  borderColor: '#171717',
+                  borderRadius: 16,
+                  padding: 12,
+                  alignItems: 'center',
+                  shadowColor: '#171717',
+                  shadowOffset: { width: 2, height: 2 },
+                  shadowOpacity: 1,
+                  shadowRadius: 0,
+                }}>
+                  <Text style={{ fontSize: 24, fontWeight: '900', color: '#facc15' }}>🔥 {getHabitStreak(sharingHabit?.logs || [])}</Text>
+                  <Text style={{ color: '#a3a3a3', fontSize: 8, fontWeight: '900', letterSpacing: 1.5, marginTop: 4 }}>DAY STREAK</Text>
+                </View>
+
+                {/* Score Box */}
+                <View style={{
+                  flex: 1,
+                  backgroundColor: '#171717',
+                  borderWidth: 2.5,
+                  borderColor: '#171717',
+                  borderRadius: 16,
+                  padding: 12,
+                  alignItems: 'center',
+                  shadowColor: '#171717',
+                  shadowOffset: { width: 2, height: 2 },
+                  shadowOpacity: 1,
+                  shadowRadius: 0,
+                }}>
+                  <Text style={{ fontSize: 24, fontWeight: '900', color: '#facc15' }}>
+                    {sharingHabit ? (parseChallengeDays(sharingHabit.challenge) !== null ? sharingHabit.logs.length : sharingHabit.logs.filter(l => l.startsWith(`${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-`)).length) : 0}
+                    <Text style={{ fontSize: 13, color: '#ffffff' }}>/{sharingHabit ? (parseChallengeDays(sharingHabit.challenge) !== null ? parseChallengeDays(sharingHabit.challenge) : new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate()) : 30}</Text>
+                  </Text>
+                  <Text style={{ color: '#a3a3a3', fontSize: 8, fontWeight: '900', letterSpacing: 1.5, marginTop: 4 }}>COMPLETED</Text>
+                </View>
+              </View>
+
+              {/* Monthly Bullet Grid Mockup */}
+              <View style={{
+                zIndex: 5,
+                backgroundColor: '#ffffff',
+                borderWidth: 3,
+                borderColor: '#171717',
+                borderRadius: 16,
+                padding: 12,
+                marginTop: 10,
+                flex: 1,
+                justifyContent: 'center',
+              }}>
+                <Text style={{ color: '#171717', fontSize: 9, fontWeight: '900', letterSpacing: 1, marginBottom: 8, textAlign: 'center' }}>
+                  MONTHLY HABIT RADAR
+                </Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 4 }}>
+                  {sharingHabit && Array.from({ length: Math.min(new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate(), 31) }).map((_, i) => {
+                    const day = i + 1;
+                    const dateStr = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                    const isDone = sharingHabit.logs.includes(dateStr);
+                    
+                    return (
+                      <View key={day} style={{
+                        width: 22,
+                        height: 22,
+                        borderRadius: 5,
+                        backgroundColor: isDone ? sharingHabit.color : '#e5e7eb',
+                        borderWidth: 1.5,
+                        borderColor: '#171717',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                      }}>
+                        {isDone ? (
+                          <Text style={{ color: '#ffffff', fontSize: 7, fontWeight: '900' }}>✓</Text>
+                        ) : (
+                          <Text style={{ color: '#9ca3af', fontSize: 7, fontWeight: '700' }}>{day}</Text>
+                        )}
+                      </View>
+                    );
+                  })}
+                </View>
+              </View>
+
+              {/* Card Footer: Slogan & Signature */}
+              <View style={{ zIndex: 5, borderTopWidth: 3, borderStyle: 'dashed', borderColor: '#171717', paddingTop: 10, marginTop: 10, alignItems: 'center' }}>
+                <Text style={{ color: '#171717', fontSize: 10, fontWeight: '900', letterSpacing: 1.5 }}>
+                  BUILD SYSTEMS, NOT GOALS
+                </Text>
+              </View>
+
+            </View>
+
+            {/* Customizer Name Input */}
+            <View style={{ width: '80%', marginTop: 15, flexDirection: 'row', alignItems: 'center', backgroundColor: '#ffffff', borderWidth: 2.5, borderColor: '#171717', borderRadius: 16, paddingHorizontal: 12, height: 44 }}>
+              <Text style={{ color: '#a3a3a3', fontSize: 11, fontWeight: '900', marginRight: 5 }}>NAME:</Text>
+              <TextInput
+                style={{ flex: 1, color: '#171717', fontWeight: '900', fontSize: 12 }}
+                value={shareUserName}
+                onChangeText={setShareUserName}
+                maxLength={18}
+                placeholder="Your Name"
+                placeholderTextColor="#a3a3a3"
+              />
+            </View>
+
+            {/* Share / Export Actions */}
+            <View style={{ flexDirection: 'row', width: '80%', gap: 10, marginTop: 15 }}>
+              <TouchableOpacity
+                onPress={exportShareCard}
+                activeOpacity={0.8}
+                style={{
+                  flex: 1,
+                  height: 48,
+                  backgroundColor: '#34d399',
+                  borderWidth: 2.5,
+                  borderColor: '#171717',
+                  borderRadius: 16,
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  flexDirection: 'row',
+                  gap: 8,
+                  shadowColor: '#171717',
+                  shadowOffset: { width: 3, height: 3 },
+                  shadowOpacity: 1,
+                  shadowRadius: 0,
+                }}
+              >
+                <Download size={18} color="#000000" strokeWidth={3} />
+                <Text style={{ color: '#000000', fontSize: 12, fontWeight: '900', letterSpacing: 0.5 }}>EXPORT PICTURE</Text>
+              </TouchableOpacity>
+            </View>
+
+          </SafeAreaView>
+        </View>
+      </Modal>
 
       <Modal visible={isModalVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
@@ -2013,13 +2805,25 @@ export default function TodoScreen() {
                     setIsModalVisible(false);
                     setEditingTodoId(null);
                     setTask("");
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                   }}
-                  style={[
-                    styles.iconBtn,
-                    { backgroundColor: Colors.background },
-                  ]}
+                  style={{
+                    width: 38,
+                    height: 38,
+                    borderRadius: 19,
+                    backgroundColor: "#ef4444",
+                    borderWidth: 2.5,
+                    borderColor: "#171717",
+                    justifyContent: "center",
+                    alignItems: "center",
+                    shadowColor: "#171717",
+                    shadowOffset: { width: 2, height: 2 },
+                    shadowOpacity: 1,
+                    shadowRadius: 0,
+                    elevation: 0,
+                  }}
                 >
-                  <X color={Colors.text} size={20} />
+                  <X color="#ffffff" size={18} strokeWidth={3.5} />
                 </TouchableOpacity>
               </View>
 
@@ -2181,72 +2985,104 @@ export default function TodoScreen() {
 
               <View style={{ marginTop: 15 }}>
                 <TouchableOpacity
-                  style={[
-                    styles.importantToggle,
-                    {
-                      backgroundColor: isStarred
-                        ? Colors.primary + "15"
-                        : Colors.background,
-                      borderColor: isStarred ? Colors.primary : Colors.border,
-                    },
-                  ]}
-                  onPress={() => setIsStarred(!isStarred)}
+                  activeOpacity={0.9}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: 16,
+                    borderRadius: 24,
+                    borderWidth: 2.5,
+                    borderColor: "#171717",
+                    backgroundColor: isStarred ? "#facc15" : "#ffffff",
+                    marginTop: 15,
+                    shadowColor: "#171717",
+                    shadowOffset: { width: 4, height: 4 },
+                    shadowOpacity: 1,
+                    shadowRadius: 0,
+                    elevation: 0,
+                  }}
+                  onPress={() => {
+                    setIsStarred(!isStarred);
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                  }}
                 >
                   <View
                     style={{
                       flexDirection: "row",
                       alignItems: "center",
-                      gap: 12,
+                      gap: 14,
                     }}
                   >
                     <View
-                      style={[
-                        styles.starIconBox,
-                        {
-                          backgroundColor: isStarred
-                            ? Colors.primary
-                            : Colors.border,
-                        },
-                      ]}
+                      style={{
+                        width: 46,
+                        height: 46,
+                        borderRadius: 14,
+                        backgroundColor: "#171717",
+                        justifyContent: "center",
+                        alignItems: "center",
+                        borderWidth: 2,
+                        borderColor: "#171717",
+                        shadowColor: "#171717",
+                        shadowOffset: { width: 1.5, height: 1.5 },
+                        shadowOpacity: 1,
+                        shadowRadius: 0,
+                      }}
                     >
                       <Star
-                        size={18}
-                        color={isStarred ? Colors.background : Colors.textMuted}
-                        fill={isStarred ? Colors.background : "transparent"}
+                        size={22}
+                        color={isStarred ? "#facc15" : "#ffffff"}
+                        fill={isStarred ? "#facc15" : "transparent"}
+                        strokeWidth={2.5}
                       />
                     </View>
                     <View>
                       <Text
                         style={{
-                          color: Colors.text,
+                          color: "#171717",
                           fontWeight: "900",
                           fontSize: 14,
+                          letterSpacing: 0.5,
                         }}
                       >
                         MARK AS IMPORTANT
                       </Text>
                       <Text
                         style={{
-                          color: Colors.textMuted,
+                          color: isStarred ? "#171717" : Colors.textMuted,
                           fontSize: 11,
-                          fontWeight: "600",
+                          fontWeight: "700",
+                          opacity: isStarred ? 0.8 : 1,
+                          marginTop: 2,
                         }}
                       >
                         Prioritize this mission
                       </Text>
                     </View>
                   </View>
+                  
                   <View
-                    style={[
-                      styles.checkDot,
-                      {
-                        borderColor: isStarred ? Colors.primary : Colors.border,
-                        backgroundColor: isStarred
-                          ? Colors.primary
-                          : "transparent",
-                      },
-                    ]}
-                  />
+                    style={{
+                      width: 28,
+                      height: 28,
+                      borderRadius: 8,
+                      borderWidth: 2.5,
+                      borderColor: "#171717",
+                      backgroundColor: isStarred ? "#171717" : "#ffffff",
+                      justifyContent: "center",
+                      alignItems: "center",
+                      shadowColor: "#171717",
+                      shadowOffset: { width: 1.5, height: 1.5 },
+                      shadowOpacity: 1,
+                      shadowRadius: 0,
+                      elevation: 0,
+                    }}
+                  >
+                    {isStarred && (
+                      <CheckCircle2 size={16} color="#facc15" strokeWidth={3.5} />
+                    )}
+                  </View>
                 </TouchableOpacity>
               </View>
 
@@ -2548,9 +3384,25 @@ export default function TodoScreen() {
                     setEditingHabitId(null);
                     setHName("");
                     setHTime("");
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                  }}
+                  style={{
+                    width: 38,
+                    height: 38,
+                    borderRadius: 19,
+                    backgroundColor: "#ef4444",
+                    borderWidth: 2.5,
+                    borderColor: "#171717",
+                    justifyContent: "center",
+                    alignItems: "center",
+                    shadowColor: "#171717",
+                    shadowOffset: { width: 2, height: 2 },
+                    shadowOpacity: 1,
+                    shadowRadius: 0,
+                    elevation: 0,
                   }}
                 >
-                  <X color={Colors.text} size={24} />
+                  <X color="#ffffff" size={18} strokeWidth={3.5} />
                 </TouchableOpacity>
               </View>
 
@@ -2572,59 +3424,58 @@ export default function TodoScreen() {
               />
 
               <Text style={[styles.label, { color: Colors.textMuted }]}>
-                PICK COLOR
+                CHOOSE EMOJI
               </Text>
-              <View style={styles.catGrid}>
+              <View style={[styles.catGrid, { justifyContent: 'space-between' }]}>
                 {[
-                  "#FF7A00",
-                  "#10B981",
-                  "#3B82F6",
-                  "#8B5CF6",
-                  "#F43F5E",
-                  "#EAB308",
-                ].map((c) => (
-                  <TouchableOpacity
-                    key={c}
-                    style={[
-                      styles.colorCircle,
-                      { backgroundColor: c },
-                      hColor === c && {
-                        borderWidth: 3,
-                        borderColor: Colors.text,
-                      },
-                    ]}
-                    onPress={() => setHColor(c)}
-                  />
-                ))}
-              </View>
-
-              <Text style={[styles.label, { color: Colors.textMuted }]}>
-                CHOOSE ICON
-              </Text>
-              <View style={styles.catGrid}>
-                {Object.keys(HABIT_ICONS).map((iconName) => {
-                  const Icon = HABIT_ICONS[iconName];
+                  "🔥", "💧", "🏃", "📚", "💰", "🧘", "🥗", "🧠", "🛌", "💪", 
+                  "🚀", "💻", "🎨", "✍️", "🌿", "🍎", "🚴", "🎸", "🎯", "🏆", 
+                  "🌟", "💡", "🎮", "📱", "🧹", "🛒", "💊", "🌞", "🎧", "✈️"
+                ].map((emoji) => {
                   return (
                     <TouchableOpacity
-                      key={iconName}
-                      onPress={() => setHIcon(iconName)}
+                      key={emoji}
+                      onPress={() => setHIcon(emoji)}
                       style={[
                         styles.catBtn,
-                        hIcon === iconName && {
-                          backgroundColor: hColor + "15",
-                          borderColor: hColor,
+                        { width: '16%', marginBottom: 10, padding: 8 },
+                        hIcon === emoji && {
+                          backgroundColor: Colors.text + "15",
+                          borderColor: Colors.text,
                         },
                         { borderColor: Colors.border },
                       ]}
                     >
-                      <Icon
-                        size={20}
-                        color={hIcon === iconName ? hColor : Colors.textMuted}
-                      />
+                      <Text style={{ fontSize: 24 }}>{emoji}</Text>
                     </TouchableOpacity>
                   );
                 })}
               </View>
+
+              <Text style={[styles.label, { color: Colors.textMuted, marginTop: 10 }]}>
+                CHALLENGE DURATION
+              </Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingBottom: 10 }}>
+                {["Regular", "10 Days", "20 Days", "30 Days", "100 Days"].map((type) => (
+                  <TouchableOpacity
+                    key={type}
+                    onPress={() => setHChallenge(type)}
+                    style={[
+                      styles.pickerBtn,
+                      {
+                        borderColor: Colors.border,
+                        borderWidth: 2,
+                        paddingVertical: 10,
+                        paddingHorizontal: 16,
+                        borderRadius: 12,
+                        backgroundColor: hChallenge === type ? Colors.text : "transparent",
+                      },
+                    ]}
+                  >
+                    <Text style={{ color: hChallenge === type ? Colors.card : Colors.text, fontWeight: '700' }}>{type.toUpperCase()}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
 
               <Text style={[styles.label, { color: Colors.textMuted }]}>
                 DAILY REMINDER
@@ -2778,10 +3629,25 @@ export default function TodoScreen() {
                     setEditingVnId(null);
                     setVnTitle("");
                     if (!editingVnId) setRecordedUri(null);
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                   }}
-                  style={styles.closeBtn}
+                  style={{
+                    width: 38,
+                    height: 38,
+                    borderRadius: 19,
+                    backgroundColor: "#ef4444",
+                    borderWidth: 2.5,
+                    borderColor: "#171717",
+                    justifyContent: "center",
+                    alignItems: "center",
+                    shadowColor: "#171717",
+                    shadowOffset: { width: 2, height: 2 },
+                    shadowOpacity: 1,
+                    shadowRadius: 0,
+                    elevation: 0,
+                  }}
                 >
-                  <X size={20} color={Colors.textMuted} />
+                  <X size={18} color="#ffffff" strokeWidth={3.5} />
                 </TouchableOpacity>
               </View>
 
@@ -3039,10 +3905,13 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     justifyContent: "center",
     alignItems: "center",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-    elevation: 12,
+    borderWidth: 2.5,
+    borderColor: "#171717",
+    shadowColor: "#171717",
+    shadowOffset: { width: 4, height: 4 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 0,
   },
   mainTabContainer: {
     flexDirection: "row",
@@ -3059,7 +3928,7 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingVertical: 12,
     borderRadius: 14,
-    borderWidth: 1,
+    borderWidth: 2.5,
     borderColor: "transparent",
   },
   mainTabText: { fontSize: 13, fontWeight: "900", letterSpacing: 1 },
@@ -3070,18 +3939,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     height: 56,
     borderRadius: 20,
-    borderWidth: 1,
+    borderWidth: 2.5,
+    borderColor: "#171717",
     gap: 12,
   },
   litSearchInput: { flex: 1, fontSize: 15, fontWeight: "700" },
   tabScroll: { marginBottom: 15 },
   litTab: {
-    paddingVertical: 12,
-    paddingHorizontal: 22,
-    borderRadius: 16,
-    borderWidth: 1,
+    paddingVertical: 6,
+    paddingHorizontal: 20,
+    borderRadius: 14,
+    borderWidth: 2,
+    borderColor: "#171717",
+    alignItems: "center",
+    justifyContent: "center",
   },
-  litTabText: { fontSize: 11, fontWeight: "900", letterSpacing: 1 },
+  litTabText: { fontSize: 12, fontWeight: "900", letterSpacing: 1 },
   content: { padding: 20, paddingBottom: 100 },
   litCard: {
     flexDirection: "row",
@@ -3089,12 +3962,13 @@ const styles = StyleSheet.create({
     padding: 18,
     borderRadius: 32,
     marginBottom: 15,
-    borderWidth: 1,
-    elevation: 4,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
+    borderWidth: 2.5,
+    borderColor: "#171717",
+    shadowColor: "#171717",
+    shadowOffset: { width: 4, height: 4 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 0,
   },
   litCheckContainer: { paddingRight: 15 },
   litMain: { flex: 1 },
@@ -3156,12 +4030,14 @@ const styles = StyleSheet.create({
     paddingTop: 24,
     borderRadius: 2,
     minHeight: 180,
-    elevation: 5,
-    shadowColor: "#000",
-    shadowOffset: { width: 2, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
+    elevation: 0,
+    shadowColor: "#171717",
+    shadowOffset: { width: 4, height: 4 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
     marginBottom: 10,
+    borderWidth: 2.5,
+    borderColor: "#171717",
     overflow: "visible",
   },
   pushPinContainer: {
@@ -3248,6 +4124,8 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 24,
     paddingTop: Platform.OS === "ios" ? 60 : 40,
+    borderWidth: 2.5,
+    borderColor: "#171717",
   },
   modalHeader: {
     flexDirection: "row",
@@ -3257,7 +4135,8 @@ const styles = StyleSheet.create({
   input: {
     padding: 22,
     borderRadius: 24,
-    borderWidth: 1,
+    borderWidth: 2.5,
+    borderColor: "#171717",
     fontSize: 18,
     fontWeight: "700",
   },
@@ -3266,15 +4145,16 @@ const styles = StyleSheet.create({
     width: "92%",
     maxHeight: "85%",
     borderRadius: 32,
-    borderWidth: 1.5,
+    borderWidth: 2.5,
+    borderColor: "#171717",
     padding: 24,
     paddingTop: 30,
     overflow: "hidden",
-    elevation: 25,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 15 },
-    shadowOpacity: 0.4,
-    shadowRadius: 20,
+    elevation: 0,
+    shadowColor: "#171717",
+    shadowOffset: { width: 4, height: 4 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
   },
   cardTopAccent: {
     position: "absolute",
@@ -3323,7 +4203,8 @@ const styles = StyleSheet.create({
   premiumInput: {
     padding: 18,
     borderRadius: 20,
-    borderWidth: 1.5,
+    borderWidth: 2.5,
+    borderColor: "#171717",
     fontSize: 16,
     fontWeight: "700",
   },
@@ -3334,7 +4215,8 @@ const styles = StyleSheet.create({
     gap: 10,
     padding: 16,
     borderRadius: 20,
-    borderWidth: 1.5,
+    borderWidth: 2.5,
+    borderColor: "#171717",
   },
   mainActionBtn: {
     flexDirection: "row",
@@ -3344,11 +4226,11 @@ const styles = StyleSheet.create({
     height: 64,
     borderRadius: 24,
     marginTop: 10,
-    elevation: 8,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
+    elevation: 0,
+    shadowColor: "#171717",
+    shadowOffset: { width: 4, height: 4 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
   },
   mainActionText: {
     color: "#000",
@@ -3376,7 +4258,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     height: 50,
     borderRadius: 15,
-    borderWidth: 1,
+    borderWidth: 2.5,
+    borderColor: "#171717",
     gap: 10,
   },
   label: {
@@ -3392,7 +4275,8 @@ const styles = StyleSheet.create({
     minWidth: 70,
     height: 64,
     borderRadius: 18,
-    borderWidth: 1,
+    borderWidth: 2.5,
+    borderColor: "#171717",
     justifyContent: "center",
     alignItems: "center",
     gap: 6,
@@ -3413,7 +4297,8 @@ const styles = StyleSheet.create({
     height: 60,
     width: "100%",
     borderRadius: 16,
-    borderWidth: 1,
+    borderWidth: 2.5,
+    borderColor: "#171717",
     borderStyle: "dashed",
     justifyContent: "center",
     alignItems: "center",
@@ -3495,7 +4380,13 @@ const styles = StyleSheet.create({
   habitCard: {
     padding: 20,
     borderRadius: 32,
-    borderWidth: 1,
+    borderWidth: 2.5,
+    borderColor: "#171717",
+    shadowColor: "#171717",
+    shadowOffset: { width: 4, height: 4 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 0,
     marginBottom: 15,
   },
   habitHeader: {
@@ -3512,12 +4403,19 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   habitName: { fontSize: 18, fontWeight: "900" },
-  habitGrid: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
+  habitGrid: { 
+    flexDirection: "row", 
+    flexWrap: "wrap", 
+    borderTopWidth: 2, 
+    borderLeftWidth: 2, 
+    borderColor: "#171717" 
+  },
   habitDay: {
-    width: (Dimensions.get("window").width - 100) / 7,
-    height: 32,
-    borderRadius: 8,
-    borderWidth: 1,
+    width: "14.285%",
+    height: 40,
+    borderRightWidth: 2,
+    borderBottomWidth: 2,
+    borderColor: "#171717",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -3536,7 +4434,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 22,
     borderRadius: 32,
-    borderWidth: 1,
+    borderWidth: 2.5,
+    borderColor: "#171717",
+    shadowColor: "#171717",
+    shadowOffset: { width: 4, height: 4 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 0,
     marginBottom: 25,
     overflow: "hidden",
   },
@@ -3576,17 +4480,19 @@ const styles = StyleSheet.create({
   },
   mainFab: {
     position: "absolute",
-    right: 20,
+    right: 24,
     width: 64,
     height: 64,
-    borderRadius: 32,
+    borderRadius: 20,
     justifyContent: "center",
     alignItems: "center",
-    elevation: 10,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+    elevation: 0,
+    shadowColor: "#171717",
+    shadowOffset: { width: 4, height: 4 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    borderWidth: 2.5,
+    borderColor: "#171717",
     zIndex: 1000,
   },
   batchBtn: {
@@ -3615,7 +4521,8 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    borderWidth: 2,
+    borderWidth: 2.5,
+    borderColor: "#171717",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -3625,7 +4532,8 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     justifyContent: "center",
     alignItems: "center",
-    borderWidth: 1.5,
+    borderWidth: 2.5,
+    borderColor: "#171717",
   },
   importantToggle: {
     flexDirection: "row",
@@ -3633,7 +4541,8 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     padding: 16,
     borderRadius: 24,
-    borderWidth: 2,
+    borderWidth: 2.5,
+    borderColor: "#171717",
     marginTop: 10,
   },
   starIconBox: {
@@ -3642,6 +4551,8 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     justifyContent: "center",
     alignItems: "center",
+    borderWidth: 2.5,
+    borderColor: "#171717",
   },
   checkDot: {
     width: 20,
@@ -3655,7 +4566,13 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     padding: 18,
     borderRadius: 24,
-    borderWidth: 2,
+    borderWidth: 2.5,
+    borderColor: "#171717",
+    shadowColor: "#171717",
+    shadowOffset: { width: 4, height: 4 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 0,
     marginBottom: 12,
   },
   voiceCardLeft: {
@@ -3676,11 +4593,13 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     justifyContent: "center",
     alignItems: "center",
-    elevation: 10,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
+    elevation: 0,
+    shadowColor: "#171717",
+    shadowOffset: { width: 4, height: 4 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    borderWidth: 2.5,
+    borderColor: "#171717",
   },
   recordControls: {
     position: "absolute",
@@ -3696,17 +4615,19 @@ const styles = StyleSheet.create({
     borderRadius: 42,
     justifyContent: "center",
     alignItems: "center",
-    elevation: 20,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
+    elevation: 0,
+    shadowColor: "#171717",
+    shadowOffset: { width: 4, height: 4 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    borderWidth: 2.5,
+    borderColor: "#171717",
   },
   recordingVisual: {
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 30,
-    borderWidth: 1.5,
+    borderWidth: 2.5,
     borderColor: "transparent",
     marginBottom: 15,
     alignItems: "center",

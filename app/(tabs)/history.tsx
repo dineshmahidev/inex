@@ -208,51 +208,104 @@ export default function HistoryScreen() {
           )}
         </View>
       </View>
-
-      {/* Horizontal Totals */}
+      {/* Redesigned Horizontal Totals */}
       <View style={styles.totalsRow}>
         <View
           style={[
             styles.totalCard,
             {
-              backgroundColor: Colors.primary + "10",
-              borderColor: Colors.primary + "30",
+              backgroundColor: Colors.card,
+              borderColor: Colors.border,
             },
           ]}
         >
-          <View style={styles.totalIconWrap}>
-            <ArrowDownCircle size={14} color={Colors.primary} />
-            <Text style={[styles.totalLabel, { color: Colors.primary }]}>
-              INCOME
-            </Text>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <View
+              style={{
+                backgroundColor: Colors.primary,
+                paddingHorizontal: 10,
+                paddingVertical: 4,
+                borderRadius: 20,
+                borderWidth: 1.5,
+                borderColor: Colors.border,
+              }}
+            >
+              <Text style={{ fontSize: 9, fontWeight: '900', color: '#ffffff', letterSpacing: 1 }}>
+                INCOME
+              </Text>
+            </View>
+            <View
+              style={{
+                width: 32,
+                height: 32,
+                borderRadius: 16,
+                backgroundColor: Colors.primary + '15',
+                borderWidth: 1.5,
+                borderColor: Colors.border,
+                justifyContent: 'center',
+                alignItems: 'center',
+              }}
+            >
+              <ArrowDownCircle size={18} color={Colors.primary} />
+            </View>
           </View>
-          <Text style={[styles.totalValue, { color: Colors.text }]}>
+          <Text style={{ fontSize: 11, fontWeight: '800', color: Colors.textMuted, letterSpacing: 0.5, marginBottom: 2 }}>
+            TOTAL EARNINGS
+          </Text>
+          <Text style={{ fontSize: 20, fontWeight: '900', color: Colors.text }}>
             {settings.currency}
             {totals.income.toLocaleString()}
           </Text>
         </View>
+
         <View
           style={[
             styles.totalCard,
             {
-              backgroundColor: Colors.secondary + "10",
-              borderColor: Colors.secondary + "30",
+              backgroundColor: Colors.card,
+              borderColor: Colors.border,
             },
           ]}
         >
-          <View style={styles.totalIconWrap}>
-            <ArrowUpCircle size={14} color={Colors.secondary} />
-            <Text style={[styles.totalLabel, { color: Colors.secondary }]}>
-              EXPENSE
-            </Text>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <View
+              style={{
+                backgroundColor: Colors.secondary,
+                paddingHorizontal: 10,
+                paddingVertical: 4,
+                borderRadius: 20,
+                borderWidth: 1.5,
+                borderColor: Colors.border,
+              }}
+            >
+              <Text style={{ fontSize: 9, fontWeight: '900', color: '#ffffff', letterSpacing: 1 }}>
+                EXPENSE
+              </Text>
+            </View>
+            <View
+              style={{
+                width: 32,
+                height: 32,
+                borderRadius: 16,
+                backgroundColor: Colors.secondary + '15',
+                borderWidth: 1.5,
+                borderColor: Colors.border,
+                justifyContent: 'center',
+                alignItems: 'center',
+              }}
+            >
+              <ArrowUpCircle size={18} color={Colors.secondary} />
+            </View>
           </View>
-          <Text style={[styles.totalValue, { color: Colors.text }]}>
+          <Text style={{ fontSize: 11, fontWeight: '800', color: Colors.textMuted, letterSpacing: 0.5, marginBottom: 2 }}>
+            TOTAL SPENDING
+          </Text>
+          <Text style={{ fontSize: 20, fontWeight: '900', color: Colors.text }}>
             {settings.currency}
             {totals.expense.toLocaleString()}
           </Text>
         </View>
       </View>
-
       {/* Month Selector & Filters */}
       <View style={styles.controls}>
         <View style={styles.monthSelector}>
@@ -290,26 +343,31 @@ export default function HistoryScreen() {
         </View>
 
         <View style={styles.filterRow}>
-          {(["all", "income", "expense"] as const).map((type) => (
-            <TouchableOpacity
-              key={type}
-              onPress={() => setFilterType(type)}
-              style={[
-                styles.typeChip,
-                filterType === type && { backgroundColor: Colors.primary },
-                { borderColor: Colors.border },
-              ]}
-            >
-              <Text
+          {(["all", "income", "expense"] as const).map((type) => {
+            const isActive = filterType === type;
+            const activeBg = type === "all" ? "#facc15" : type === "income" ? Colors.primary : Colors.secondary;
+            const activeText = "#000000";
+            return (
+              <TouchableOpacity
+                key={type}
+                onPress={() => setFilterType(type)}
                 style={[
-                  styles.typeText,
-                  { color: filterType === type ? "#000" : Colors.textMuted },
+                  styles.typeChip,
+                  isActive && { backgroundColor: activeBg },
+                  { borderColor: Colors.border },
                 ]}
               >
-                {type.toUpperCase()}
-              </Text>
-            </TouchableOpacity>
-          ))}
+                <Text
+                  style={[
+                    styles.typeText,
+                    { color: isActive ? activeText : Colors.textMuted },
+                  ]}
+                >
+                  {type.toUpperCase()}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
       </View>
 
@@ -399,7 +457,7 @@ export default function HistoryScreen() {
         onPress={() => setIsModalVisible(true)}
       >
         <View style={[styles.fabGradient, { backgroundColor: Colors.primary }]}>
-          <Plus color="#000" size={32} />
+          <Plus color="#000" size={32} strokeWidth={3.5} />
         </View>
       </TouchableOpacity>
 
@@ -433,7 +491,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     marginBottom: 20,
   },
-  totalCard: { flex: 1, padding: 15, borderRadius: 20, borderWidth: 1 },
+  totalCard: { 
+    flex: 1, 
+    padding: 15, 
+    borderRadius: 16, 
+    borderWidth: 2.5,
+    borderColor: '#171717',
+    shadowColor: '#171717',
+    shadowOffset: { width: 4, height: 4 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 0,
+  },
   totalIconWrap: {
     flexDirection: "row",
     alignItems: "center",
@@ -450,7 +519,13 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     justifyContent: "center",
     alignItems: "center",
-    borderWidth: 1,
+    borderWidth: 2.5,
+    borderColor: '#171717',
+    shadowColor: '#171717',
+    shadowOffset: { width: 4, height: 4 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 0,
   },
   controls: { paddingHorizontal: 20, gap: 12, marginBottom: 10 },
   monthSelector: {
@@ -460,7 +535,21 @@ const styles = StyleSheet.create({
     gap: 20,
     marginBottom: 5,
   },
-  arrowBox: { padding: 10 },
+  arrowBox: {
+    width: 38,
+    height: 38,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: '#171717',
+    backgroundColor: '#ffffff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 2, height: 2 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 2,
+  },
   monthDisplay: {
     fontSize: 18,
     fontWeight: "800",
@@ -473,7 +562,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     height: 50,
     borderRadius: 15,
-    borderWidth: 1,
+    borderWidth: 2.5,
+    borderColor: '#171717',
+    shadowColor: '#171717',
+    shadowOffset: { width: 4, height: 4 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 0,
     gap: 12,
   },
   searchInput: { flex: 1, fontSize: 15, fontWeight: "600" },
@@ -482,7 +577,13 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: 12,
-    borderWidth: 1,
+    borderWidth: 2.5,
+    borderColor: '#171717',
+    shadowColor: '#171717',
+    shadowOffset: { width: 4, height: 4 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 0,
   },
   typeText: { fontSize: 11, fontWeight: "BOLD", letterSpacing: 1 },
   content: { padding: 20, paddingBottom: 50 },
@@ -490,9 +591,15 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     padding: 16,
-    borderRadius: 24,
+    borderRadius: 16,
     marginBottom: 12,
-    borderWidth: 1,
+    borderWidth: 2.5,
+    borderColor: '#171717',
+    shadowColor: '#171717',
+    shadowOffset: { width: 4, height: 4 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 0,
   },
   iconBox: {
     width: 48,
@@ -515,22 +622,22 @@ const styles = StyleSheet.create({
   empty: { padding: 80, alignItems: "center" },
   fab: {
     position: "absolute",
-    bottom: 50,
-    right: 30,
-    width: 68,
-    height: 68,
-    borderRadius: 34,
-    elevation: 8,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
+    bottom: 120,
+    right: 24,
+    zIndex: 100,
   },
   fabGradient: {
-    width: "100%",
-    height: "100%",
-    borderRadius: 34,
+    width: 64,
+    height: 64,
+    borderRadius: 20,
     justifyContent: "center",
     alignItems: "center",
+    borderWidth: 2.5,
+    borderColor: '#171717',
+    shadowColor: '#171717',
+    shadowOffset: { width: 4, height: 4 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 0,
   },
 });

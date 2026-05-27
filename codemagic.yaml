@@ -1,6 +1,6 @@
 workflows:
-  android-release:
-    name: Tracksy Release (Signed APK + AAB)
+  android-build:
+    name: Tracksy Android Build (Debug & Release)
     max_build_duration: 60
     instance_type: mac_mini_m1
     environment:
@@ -15,43 +15,29 @@ workflows:
         script: npx expo prebuild --platform android
       - name: Set up keystore
         script: |
-          echo $ANDROID_KEYSTORE_BASE64 | base64 --decode > /tmp/tracksy.keystore
-      - name: Build Android Release
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "Keystore base64 found. Decoding keystore..."
+            echo $ANDROID_KEYSTORE_BASE64 | base64 --decode > /tmp/tracksy.keystore
+          else
+            echo "Keystore base64 NOT found. Proceeding without signing."
+          fi
+      - name: Build Android APKs & Bundle
         script: |
           cd android
-          ./gradlew bundleRelease assembleRelease \
-            -Pandroid.injected.signing.store.file=/tmp/tracksy.keystore \
-            -Pandroid.injected.signing.store.password=$ANDROID_KEYSTORE_PASSWORD \
-            -Pandroid.injected.signing.key.alias=$ANDROID_KEY_ALIAS \
-            -Pandroid.injected.signing.key.password=$ANDROID_KEY_PASSWORD
+          if [ -f "/tmp/tracksy.keystore" ]; then
+            echo "Keystore file exists. Building signed Release and Debug..."
+            ./gradlew bundleRelease assembleRelease assembleDebug \
+              -Pandroid.injected.signing.store.file=/tmp/tracksy.keystore \
+              -Pandroid.injected.signing.store.password=$ANDROID_KEYSTORE_PASSWORD \
+              -Pandroid.injected.signing.key.alias=$ANDROID_KEY_ALIAS \
+              -Pandroid.injected.signing.key.password=$ANDROID_KEY_PASSWORD
+          else
+            echo "No keystore file found. Building unsigned Debug APK..."
+            ./gradlew assembleDebug
+          fi
     artifacts:
       - android/app/build/outputs/apk/release/*.apk
       - android/app/build/outputs/bundle/release/*.aab
-    publishing:
-      email:
-        recipients:
-          - dinesh.mahi.dev@gmail.com
-        notify:
-          success: true
-          failure: true
-
-  android-debug:
-    name: Tracksy Debug (Unsigned APK)
-    max_build_duration: 30
-    instance_type: mac_mini_m1
-    environment:
-      node: 20
-      java: 17
-    scripts:
-      - name: Install dependencies
-        script: npm install
-      - name: Expo Prebuild
-        script: npx expo prebuild --platform android
-      - name: Build Android Debug
-        script: |
-          cd android
-          ./gradlew assembleDebug
-    artifacts:
       - android/app/build/outputs/apk/debug/*.apk
     publishing:
       email:
