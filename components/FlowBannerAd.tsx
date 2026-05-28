@@ -18,12 +18,8 @@ try {
 }
 
 export const FlowBannerAd = () => {
-  const [adFailed, setAdFailed] = React.useState(false);
-
-  // Hide completely if native ads aren't built or if they fail to load
-  if (!BannerAd || adFailed) {
-    return null;
-  }
+  // ADS DISABLED FOR NOW
+  return null;
 
   return (
     <View style={styles.container}>

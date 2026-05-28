@@ -23,6 +23,7 @@ class AdManager {
   }
 
   public init() {
+    return; // ADS DISABLED FOR NOW
     if (!InterstitialAd) {
       console.log('react-native-google-mobile-ads module is not available.');
       return;
@@ -64,6 +65,7 @@ class AdManager {
   }
 
   public load() {
+    return; // ADS DISABLED FOR NOW
     if (!this.interstitial || this.isLoaded || this.isLoading) return;
     try {
       this.isLoading = true;
@@ -75,6 +77,7 @@ class AdManager {
   }
 
   public showAd() {
+    return; // ADS DISABLED FOR NOW
     if (!InterstitialAd) {
       console.log('AdMob is not available in this environment.');
       return;
