@@ -13,6 +13,8 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
+      "image": "./assets/app_logo.png",
+      "resizeMode": "contain",
       "backgroundColor": "#fcd002"
     },
     "ios": {
@@ -25,6 +27,8 @@
       "allowBackup": true,
       "fullBackupOnly": false,
       "splash": {
+        "image": "./assets/app_logo.png",
+        "resizeMode": "contain",
         "backgroundColor": "#fcd002"
       },
 "adaptiveIcon": {
@@ -52,6 +56,8 @@
       [
         "expo-splash-screen",
         {
+          "image": "./assets/app_logo.png",
+          "resizeMode": "contain",
           "backgroundColor": "#fcd002"
         }
       ],
