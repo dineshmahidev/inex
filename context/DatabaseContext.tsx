@@ -122,7 +122,8 @@ interface DatabaseContextType {
   addTransaction: (tx: Omit<Transaction, 'id'>) => Promise<void>;
   updateTransaction: (id: string, tx: Partial<Transaction>) => Promise<void>;
   deleteTransaction: (id: string) => void;
-  markReminderPaid: (id: string, trackAsExpense?: boolean) => Promise<void>;
+  deleteTransactions: (ids: string[]) => void;
+  markReminderPaid: (id: string, trackAsExpense?: boolean, manualDate?: string) => Promise<void>;
   addReminder: (rem: Omit<Reminder, 'id'>) => void;
   updateReminder: (id: string, rem: Partial<Reminder>) => Promise<void>;
   deleteReminder: (id: string) => void;
@@ -132,7 +133,7 @@ interface DatabaseContextType {
   addTodo: (td: Omit<Todo, 'id'>) => Promise<string>;
   updateTodo: (id: string, td: Partial<Todo>) => Promise<void>;
   saveTodos: (todos: Todo[]) => Promise<void>;
-  addHabit: (h: Omit<Habit, 'id' | 'logs'>) => Promise<void>;
+  addHabit: (h: Omit<Habit, 'id' | 'logs'>) => Promise<string>;
   updateHabit: (id: string, h: Partial<Habit>) => Promise<void>;
   deleteHabit: (id: string) => void;
   addVoiceNote: (vn: Omit<VoiceNote, 'id'>) => Promise<string>;
@@ -177,10 +178,20 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
 
   const Colors = settings.theme === 'light' ? Theme.light : Theme.dark;
 
+  const mergeLists = <T extends { id: string }>(listA: T[], listB: T[]): T[] => {
+    const merged = [...listA, ...listB];
+    const seen = new Set<string>();
+    return merged.filter(item => {
+      if (seen.has(item.id)) return false;
+      seen.add(item.id);
+      return true;
+    });
+  };
+
   const load = async () => {
     try {
-      // 1. Load Current Version Data
-      const [t, c, r, s, n, td, h, vn, sms] = await Promise.all([
+      // 1. Load current version values
+      const [currentTxStr, currentCatStr, currentRemStr, currentSetStr, currentNoteStr, currentTodoStr, currentHabitStr, currentVoiceStr, currentSmsStr] = await Promise.all([
         AsyncStorage.getItem(KEYS.DATA),
         AsyncStorage.getItem(KEYS.CATS),
         AsyncStorage.getItem(KEYS.REMINDERS),
@@ -192,59 +203,148 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
         AsyncStorage.getItem('tracksy_sms'),
       ]);
 
-      // 2. Migration Check (Elite Safety)
-      // If current DATA is empty, check for safety backup or legacy versions
-      if (!t) {
-          // Check safety backup first (for reinstalls)
-          const safetyData = await loadFromSafetyFile();
-          if (safetyData) {
-              setTransactions(safetyData.transactions || []);
-              setCategories(safetyData.categories || DEFAULT_CATS);
-              setReminders(safetyData.reminders || []);
-              setNotes(safetyData.notes || []);
-              setTodos(safetyData.todos || []);
-              setHabits(safetyData.habits || []);
-              setVoiceNotes(safetyData.voiceNotes || []);
-              if (safetyData.settings) setSettings(prev => ({...prev, ...safetyData.settings}));
-          } else {
-              // Fallback to legacy migration
-              const legacyKeys = ['@smart_data_v3', '@smart_data_v2', '@smart_data_v1', 'transactions'];
-              for (const lk of legacyKeys) {
-                  const legacyData = await AsyncStorage.getItem(lk);
-                  if (legacyData) {
-                      setTransactions(JSON.parse(legacyData));
-                      await AsyncStorage.setItem(KEYS.DATA, legacyData);
-                      break;
-                  }
-              }
-          }
-      } else {
-          setTransactions(JSON.parse(t));
+      let loadedTx: Transaction[] = currentTxStr ? JSON.parse(currentTxStr) : [];
+      let loadedCat: Category[] = currentCatStr ? JSON.parse(currentCatStr) : DEFAULT_CATS;
+      let loadedRem: Reminder[] = currentRemStr ? JSON.parse(currentRemStr) : [];
+      let loadedSet: Partial<UserSettings> = currentSetStr ? JSON.parse(currentSetStr) : {};
+      let loadedNote: Note[] = currentNoteStr ? JSON.parse(currentNoteStr) : [];
+      let loadedTodo: Todo[] = currentTodoStr ? JSON.parse(currentTodoStr) : [];
+      let loadedHabit: Habit[] = currentHabitStr ? JSON.parse(currentHabitStr) : [];
+      let loadedVoice: VoiceNote[] = currentVoiceStr ? JSON.parse(currentVoiceStr) : [];
+      let loadedSms = currentSmsStr ? JSON.parse(currentSmsStr) : [];
+
+      // 2. Load safety backup file data (for reinstalls recovery)
+      const safetyData = await loadFromSafetyFile();
+      if (safetyData) {
+        loadedTx = mergeLists(loadedTx, safetyData.transactions || []);
+        loadedRem = mergeLists(loadedRem, safetyData.reminders || []);
+        loadedNote = mergeLists(loadedNote, safetyData.notes || []);
+        loadedTodo = mergeLists(loadedTodo, safetyData.todos || []);
+        loadedHabit = mergeLists(loadedHabit, safetyData.habits || []);
+        loadedVoice = mergeLists(loadedVoice, safetyData.voiceNotes || []);
+        loadedSet = { ...(safetyData.settings || {}), ...loadedSet };
       }
 
-      if (c) setCategories(JSON.parse(c));
-      
-      // Migrate Reminders
-      if (!r) {
-          const legacyRem = await AsyncStorage.getItem('@smart_reminders_v1');
-          if (legacyRem) {
-              setReminders(JSON.parse(legacyRem));
-              await AsyncStorage.setItem(KEYS.REMINDERS, legacyRem);
-          }
-      } else {
-          setReminders(JSON.parse(r));
+      // 3. Scan and merge legacy keys in order (for app upgrade migrations)
+      // Legacy Transactions
+      const legacyTxKeys = ['@smart_data_v3', '@smart_data_v2', '@smart_data_v1', 'transactions'];
+      for (const key of legacyTxKeys) {
+        const val = await AsyncStorage.getItem(key);
+        if (val) {
+          try {
+            const parsed = JSON.parse(val);
+            loadedTx = mergeLists(loadedTx, Array.isArray(parsed) ? parsed : []);
+          } catch (e) {}
+        }
       }
 
-      if (n) setNotes(JSON.parse(n));
-      if (td) setTodos(JSON.parse(td));
-      if (h) setHabits(JSON.parse(h));
-      if (vn) setVoiceNotes(JSON.parse(vn));
-      if (sms) setSmsBills(JSON.parse(sms));
-      
-      if (s) {
-          const loadedSettings = JSON.parse(s);
-          setSettings(prev => ({...prev, ...loadedSettings}));
+      // Legacy Categories
+      const legacyCatKeys = ['@smart_cats_v2', '@smart_cats_v1', 'categories'];
+      for (const key of legacyCatKeys) {
+        const val = await AsyncStorage.getItem(key);
+        if (val) {
+          try {
+            const parsed = JSON.parse(val);
+            loadedCat = mergeLists(loadedCat, Array.isArray(parsed) ? parsed : []);
+          } catch (e) {}
+        }
       }
+
+      // Legacy Reminders
+      const legacyRemKeys = ['@smart_reminders_v1', 'reminders'];
+      for (const key of legacyRemKeys) {
+        const val = await AsyncStorage.getItem(key);
+        if (val) {
+          try {
+            const parsed = JSON.parse(val);
+            loadedRem = mergeLists(loadedRem, Array.isArray(parsed) ? parsed : []);
+          } catch (e) {}
+        }
+      }
+
+      // Legacy Settings
+      const legacySetKeys = ['@smart_settings_v3', '@smart_settings_v2', '@smart_settings_v1', 'settings'];
+      for (const key of legacySetKeys) {
+        const val = await AsyncStorage.getItem(key);
+        if (val) {
+          try {
+            const parsed = JSON.parse(val);
+            loadedSet = { ...parsed, ...loadedSet };
+          } catch (e) {}
+        }
+      }
+
+      // Legacy Notes
+      const legacyNoteKeys = ['notes', '@smart_notes_v0'];
+      for (const key of legacyNoteKeys) {
+        const val = await AsyncStorage.getItem(key);
+        if (val) {
+          try {
+            const parsed = JSON.parse(val);
+            loadedNote = mergeLists(loadedNote, Array.isArray(parsed) ? parsed : []);
+          } catch (e) {}
+        }
+      }
+
+      // Legacy Todos
+      const legacyTodoKeys = ['todos', '@smart_todos_v0'];
+      for (const key of legacyTodoKeys) {
+        const val = await AsyncStorage.getItem(key);
+        if (val) {
+          try {
+            const parsed = JSON.parse(val);
+            loadedTodo = mergeLists(loadedTodo, Array.isArray(parsed) ? parsed : []);
+          } catch (e) {}
+        }
+      }
+
+      // Legacy Habits
+      const legacyHabitKeys = ['habits', '@smart_habits_v0'];
+      for (const key of legacyHabitKeys) {
+        const val = await AsyncStorage.getItem(key);
+        if (val) {
+          try {
+            const parsed = JSON.parse(val);
+            loadedHabit = mergeLists(loadedHabit, Array.isArray(parsed) ? parsed : []);
+          } catch (e) {}
+        }
+      }
+
+      // Legacy Voice Notes
+      const legacyVoiceKeys = ['voice', '@smart_voice_v0'];
+      for (const key of legacyVoiceKeys) {
+        const val = await AsyncStorage.getItem(key);
+        if (val) {
+          try {
+            const parsed = JSON.parse(val);
+            loadedVoice = mergeLists(loadedVoice, Array.isArray(parsed) ? parsed : []);
+          } catch (e) {}
+        }
+      }
+
+      // 4. Update state with completely loaded & merged values
+      setTransactions(loadedTx);
+      setCategories(loadedCat);
+      setReminders(loadedRem);
+      setNotes(loadedNote);
+      setTodos(loadedTodo);
+      setHabits(loadedHabit);
+      setVoiceNotes(loadedVoice);
+      setSmsBills(loadedSms);
+      setSettings(prev => ({ ...prev, ...loadedSet }));
+
+      // 5. Instantly seed/save back merged values to current AsyncStorage keys (guarantees safe sync)
+      await Promise.all([
+        AsyncStorage.setItem(KEYS.DATA, JSON.stringify(loadedTx)),
+        AsyncStorage.setItem(KEYS.CATS, JSON.stringify(loadedCat)),
+        AsyncStorage.setItem(KEYS.REMINDERS, JSON.stringify(loadedRem)),
+        AsyncStorage.setItem(KEYS.SETTINGS, JSON.stringify({ ...settings, ...loadedSet })),
+        AsyncStorage.setItem(KEYS.NOTES, JSON.stringify(loadedNote)),
+        AsyncStorage.setItem(KEYS.TODOS, JSON.stringify(loadedTodo)),
+        AsyncStorage.setItem(KEYS.HABITS, JSON.stringify(loadedHabit)),
+        AsyncStorage.setItem(KEYS.VOICE, JSON.stringify(loadedVoice)),
+      ]);
+
     } catch (e) {
       console.error("Critical Load/Migration Error:", e);
     } finally {
@@ -254,26 +354,26 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
 
   const loadFromSafetyFile = async () => {
     try {
-        const fileUri = `${FileSystem.documentDirectory}tracksy_safety_backup.json`;
-        const info = await FileSystem.getInfoAsync(fileUri);
-        if (info.exists) {
-            const content = await FileSystem.readAsStringAsync(fileUri);
-            return JSON.parse(content);
-        }
+      const fileUri = `${FileSystem.documentDirectory}tracksy_safety_backup.json`;
+      const info = await FileSystem.getInfoAsync(fileUri);
+      if (info.exists) {
+        const content = await FileSystem.readAsStringAsync(fileUri);
+        return JSON.parse(content);
+      }
     } catch (e) {
-        console.log("Safety recovery check failed:", e);
+      console.log("Safety recovery check failed:", e);
     }
     return null;
   };
 
   const saveToSafetyFile = async () => {
-      try {
-          const backup = { transactions, categories, reminders, settings, notes, todos, habits, voiceNotes };
-          const fileUri = `${FileSystem.documentDirectory}tracksy_safety_backup.json`;
-          await FileSystem.writeAsStringAsync(fileUri, JSON.stringify(backup));
-      } catch (e) {
-          console.error("Safety backup failed:", e);
-      }
+    try {
+      const backup = { transactions, categories, reminders, settings, notes, todos, habits, voiceNotes };
+      const fileUri = `${FileSystem.documentDirectory}tracksy_safety_backup.json`;
+      await FileSystem.writeAsStringAsync(fileUri, JSON.stringify(backup));
+    } catch (e) {
+      console.error("Safety backup failed:", e);
+    }
   };
 
   useEffect(() => {
@@ -293,6 +393,12 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
 
   const deleteTransaction = (id: string) => {
     const updated = transactions.filter(t => t.id !== id);
+    setTransactions(updated);
+    AsyncStorage.setItem(KEYS.DATA, JSON.stringify(updated));
+  };
+
+  const deleteTransactions = (ids: string[]) => {
+    const updated = transactions.filter(t => !ids.includes(t.id));
     setTransactions(updated);
     AsyncStorage.setItem(KEYS.DATA, JSON.stringify(updated));
   };
@@ -513,7 +619,18 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
   };
 
   const clearAllData = async () => {
+    // 1. Wipe all AsyncStorage keys
     await AsyncStorage.multiRemove(Object.values(KEYS));
+    
+    // 2. Delete safety backup file from FileSystem (Factory Reset clean-wipe)
+    try {
+      const fileUri = `${FileSystem.documentDirectory}tracksy_safety_backup.json`;
+      await FileSystem.deleteAsync(fileUri, { idempotent: true });
+    } catch (e) {
+      console.log("Failed to clear safety backup file:", e);
+    }
+    
+    // 3. Clear react state
     setTransactions([]); setReminders([]); setNotes([]); setTodos([]); setHabits([]); setVoiceNotes([]); setCategories(DEFAULT_CATS); 
     setSettings({ 
         isLocked: false, 
@@ -574,7 +691,7 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
     <DatabaseContext.Provider 
       value={{ 
         transactions, categories, reminders, notes, todos, habits, isLoading, Colors,
-        addTransaction, updateTransaction, deleteTransaction,
+        addTransaction, updateTransaction, deleteTransaction, deleteTransactions,
         markReminderPaid, addReminder, updateReminder, deleteReminder,
         addNote, updateNote, deleteNote,
         addTodo, updateTodo, saveTodos,

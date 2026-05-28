@@ -1,6 +1,7 @@
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { Transaction, Category } from '../hooks/useDatabase';
+import { formatWithCommas } from '../constants/theme';
 
 export async function exportToPDF(transactions: Transaction[], categories: Category[], currency: string) {
   const income = transactions.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
@@ -15,7 +16,7 @@ export async function exportToPDF(transactions: Transaction[], categories: Categ
         <td style="padding: 10px; border-bottom: 1px solid #eee;">${cat}</td>
         <td style="padding: 10px; border-bottom: 1px solid #eee;">${t.note || '---'}</td>
         <td style="padding: 10px; border-bottom: 1px solid #eee; font-weight: bold; color: ${t.type === 'income' ? '#22c55e' : '#ef4444'}">
-          ${t.type === 'income' ? '+' : '-'}${currency}${t.amount.toLocaleString()}
+          ${t.type === 'income' ? '+' : '-'}${currency}${formatWithCommas(t.amount)}
         </td>
       </tr>
     `;
@@ -49,15 +50,15 @@ export async function exportToPDF(transactions: Transaction[], categories: Categ
         <div class="stats-grid">
           <div class="stat-box">
             <div class="stat-label">Total Income</div>
-            <div class="stat-value income">+${currency}${income.toLocaleString()}</div>
+            <div class="stat-value income">+${currency}${formatWithCommas(income)}</div>
           </div>
           <div class="stat-box">
             <div class="stat-label">Total Expense</div>
-            <div class="stat-value expense">-${currency}${expense.toLocaleString()}</div>
+            <div class="stat-value expense">-${currency}${formatWithCommas(expense)}</div>
           </div>
           <div class="stat-box" style="background: #FFF7ED; border-color: #FF7A00;">
             <div class="stat-label" style="color: #FF7A00;">Net Balance</div>
-            <div class="stat-value" style="color: #121212;">${currency}${balance.toLocaleString()}</div>
+            <div class="stat-value" style="color: #121212;">${currency}${formatWithCommas(balance)}</div>
           </div>
         </div>
 

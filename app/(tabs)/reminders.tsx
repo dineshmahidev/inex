@@ -1,40 +1,45 @@
 import { FlowBannerAd } from "@/components/FlowBannerAd";
+import { formatInputWithCommas, formatWithCommas } from "@/constants/theme";
 import { Reminder, useDatabase } from "@/hooks/useDatabase";
 import { parseFinancialText } from "@/utils/billParser";
 import {
-    cancelReminderNotification,
-    requestNotificationPermissions,
-    scheduleMonthlyReminderNotification,
-    scheduleReminderNotification,
+  cancelReminderNotification,
+  requestNotificationPermissions,
+  scheduleMonthlyReminderNotification,
+  scheduleReminderNotification,
 } from "@/utils/notifications";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import * as Haptics from "expo-haptics";
 import LottieView from "lottie-react-native";
 import {
-    Bell,
-    Calendar,
-    CheckCircle2,
-    Circle,
-    Clock,
-    Eye,
-    Plus,
-    Sparkles,
-    Trash2,
-    X,
+  Bell,
+  Calendar,
+  CheckCircle2,
+  Circle,
+  Clock,
+  Eye,
+  Plus,
+  Smile,
+  Sparkles,
+  Star,
+  Target,
+  Trash2,
+  X,
+  Zap
 } from "lucide-react-native";
 import React, { useMemo, useState } from "react";
 import {
-    Alert,
-    KeyboardAvoidingView,
-    Modal,
-    Platform,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 export default function RemindersScreen() {
@@ -133,7 +138,7 @@ export default function RemindersScreen() {
     if (rem) {
       setEditingRemId(rem.id);
       setName(rem.name);
-      setAmount(rem.amount.toString());
+      setAmount(formatInputWithCommas(rem.amount.toString()));
       setDueDay(rem.dueDay.toString());
       setType(rem.type);
       setTotalMonths(rem.totalMonths ? rem.totalMonths.toString() : "");
@@ -186,95 +191,79 @@ export default function RemindersScreen() {
     if (!name || !amount || !dueDay) return;
     setIsSubmitting(true);
 
-    const parsedAmount = parseFloat(amount);
-    const parsedDueDay = parseInt(dueDay);
-    const parsedTotalMonths = totalMonths ? parseInt(totalMonths) : undefined;
+    try {
+      const parsedAmount = parseFloat(amount.replace(/,/g, ''));
+      const parsedDueDay = parseInt(dueDay);
+      const parsedTotalMonths = totalMonths ? parseInt(totalMonths) : undefined;
 
-    if (editingRemId) {
-      await updateReminder(editingRemId, {
-        name,
-        amount: parsedAmount,
-        dueDay: parsedDueDay,
-        type,
-        totalMonths: parsedTotalMonths,
-        alertType,
-        customDate: date.toISOString(),
-      });
-      if (alertType === "custom") {
-        const hasPermission = await requestNotificationPermissions();
-        if (hasPermission) {
-          await scheduleReminderNotification(
-            editingRemId,
-            name,
-            parsedAmount,
-            date,
-          );
-        }
-      } else if (alertType !== "none") {
-        const hasPermission = await requestNotificationPermissions();
-        if (hasPermission) {
-          await scheduleMonthlyReminderNotification(
-            editingRemId,
-            name,
-            parsedAmount,
-            parsedDueDay,
-            alertType,
-          );
+      if (editingRemId) {
+        await updateReminder(editingRemId, {
+          name,
+          amount: parsedAmount,
+          dueDay: parsedDueDay,
+          type,
+          totalMonths: parsedTotalMonths,
+          alertType,
+          customDate: date.toISOString(),
+        });
+        if (alertType === "custom") {
+          const hasPermission = await requestNotificationPermissions();
+          if (hasPermission) {
+            await scheduleReminderNotification(editingRemId, name, parsedAmount, date);
+          }
+        } else if (alertType !== "none") {
+          const hasPermission = await requestNotificationPermissions();
+          if (hasPermission) {
+            await scheduleMonthlyReminderNotification(editingRemId, name, parsedAmount, parsedDueDay, alertType);
+          }
+        } else {
+          await cancelReminderNotification(editingRemId);
         }
       } else {
-        await cancelReminderNotification(editingRemId);
-      }
-    } else {
-      const remId = Date.now().toString();
-      await addReminder({
-        name,
-        amount: parsedAmount,
-        dueDay: parsedDueDay,
-        type,
-        totalMonths: parsedTotalMonths,
-        alertType,
-        paidMonths: 0,
-        customDate: date.toISOString(),
-      });
-      if (alertType === "custom") {
-        const hasPermission = await requestNotificationPermissions();
-        if (hasPermission) {
-          await scheduleReminderNotification(remId, name, parsedAmount, date);
-        }
-      } else if (alertType !== "none") {
-        const hasPermission = await requestNotificationPermissions();
-        if (hasPermission) {
-          await scheduleMonthlyReminderNotification(
-            remId,
-            name,
-            parsedAmount,
-            parsedDueDay,
-            alertType,
-          );
+        const remId = Date.now().toString();
+        await addReminder({
+          name,
+          amount: parsedAmount,
+          dueDay: parsedDueDay,
+          type,
+          totalMonths: parsedTotalMonths,
+          alertType,
+          paidMonths: 0,
+          customDate: date.toISOString(),
+        });
+        if (alertType === "custom") {
+          const hasPermission = await requestNotificationPermissions();
+          if (hasPermission) {
+            await scheduleReminderNotification(remId, name, parsedAmount, date);
+          }
+        } else if (alertType !== "none") {
+          const hasPermission = await requestNotificationPermissions();
+          if (hasPermission) {
+            await scheduleMonthlyReminderNotification(remId, name, parsedAmount, parsedDueDay, alertType);
+          }
         }
       }
-    }
 
-    setName("");
-    setAmount("");
-    setDueDay("");
-    setTotalMonths("");
-    setAlertType("none");
-    setIsModalVisible(false);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setName("");
+      setAmount("");
+      setDueDay("");
+      setTotalMonths("");
+      setAlertType("none");
+      setIsModalVisible(false);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (e) {
+      console.error("Failed to save reminder", e);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const getCountdown = (day: number) => {
+  const getCountdownForDate = (target: Date) => {
     const now = new Date();
-    const currentDay = now.getDate();
-    let target = new Date(now.getFullYear(), now.getMonth(), day);
-
-    if (currentDay > day) {
-      // Due next month
-      target = new Date(now.getFullYear(), now.getMonth() + 1, day);
-    }
-
     const diffMs = target.getTime() - now.getTime();
+
+    if (diffMs <= 0) return "Due Today!";
+
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
     const diffHours = Math.floor(
       (diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60),
@@ -287,31 +276,82 @@ export default function RemindersScreen() {
     return "Due Today!";
   };
 
+  const getCountdown = (dueDay: number) => {
+    const now = new Date();
+    const targetDate = new Date(now.getFullYear(), now.getMonth(), dueDay, 9, 0, 0, 0);
+    return getCountdownForDate(targetDate);
+  };
+
   const mostUrgent = useMemo(() => {
-    if (pendingReminders.length === 0) return null;
-    return [...pendingReminders].sort((a, b) => {
+    const activeReminders = reminders?.filter((r) => !r.isCompleted) || [];
+    if (activeReminders.length === 0) return null;
+
+    const sorted = [...activeReminders].map((r) => {
       const now = new Date();
-      const getT = (d: number) => {
-        let t = new Date(now.getFullYear(), now.getMonth(), d);
-        if (now.getDate() > d)
-          t = new Date(now.getFullYear(), now.getMonth() + 1, d);
-        return t.getTime();
+      const currentMonthStr = now.toISOString().slice(0, 7);
+      let targetDate: Date;
+      let status: "pending" | "settled" = "pending";
+
+      if (r.lastPaidMonth === currentMonthStr) {
+        // Settled this month, next due date is next month!
+        targetDate = new Date(now.getFullYear(), now.getMonth() + 1, r.dueDay, 9, 0, 0, 0);
+        status = "settled";
+      } else {
+        // Unpaid/pending for this month. 
+        targetDate = new Date(now.getFullYear(), now.getMonth(), r.dueDay, 9, 0, 0, 0);
+        status = "pending";
+      }
+
+      return {
+        reminder: r,
+        targetDate,
+        status,
       };
-      return getT(a.dueDay) - getT(b.dueDay);
-    })[0];
-  }, [pendingReminders, tick]);
+    }).sort((a, b) => a.targetDate.getTime() - b.targetDate.getTime());
+
+    return sorted[0];
+  }, [reminders, tick]);
+
+  const otherUpcoming = useMemo(() => {
+    const activeReminders = reminders?.filter((r) => !r.isCompleted) || [];
+    if (activeReminders.length <= 1) return [];
+
+    const sorted = [...activeReminders].map((r) => {
+      const now = new Date();
+      const currentMonthStr = now.toISOString().slice(0, 7);
+      let targetDate: Date;
+      let status: "pending" | "settled" = "pending";
+
+      if (r.lastPaidMonth === currentMonthStr) {
+        targetDate = new Date(now.getFullYear(), now.getMonth() + 1, r.dueDay, 9, 0, 0, 0);
+        status = "settled";
+      } else {
+        targetDate = new Date(now.getFullYear(), now.getMonth(), r.dueDay, 9, 0, 0, 0);
+        status = "pending";
+      }
+
+      return {
+        reminder: r,
+        targetDate,
+        status,
+      };
+    }).sort((a, b) => a.targetDate.getTime() - b.targetDate.getTime());
+
+    return sorted.slice(1, 4); // return next 3 upcoming reminders
+  }, [reminders, tick]);
 
   return (
     <SafeAreaView
       style={[styles.container, { backgroundColor: Colors.background }]}
     >
+
       <View style={styles.header}>
         <Text style={[styles.title, { color: Colors.text }]}>Bills & EMIs</Text>
         <TouchableOpacity
           style={[styles.addBtn, { backgroundColor: Colors.primary }]}
           onPress={() => handleOpenModal()}
         >
-          <Plus color="#000" size={24} />
+          <Plus color="#FFF" size={24} strokeWidth={2.5} />
         </TouchableOpacity>
       </View>
 
@@ -329,20 +369,51 @@ export default function RemindersScreen() {
             />
             <View style={styles.heroHeader}>
               <Bell color="#000" size={16} />
-              <Text style={styles.heroLabel}>MOST URGENT PAYMENT</Text>
+              <Text style={styles.heroLabel}>
+                {mostUrgent.status === "settled"
+                  ? "SETTLED • UPCOMING NEXT"
+                  : "MOST URGENT PAYMENT"}
+              </Text>
             </View>
             <Text style={styles.heroName} numberOfLines={1}>
-              {mostUrgent.name}
+              {mostUrgent.reminder.name}
             </Text>
             <View style={styles.heroTimeContainer}>
               <Text style={styles.heroTime}>
-                {getCountdown(mostUrgent.dueDay)}
+                {getCountdownForDate(mostUrgent.targetDate)}
               </Text>
             </View>
+
+            {otherUpcoming.length > 0 && (
+              <View style={styles.heroOthersContainer}>
+                <Text style={styles.heroOthersTitle}>ALSO UPCOMING QUEUE • 📋</Text>
+                {otherUpcoming.map((item) => (
+                  <View key={item.reminder.id} style={styles.heroOtherRow}>
+                    <Text style={styles.heroOtherName} numberOfLines={1}>
+                      • {item.reminder.name}
+                    </Text>
+                    <Text style={styles.heroOtherMeta}>
+                      {item.status === "settled"
+                        ? "Settled"
+                        : `${getCountdownForDate(item.targetDate)}`}{" "}
+                      • {settings.currency}
+                      {formatWithCommas(item.reminder.amount)}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            )}
+
             <View style={styles.heroFooter}>
               <Text style={styles.heroMeta}>
-                DUE ON {mostUrgent.dueDay}TH • {settings.currency}
-                {mostUrgent.amount.toLocaleString()}
+                DUE ON {mostUrgent.reminder.dueDay}TH
+                {mostUrgent.status === "settled"
+                  ? ` ${mostUrgent.targetDate
+                    .toLocaleString("default", { month: "short" })
+                    .toUpperCase()}`
+                  : ""}{" "}
+                • {settings.currency}
+                {formatWithCommas(mostUrgent.reminder.amount)}
               </Text>
             </View>
           </View>
@@ -355,10 +426,10 @@ export default function RemindersScreen() {
               activeTab === "required"
                 ? { backgroundColor: Colors.primary }
                 : {
-                    backgroundColor: Colors.card,
-                    borderColor: Colors.border,
-                    borderWidth: 1,
-                  },
+                  backgroundColor: Colors.card,
+                  borderColor: Colors.border,
+                  borderWidth: 1,
+                },
             ]}
             onPress={() => setActiveTab("required")}
           >
@@ -379,10 +450,10 @@ export default function RemindersScreen() {
               activeTab === "sms"
                 ? { backgroundColor: Colors.primary }
                 : {
-                    backgroundColor: Colors.card,
-                    borderColor: Colors.border,
-                    borderWidth: 1,
-                  },
+                  backgroundColor: Colors.card,
+                  borderColor: Colors.border,
+                  borderWidth: 1,
+                },
             ]}
             onPress={() => setActiveTab("sms")}
           >
@@ -560,7 +631,7 @@ export default function RemindersScreen() {
                         ]}
                       >
                         {settings.currency}
-                        {rem.amount.toLocaleString()}
+                        {formatWithCommas(rem.amount)}
                       </Text>
                       {rem.totalMonths && (
                         <View style={{ marginTop: 6, width: 80 }}>
@@ -678,7 +749,7 @@ export default function RemindersScreen() {
                         ]}
                       >
                         {settings.currency}
-                        {rem.amount.toLocaleString()}
+                        {formatWithCommas(rem.amount)}
                       </Text>
                       {rem.totalMonths && (
                         <View style={{ marginTop: 4, width: 60 }}>
@@ -830,7 +901,7 @@ export default function RemindersScreen() {
                     ]}
                   >
                     {settings.currency}
-                    {sms.amount.toLocaleString()}
+                    {formatWithCommas(sms.amount)}
                   </Text>
                   <TouchableOpacity
                     style={{
@@ -959,7 +1030,7 @@ export default function RemindersScreen() {
                       const parsed = parseFinancialText(text);
                       if (parsed) {
                         setName(parsed.name);
-                        setAmount(parsed.amount.toString());
+                        setAmount(formatInputWithCommas(parsed.amount.toString()));
                         setDueDay(parsed.date.getDate().toString());
                         setType(parsed.type);
                         Haptics.notificationAsync(
@@ -1000,7 +1071,7 @@ export default function RemindersScreen() {
                   placeholderTextColor={Colors.textMuted}
                   keyboardType="numeric"
                   value={amount}
-                  onChangeText={setAmount}
+                  onChangeText={(text) => setAmount(formatInputWithCommas(text))}
                 />
                 <TextInput
                   style={[
@@ -1255,9 +1326,7 @@ export default function RemindersScreen() {
                       }}
                     >
                       {settings.currency}
-                      {(
-                        historyRem.amount * (historyRem.totalMonths || 1)
-                      ).toLocaleString()}
+                      {formatWithCommas(historyRem.amount * (historyRem.totalMonths || 1))}
                     </Text>
                   </View>
                   <View
@@ -1288,11 +1357,11 @@ export default function RemindersScreen() {
                       }}
                     >
                       {settings.currency}
-                      {(
+                      {formatWithCommas(
                         historyRem.amount *
                         ((historyRem.totalMonths || 0) -
                           (historyRem.paidMonths || 0))
-                      ).toLocaleString()}
+                      )}
                     </Text>
                   </View>
                 </View>
@@ -1341,7 +1410,7 @@ export default function RemindersScreen() {
                           style={{ color: Colors.primary, fontWeight: "900" }}
                         >
                           +{settings.currency}
-                          {log.amount.toLocaleString()}
+                          {formatWithCommas(log.amount)}
                         </Text>
                       </View>
                     ))
@@ -1415,18 +1484,16 @@ const styles = StyleSheet.create({
   addBtn: {
     width: 48,
     height: 48,
-    borderRadius: 24,
+    borderRadius: 16,
     justifyContent: "center",
     alignItems: "center",
-    borderWidth: 2.5,
-    borderColor: "#171717",
-    shadowColor: "#171717",
-    shadowOffset: { width: 4, height: 4 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 0,
+    shadowColor: "#16a34a",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
   },
-  content: { padding: 20 },
+  content: { padding: 20, paddingBottom: 180 },
   heroCard: {
     borderRadius: 24,
     padding: 24,
@@ -1483,6 +1550,41 @@ const styles = StyleSheet.create({
     paddingTop: 15,
   },
   heroMeta: { fontSize: 12, fontWeight: "bold", color: "#000", opacity: 0.7 },
+  heroOthersContainer: {
+    backgroundColor: "rgba(0,0,0,0.06)",
+    padding: 14,
+    borderRadius: 18,
+    marginBottom: 15,
+    borderWidth: 1.5,
+    borderColor: "rgba(0,0,0,0.15)",
+  },
+  heroOthersTitle: {
+    fontSize: 9,
+    fontWeight: "900",
+    color: "#000",
+    opacity: 0.6,
+    letterSpacing: 1,
+    marginBottom: 8,
+  },
+  heroOtherRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 4,
+  },
+  heroOtherName: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#000",
+    flex: 1,
+    marginRight: 10,
+  },
+  heroOtherMeta: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#000",
+    opacity: 0.8,
+  },
   sectionTitle: {
     fontSize: 11,
     fontWeight: "bold",

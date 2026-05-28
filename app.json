@@ -2,20 +2,18 @@
   "expo": {
     "name": "Tracksy",
     "slug": "flow-ledger",
-    "version": "1.0.3",
+    "version": "1.0.4",
     "orientation": "portrait",
     "icon": "./assets/app_logo.png",
     "notification": {
       "icon": "./assets/notification_icon.png",
-      "color": "#facc15"
+      "color": "#fcd002"
     },
     "scheme": "flowledger",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/app_logo.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#facc15"
+      "backgroundColor": "#fcd002"
     },
     "ios": {
       "supportsTablet": true,
@@ -23,20 +21,18 @@
     },
     "android": {
       "package": "com.dineshmahidev.tracksy",
-      "versionCode": 7,
+      "versionCode": 8,
       "allowBackup": true,
       "fullBackupOnly": false,
       "splash": {
-        "image": "./assets/app_logo.png",
-        "resizeMode": "contain",
-        "backgroundColor": "#facc15"
+        "backgroundColor": "#fcd002"
       },
-      "adaptiveIcon": {
-        "backgroundColor": "#facc15",
-        "foregroundImage": "./assets/app_logo.png",
-        "backgroundImage": "./assets/app_logo.png",
-        "monochromeImage": "./assets/app_logo.png"
-      },
+"adaptiveIcon": {
+          "backgroundColor": "#fcd002",
+          "foregroundImage": "./assets/app_logo.png",
+          "backgroundImage": "./assets/app_logo.png",
+          "monochromeImage": "./assets/app_logo.png"
+        },
       "config": {
         "googleMobileAdsAppId": "ca-app-pub-2141805169615611~2090173992"
       },
@@ -56,10 +52,7 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/app_logo.png",
-          "imageWidth": 250,
-          "resizeMode": "contain",
-          "backgroundColor": "#facc15"
+          "backgroundColor": "#fcd002"
         }
       ],
       "@react-native-community/datetimepicker",
@@ -76,7 +69,7 @@
         "expo-notifications",
         {
           "icon": "./assets/notification_icon.png",
-          "color": "#facc15",
+          "color": "#fcd002",
           "sounds": [
             "./assets/mixkit_bell_notification_933.wav"
           ]

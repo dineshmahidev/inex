@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { Colors, Currency } from '@/constants/theme';
+import { Colors, Currency, formatWithCommas } from '@/constants/theme';
 import { NeoCard } from './NeoCard';
 
 interface BudgetProgressProps {
@@ -17,7 +17,7 @@ export function BudgetProgress({ spent, limit }: BudgetProgressProps) {
     <NeoCard style={styles.card}>
       <View style={styles.header}>
         <Text style={styles.title}>Monthly Budget</Text>
-        <Text style={styles.amount}>{Currency}{limit.toLocaleString()}</Text>
+        <Text style={styles.amount}>{Currency}{formatWithCommas(limit)}</Text>
       </View>
       
       <View style={styles.progressBg}>
@@ -25,8 +25,8 @@ export function BudgetProgress({ spent, limit }: BudgetProgressProps) {
       </View>
 
       <View style={styles.footer}>
-        <Text style={styles.footerText}>Spent: {Currency}{spent.toLocaleString()}</Text>
-        <Text style={styles.footerText}>Remains: {Currency}{remaining.toLocaleString()}</Text>
+        <Text style={styles.footerText}>Spent: {Currency}{formatWithCommas(spent)}</Text>
+        <Text style={styles.footerText}>Remains: {Currency}{formatWithCommas(remaining)}</Text>
       </View>
     </NeoCard>
   );

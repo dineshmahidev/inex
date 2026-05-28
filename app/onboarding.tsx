@@ -51,7 +51,7 @@ export default function OnboardingScreen() {
           <View style={styles.header}>
             <Text style={[styles.title, { color: Colors.text }]}>Welcome to</Text>
             <Text style={[styles.brand, { color: Colors.primary }]}>Tracksy</Text>
-            <Text style={[styles.subtitle, { color: Colors.textMuted }]}>Let's set up your profile to get started.</Text>
+            <Text style={[styles.subtitle, { color: Colors.textMuted }]}>{"Let's set up your profile to get started."}</Text>
           </View>
 
           <TouchableOpacity onPress={handlePickImage} style={styles.imageBox}>

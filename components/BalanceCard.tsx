@@ -1,4 +1,4 @@
-import { Colors, Currency } from "@/constants/theme";
+import { Colors, Currency, formatWithCommas } from "@/constants/theme";
 import { TrendingDown, TrendingUp } from "lucide-react-native";
 import React from "react";
 import { Dimensions, StyleSheet, Text, View } from "react-native";
@@ -14,16 +14,23 @@ interface BalanceCardProps {
 const { width } = Dimensions.get("window");
 
 export function BalanceCard({ total, income, expense }: BalanceCardProps) {
+  const cardBg = total >= 0 ? "#22c55e" : "#ef4444";
+
   return (
-    <View
-      style={[styles.container, { backgroundColor: '#f97316' }]}
-    >
+    <View style={[styles.container, { backgroundColor: cardBg }]}>
+      {/* Neubrutalist grid dots background overlay */}
+      <View style={styles.gridOverlay} pointerEvents="none">
+        {Array.from({ length: 45 }).map((_, i) => (
+          <View key={i} style={styles.gridDot} />
+        ))}
+      </View>
+
       <View style={styles.topRow}>
         <View style={{ flex: 1 }}>
           <Text style={styles.label}>Net Portfolio</Text>
           <Text style={styles.balance}>
             {Currency}
-            {total.toLocaleString()}
+            {formatWithCommas(total)}
           </Text>
         </View>
         <View style={styles.lottieHost}>
@@ -49,7 +56,7 @@ export function BalanceCard({ total, income, expense }: BalanceCardProps) {
             <Text style={styles.statLabel}>Income</Text>
             <Text style={styles.statVal}>
               +{Currency}
-              {income.toLocaleString()}
+              {formatWithCommas(income)}
             </Text>
           </View>
         </View>
@@ -69,7 +76,7 @@ export function BalanceCard({ total, income, expense }: BalanceCardProps) {
             <Text style={styles.statLabel}>Expense</Text>
             <Text style={styles.statVal}>
               -{Currency}
-              {expense.toLocaleString()}
+              {formatWithCommas(expense)}
             </Text>
           </View>
         </View>
@@ -77,8 +84,6 @@ export function BalanceCard({ total, income, expense }: BalanceCardProps) {
     </View>
   );
 }
-
-// Added touchable opacity mock for look
 
 const styles = StyleSheet.create({
   container: {
@@ -95,6 +100,8 @@ const styles = StyleSheet.create({
     shadowRadius: 0,
     elevation: 0,
     marginBottom: 24,
+    position: "relative",
+    overflow: "hidden",
   },
   topRow: {
     flexDirection: "row",
@@ -170,5 +177,20 @@ const styles = StyleSheet.create({
     width: 1,
     height: 20,
     backgroundColor: "rgba(255,255,255,0.1)",
+  },
+  gridOverlay: {
+    position: "absolute",
+    top: 0, left: 0, right: 0, bottom: 0,
+    opacity: 0.12,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    padding: 10,
+  },
+  gridDot: {
+    width: 2.5,
+    height: 2.5,
+    borderRadius: 1.5,
+    backgroundColor: "#000",
+    margin: 14,
   },
 });

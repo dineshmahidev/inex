@@ -41,10 +41,10 @@ export default function LockScreen() {
                 disableDeviceFallback: false,
             });
 
-            if (result.success) {
+                    if (result.success) {
                 Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                router.replace('/(tabs)');
-            }
+                router.replace('/splash-transition');
+                    }
         } catch (e) {
             console.error("Auth error:", e);
         } finally {
@@ -82,7 +82,7 @@ export default function LockScreen() {
                     setSettings({ ...settings, pin: np });
                     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                     Alert.alert("Success", "PIN has been reset.", [
-                        { text: "Continue", onPress: () => router.replace('/(tabs)') }
+                        { text: "Continue", onPress: () => router.replace('/splash-transition') }
                     ]);
                 }
             }
@@ -95,9 +95,9 @@ export default function LockScreen() {
             setError(false);
             
             if (currentPin.length === 4) {
-                if (currentPin === settings.pin) {
+                    if (currentPin === settings.pin) {
                     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                    setTimeout(() => router.replace('/(tabs)'), 200);
+                    setTimeout(() => router.replace('/splash-transition'), 200);
                 } else {
                     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
                     setError(true);

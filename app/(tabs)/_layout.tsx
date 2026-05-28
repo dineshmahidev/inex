@@ -85,16 +85,21 @@ export default function TabLayout() {
               />
             </AnimatedIcon>
           ),
-          tabBarButton: (props) => (
-            <TouchableOpacity
-              {...props}
-              activeOpacity={0.7}
-              onPress={(e) => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                props.onPress?.(e);
-              }}
-            />
-          ),
+          tabBarButton: (props) => {
+            const { delayLongPress, disabled, ...rest } = props;
+            return (
+              <TouchableOpacity
+                {...(rest as any)}
+                delayLongPress={delayLongPress ?? undefined}
+                disabled={disabled ?? undefined}
+                activeOpacity={0.7}
+                onPress={(e) => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  props.onPress?.(e);
+                }}
+              />
+            );
+          },
         }}
       />
       <Tabs.Screen
@@ -110,16 +115,21 @@ export default function TabLayout() {
               />
             </AnimatedIcon>
           ),
-          tabBarButton: (props) => (
-            <TouchableOpacity
-              {...props}
-              activeOpacity={0.7}
-              onPress={(e) => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                props.onPress?.(e);
-              }}
-            />
-          ),
+          tabBarButton: (props) => {
+            const { delayLongPress, disabled, ...rest } = props;
+            return (
+              <TouchableOpacity
+                {...(rest as any)}
+                delayLongPress={delayLongPress ?? undefined}
+                disabled={disabled ?? undefined}
+                activeOpacity={0.7}
+                onPress={(e) => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  props.onPress?.(e);
+                }}
+              />
+            );
+          },
         }}
       />
       <Tabs.Screen
@@ -135,16 +145,21 @@ export default function TabLayout() {
               />
             </AnimatedIcon>
           ),
-          tabBarButton: (props) => (
-            <TouchableOpacity
-              {...props}
-              activeOpacity={0.7}
-              onPress={(e) => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                props.onPress?.(e);
-              }}
-            />
-          ),
+          tabBarButton: (props) => {
+            const { delayLongPress, disabled, ...rest } = props;
+            return (
+              <TouchableOpacity
+                {...(rest as any)}
+                delayLongPress={delayLongPress ?? undefined}
+                disabled={disabled ?? undefined}
+                activeOpacity={0.7}
+                onPress={(e) => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  props.onPress?.(e);
+                }}
+              />
+            );
+          },
         }}
       />
       <Tabs.Screen
@@ -160,16 +175,21 @@ export default function TabLayout() {
               />
             </AnimatedIcon>
           ),
-          tabBarButton: (props) => (
-            <TouchableOpacity
-              {...props}
-              activeOpacity={0.7}
-              onPress={(e) => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                props.onPress?.(e);
-              }}
-            />
-          ),
+          tabBarButton: (props) => {
+            const { delayLongPress, disabled, ...rest } = props;
+            return (
+              <TouchableOpacity
+                {...(rest as any)}
+                delayLongPress={delayLongPress ?? undefined}
+                disabled={disabled ?? undefined}
+                activeOpacity={0.7}
+                onPress={(e) => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  props.onPress?.(e);
+                }}
+              />
+            );
+          },
         }}
       />
       <Tabs.Screen
@@ -185,16 +205,21 @@ export default function TabLayout() {
               />
             </AnimatedIcon>
           ),
-          tabBarButton: (props) => (
-            <TouchableOpacity
-              {...props}
-              activeOpacity={0.7}
-              onPress={(e) => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                props.onPress?.(e);
-              }}
-            />
-          ),
+          tabBarButton: (props) => {
+            const { delayLongPress, disabled, ...rest } = props;
+            return (
+              <TouchableOpacity
+                {...(rest as any)}
+                delayLongPress={delayLongPress ?? undefined}
+                disabled={disabled ?? undefined}
+                activeOpacity={0.7}
+                onPress={(e) => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  props.onPress?.(e);
+                }}
+              />
+            );
+          },
         }}
       />
     </Tabs>

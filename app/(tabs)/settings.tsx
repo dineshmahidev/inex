@@ -1,38 +1,33 @@
 import { useDatabase } from "@/hooks/useDatabase";
+import { useLanguage } from "@/context/LanguageContext";
 import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system/legacy";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
+import { checkForUpdates, openStoreLink, CURRENT_VERSION } from "@/utils/updates";
 import {
-    Camera,
-    ChevronRight,
-    Download,
-    Edit2,
-    Ghost,
-    Lock,
-    ShieldCheck,
-    Smile,
-    Star,
-    Trash2,
-    Upload,
-    User,
-    Zap
+  Camera,
+  ChevronRight,
+  Smile,
+  Sparkles,
+  Star,
+  Target,
+  Zap
 } from "lucide-react-native";
 import React, { useState } from "react";
 import {
-    Alert,
-    Animated,
-    Dimensions,
-    Image,
-    Modal,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Switch,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  Dimensions,
+  Image,
+  Modal,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from "react-native";
 
 const { width } = Dimensions.get("window");
@@ -48,8 +43,10 @@ export default function SettingsScreen() {
     refresh,
     Colors,
   } = useDatabase();
+  const { t, language, setLanguage, languages } = useLanguage();
   const [isEditingName, setIsEditingName] = useState(false);
   const [userName, setUserName] = useState(settings.userName);
+  const [isLangModalVisible, setIsLangModalVisible] = useState(false);
 
   // PIN Setup State
   const [isPinModalVisible, setIsPinModalVisible] = useState(false);
@@ -105,6 +102,32 @@ export default function SettingsScreen() {
     }
   };
 
+  const handleCheckUpdates = async () => {
+    try {
+      const update = await checkForUpdates();
+      if (update && update.hasUpdate) {
+        Alert.alert(
+          "Update Available! 🚀",
+          `A new version of Tracksy (${update.latestVersion}) is available. Open the store to update now?`,
+          [
+            { text: "Later", style: "cancel" },
+            { 
+              text: "Update Now", 
+              onPress: () => openStoreLink(update.storeUrl) 
+            }
+          ]
+        );
+      } else {
+        Alert.alert(
+          "Up to Date! 🚀",
+          "You are running the latest version of Tracksy. All features are fully up to date."
+        );
+      }
+    } catch (e) {
+      Alert.alert("Update Check Failed", "Could not check for updates. Please try again.");
+    }
+  };
+
   const renderAvatar = (size: number = 120, borderRadius: number = 60) => {
     const GUEST_ICONS = ["👤", "👻", "😀", "⭐", "⚡"];
     const GUEST_COLORS = [
@@ -152,17 +175,8 @@ export default function SettingsScreen() {
     <SafeAreaView
       style={[styles.container, { backgroundColor: Colors.background }]}
     >
-      <View
-        style={[
-          styles.header,
-          {
-            flexDirection: "row",
-            justifyContent: "space-between",
-            alignItems: "center",
-          },
-        ]}
-      >
-        <Text style={[styles.title, { color: Colors.text }]}>Settings</Text>
+      <View style={styles.header}>
+        <Text style={[styles.title, { color: Colors.text }]}>{t.settings}</Text>
       </View>
 
       <ScrollView
@@ -225,7 +239,7 @@ export default function SettingsScreen() {
             <Text
               style={{ color: Colors.textMuted, fontSize: 12, marginTop: 4 }}
             >
-              Elite Member
+              {t.eliteMember}
             </Text>
           </View>
         </View>
@@ -233,7 +247,7 @@ export default function SettingsScreen() {
         {/* General Settings */}
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: Colors.textMuted }]}>
-            PREFERENCES
+            {t.preferences}
           </Text>
           <View
             style={[
@@ -252,7 +266,7 @@ export default function SettingsScreen() {
                   <Text style={{ fontSize: 18 }}>🔒</Text>
                 </View>
                 <Text style={[styles.settingLabel, { color: Colors.text }]}>
-                  Data Lock
+                  {t.dataLock}
                 </Text>
               </View>
               <Switch
@@ -277,7 +291,7 @@ export default function SettingsScreen() {
         {/* Data Management */}
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: Colors.textMuted }]}>
-            PORTABILITY
+            {t.portability}
           </Text>
           <View
             style={[
@@ -293,7 +307,7 @@ export default function SettingsScreen() {
                   <Text style={{ fontSize: 18 }}>📤</Text>
                 </View>
                 <Text style={[styles.settingLabel, { color: Colors.text }]}>
-                  Export Backup
+                  {t.exportBackup}
                 </Text>
               </View>
               <ChevronRight size={18} color={Colors.textMuted} />
@@ -311,7 +325,7 @@ export default function SettingsScreen() {
                   <Text style={{ fontSize: 18 }}>📥</Text>
                 </View>
                 <Text style={[styles.settingLabel, { color: Colors.text }]}>
-                  Import JSON
+                  {t.importJson}
                 </Text>
               </View>
               <ChevronRight size={18} color={Colors.textMuted} />
@@ -324,10 +338,10 @@ export default function SettingsScreen() {
             <TouchableOpacity
               style={styles.settingItem}
               onPress={() => {
-                Alert.alert("Reset App", "This will wipe all data. Continue?", [
-                  { text: "Cancel" },
+                Alert.alert(t.resetApp, t.wipeData, [
+                  { text: t.cancel },
                   {
-                    text: "WIPE ALL",
+                    text: t.wipeAll,
                     style: "destructive",
                     onPress: clearAllData,
                   },
@@ -341,7 +355,7 @@ export default function SettingsScreen() {
                   <Text style={{ fontSize: 18 }}>🗑️</Text>
                 </View>
                 <Text style={[styles.settingLabel, { color: Colors.text }]}>
-                  Factory Reset
+                  {t.factoryReset}
                 </Text>
               </View>
             </TouchableOpacity>
@@ -351,7 +365,7 @@ export default function SettingsScreen() {
         {/* Security Section */}
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: Colors.textMuted }]}>
-            SECURITY
+            {t.security}
           </Text>
           <View
             style={[
@@ -373,7 +387,31 @@ export default function SettingsScreen() {
                   <Text style={{ fontSize: 18 }}>🛡️</Text>
                 </View>
                 <Text style={[styles.settingLabel, { color: Colors.text }]}>
-                  Privacy Policy
+                  {t.privacyPolicy}
+                </Text>
+              </View>
+              <ChevronRight size={18} color={Colors.textMuted} />
+            </TouchableOpacity>
+
+            <View
+              style={[styles.divider, { backgroundColor: Colors.border }]}
+            />
+
+            <TouchableOpacity
+              style={styles.settingItem}
+              onPress={handleCheckUpdates}
+            >
+              <View style={styles.settingLeft}>
+                <View
+                  style={[
+                    styles.iconBox,
+                    { backgroundColor: Colors.primary + "15" },
+                  ]}
+                >
+                  <Text style={{ fontSize: 18 }}>🔄</Text>
+                </View>
+                <Text style={[styles.settingLabel, { color: Colors.text }]}>
+                  {t.checkUpdates}
                 </Text>
               </View>
               <ChevronRight size={18} color={Colors.textMuted} />
@@ -386,10 +424,110 @@ export default function SettingsScreen() {
             TRACKSY PRO
           </Text>
           <Text style={[styles.footerInfo, { color: Colors.textMuted }]}>
-            V 1.0.5 • SECURE & OFFLINE
+            {"V " + CURRENT_VERSION + " • SECURE & OFFLINE"}
           </Text>
         </View>
       </ScrollView>
+
+      {/* ───────────────────────── Language Picker Modal ─────────────────────── */}
+      <Modal
+        visible={isLangModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsLangModalVisible(false)}
+      >
+        <View style={{
+          flex: 1,
+          backgroundColor: 'rgba(0,0,0,0.55)',
+          justifyContent: 'center',
+          alignItems: 'center',
+          padding: 28,
+        }}>
+          <View style={{
+            width: '100%',
+            backgroundColor: Colors.card,
+            borderWidth: 3,
+            borderColor: '#171717',
+            borderRadius: 24,
+            padding: 24,
+            shadowColor: '#171717',
+            shadowOffset: { width: 6, height: 6 },
+            shadowOpacity: 1,
+            shadowRadius: 0,
+            elevation: 5,
+          }}>
+            {/* Modal Title */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 20 }}>
+              <View style={{ width: 36, height: 36, borderRadius: 12, backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#171717' }}>
+                <Text style={{ fontSize: 18 }}>🌐</Text>
+              </View>
+              <Text style={{ fontSize: 18, fontWeight: '900', color: Colors.text, letterSpacing: -0.5 }}>
+                {t.selectLanguage}
+              </Text>
+            </View>
+
+            {/* Language Options */}
+            {languages.map((lang, idx) => {
+              const isActive = lang.code === language;
+              return (
+                <TouchableOpacity
+                  key={lang.code}
+                  activeOpacity={0.8}
+                  onPress={async () => {
+                    await setLanguage(lang.code);
+                    setIsLangModalVisible(false);
+                  }}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 14,
+                    padding: 16,
+                    borderRadius: 16,
+                    borderWidth: 2.5,
+                    borderColor: isActive ? Colors.primary : '#171717',
+                    backgroundColor: isActive ? Colors.primary + '18' : 'transparent',
+                    marginBottom: idx < languages.length - 1 ? 10 : 0,
+                  }}
+                >
+                  <Text style={{ fontSize: 26 }}>{lang.flag}</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: Colors.text, fontWeight: '900', fontSize: 16 }}>
+                      {lang.nativeLabel}
+                    </Text>
+                    <Text style={{ color: Colors.textMuted, fontSize: 11, fontWeight: '600', marginTop: 2 }}>
+                      {lang.label}
+                    </Text>
+                  </View>
+                  {isActive && (
+                    <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#171717' }}>
+                      <Text style={{ color: '#000', fontSize: 12, fontWeight: '900' }}>✓</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+
+            {/* Close */}
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => setIsLangModalVisible(false)}
+              style={{
+                marginTop: 16,
+                height: 48,
+                borderRadius: 16,
+                borderWidth: 2.5,
+                borderColor: '#171717',
+                justifyContent: 'center',
+                alignItems: 'center',
+              }}
+            >
+              <Text style={{ color: Colors.text, fontWeight: '900', fontSize: 14 }}>
+                {t.cancel}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       {/* PIN Setup Modal */}
       <Modal visible={isPinModalVisible} animationType="slide" transparent>
@@ -418,7 +556,7 @@ export default function SettingsScreen() {
                 <Text style={{ fontSize: 32 }}>🔒</Text>
               </View>
               <Text style={[styles.title, { color: Colors.text }]}>
-                {setupStep === 1 ? "Set New PIN" : "Confirm PIN"}
+                {setupStep === 1 ? t.setNewPin : t.confirmPin}
               </Text>
               <Text
                 style={[
@@ -427,10 +565,10 @@ export default function SettingsScreen() {
                 ]}
               >
                 {pinError
-                  ? "PINs do not match. Try again."
+                  ? t.pinsNoMatch
                   : setupStep === 1
-                    ? "Enter a 4-digit PIN"
-                    : "Re-enter your PIN to confirm"}
+                    ? t.enter4Digit
+                    : t.reenterPin}
               </Text>
             </View>
 
@@ -443,7 +581,7 @@ export default function SettingsScreen() {
                     {
                       backgroundColor:
                         i <
-                        (setupStep === 1 ? setupPin.length : confirmPin.length)
+                          (setupStep === 1 ? setupPin.length : confirmPin.length)
                           ? Colors.primary
                           : "transparent",
                       borderColor: pinError ? "#ef4444" : Colors.primary,
@@ -510,7 +648,7 @@ export default function SettingsScreen() {
                   }}
                 >
                   <Text style={{ color: Colors.textMuted, fontSize: 16 }}>
-                    Cancel
+                    {t.cancel}
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -617,16 +755,16 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     marginLeft: 5,
   },
-  card: { 
-    borderRadius: 16, 
-    borderWidth: 2.5, 
-    borderColor: '#171717', 
-    shadowColor: '#171717', 
-    shadowOffset: { width: 4, height: 4 }, 
-    shadowOpacity: 1, 
-    shadowRadius: 0, 
-    elevation: 0, 
-    overflow: "hidden" 
+  card: {
+    borderRadius: 16,
+    borderWidth: 2.5,
+    borderColor: '#171717',
+    shadowColor: '#171717',
+    shadowOffset: { width: 4, height: 4 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 0,
+    overflow: "hidden"
   },
   settingItem: {
     flexDirection: "row",

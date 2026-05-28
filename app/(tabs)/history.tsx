@@ -1,29 +1,35 @@
 import { AddTransactionModal } from "@/components/AddTransactionModal";
+import { formatWithCommas } from "@/constants/theme";
 import { useDatabase } from "@/hooks/useDatabase";
 import { exportToPDF } from "@/utils/export"; // Added PDF utility
 import { endOfMonth, format, isWithinInterval, startOfMonth } from "date-fns";
 import {
-    ArrowDownCircle,
-    ArrowUpCircle, // Added FileText for PDF
-    CheckCircle2,
-    ChevronLeft,
-    ChevronRight,
-    FileText,
-    Plus,
-    Search,
-    Trash2,
-    X
+  ArrowDownCircle,
+  ArrowUpCircle,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  FileText,
+  Plus,
+  Search,
+  Smile,
+  Sparkles,
+  Star,
+  Target,
+  Trash2,
+  X,
+  Zap
 } from "lucide-react-native";
 import React, { useMemo, useState } from "react";
 import {
-    Alert,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 export default function HistoryScreen() {
@@ -31,6 +37,7 @@ export default function HistoryScreen() {
     transactions,
     categories,
     deleteTransaction,
+    deleteTransactions,
     updateTransaction,
     addTransaction,
     settings,
@@ -63,8 +70,9 @@ export default function HistoryScreen() {
           text: "Delete",
           style: "destructive",
           onPress: () => {
-            selectedIds.forEach((id) => deleteTransaction(id));
+            const idsToDelete = [...selectedIds];
             setSelectedIds([]);
+            deleteTransactions(idsToDelete);
           },
         },
       ],
@@ -158,19 +166,10 @@ export default function HistoryScreen() {
     <SafeAreaView
       style={[styles.container, { backgroundColor: Colors.background }]}
     >
+
       <View style={styles.header}>
         <View>
           <Text style={[styles.title, { color: Colors.text }]}>Reports</Text>
-          <Text
-            style={{
-              color: Colors.primary,
-              fontSize: 10,
-              fontWeight: "bold",
-              marginTop: 2,
-            }}
-          >
-            {format(globalMonth, "MMMM yyyy").toUpperCase()}
-          </Text>
         </View>
         <View style={styles.headerRight}>
           {isSelectionMode && (
@@ -208,7 +207,27 @@ export default function HistoryScreen() {
           )}
         </View>
       </View>
-      {/* Redesigned Horizontal Totals */}
+
+      {/* Sticky Month Selector at the top (below Reports title) */}
+      <View style={styles.monthSelector}>
+        <TouchableOpacity
+          onPress={() => changeMonth(-1)}
+          style={styles.arrowBox}
+        >
+          <ChevronLeft size={24} color={Colors.primary} />
+        </TouchableOpacity>
+        <Text style={[styles.monthDisplay, { color: Colors.text }]}>
+          {format(globalMonth, "MMMM yyyy").toUpperCase()}
+        </Text>
+        <TouchableOpacity
+          onPress={() => changeMonth(1)}
+          style={styles.arrowBox}
+        >
+          <ChevronRight size={24} color={Colors.primary} />
+        </TouchableOpacity>
+      </View>
+
+      {/* Sticky Neubrutalist Income/Expense Bento Cards */}
       <View style={styles.totalsRow}>
         <View
           style={[
@@ -254,7 +273,7 @@ export default function HistoryScreen() {
           </Text>
           <Text style={{ fontSize: 20, fontWeight: '900', color: Colors.text }}>
             {settings.currency}
-            {totals.income.toLocaleString()}
+            {formatWithCommas(totals.income)}
           </Text>
         </View>
 
@@ -302,72 +321,8 @@ export default function HistoryScreen() {
           </Text>
           <Text style={{ fontSize: 20, fontWeight: '900', color: Colors.text }}>
             {settings.currency}
-            {totals.expense.toLocaleString()}
+            {formatWithCommas(totals.expense)}
           </Text>
-        </View>
-      </View>
-      {/* Month Selector & Filters */}
-      <View style={styles.controls}>
-        <View style={styles.monthSelector}>
-          <TouchableOpacity
-            onPress={() => changeMonth(-1)}
-            style={styles.arrowBox}
-          >
-            <ChevronLeft size={24} color={Colors.primary} />
-          </TouchableOpacity>
-          <Text style={[styles.monthDisplay, { color: Colors.text }]}>
-            {format(globalMonth, "MMM yyyy")}
-          </Text>
-          <TouchableOpacity
-            onPress={() => changeMonth(1)}
-            style={styles.arrowBox}
-          >
-            <ChevronRight size={24} color={Colors.primary} />
-          </TouchableOpacity>
-        </View>
-
-        <View
-          style={[
-            styles.searchBox,
-            { backgroundColor: Colors.card, borderColor: Colors.border },
-          ]}
-        >
-          <Search size={18} color={Colors.textMuted} />
-          <TextInput
-            style={[styles.searchInput, { color: Colors.text }]}
-            placeholder="Search..."
-            placeholderTextColor={Colors.textMuted}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-        </View>
-
-        <View style={styles.filterRow}>
-          {(["all", "income", "expense"] as const).map((type) => {
-            const isActive = filterType === type;
-            const activeBg = type === "all" ? "#facc15" : type === "income" ? Colors.primary : Colors.secondary;
-            const activeText = "#000000";
-            return (
-              <TouchableOpacity
-                key={type}
-                onPress={() => setFilterType(type)}
-                style={[
-                  styles.typeChip,
-                  isActive && { backgroundColor: activeBg },
-                  { borderColor: Colors.border },
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.typeText,
-                    { color: isActive ? activeText : Colors.textMuted },
-                  ]}
-                >
-                  {type.toUpperCase()}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
         </View>
       </View>
 
@@ -375,6 +330,52 @@ export default function HistoryScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
+        {/* Search Box & Filters inside ScrollView (Scrollable) */}
+        <View style={{ gap: 12, marginBottom: 20 }}>
+          <View
+            style={[
+              styles.searchBox,
+              { backgroundColor: Colors.card, borderColor: Colors.border },
+            ]}
+          >
+            <Search size={18} color={Colors.textMuted} />
+            <TextInput
+              style={[styles.searchInput, { color: Colors.text }]}
+              placeholder="Search..."
+              placeholderTextColor={Colors.textMuted}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+          </View>
+
+          <View style={styles.filterRow}>
+            {(["all", "income", "expense"] as const).map((type) => {
+              const isActive = filterType === type;
+              const activeBg = type === "all" ? "#facc15" : type === "income" ? Colors.primary : Colors.secondary;
+              const activeText = "#000000";
+              return (
+                <TouchableOpacity
+                  key={type}
+                  onPress={() => setFilterType(type)}
+                  style={[
+                    styles.typeChip,
+                    isActive && { backgroundColor: activeBg },
+                    { borderColor: Colors.border },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.typeText,
+                      { color: isActive ? activeText : Colors.textMuted },
+                    ]}
+                  >
+                    {type.toUpperCase()}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
         {filteredTransactions.length === 0 ? (
           <View style={styles.empty}>
             <Text style={{ color: Colors.textMuted, fontWeight: "bold" }}>
@@ -441,7 +442,7 @@ export default function HistoryScreen() {
                   >
                     {isIncome ? "+" : "-"}
                     {settings.currency}
-                    {t.amount.toLocaleString()}
+                    {formatWithCommas(t.amount)}
                   </Text>
                 </View>
               </TouchableOpacity>
@@ -457,7 +458,7 @@ export default function HistoryScreen() {
         onPress={() => setIsModalVisible(true)}
       >
         <View style={[styles.fabGradient, { backgroundColor: Colors.primary }]}>
-          <Plus color="#000" size={32} strokeWidth={3.5} />
+          <Plus color="#FFF" size={28} strokeWidth={3} />
         </View>
       </TouchableOpacity>
 
@@ -491,10 +492,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     marginBottom: 20,
   },
-  totalCard: { 
-    flex: 1, 
-    padding: 15, 
-    borderRadius: 16, 
+  totalCard: {
+    flex: 1,
+    padding: 15,
+    borderRadius: 16,
     borderWidth: 2.5,
     borderColor: '#171717',
     shadowColor: '#171717',
@@ -585,7 +586,7 @@ const styles = StyleSheet.create({
     shadowRadius: 0,
     elevation: 0,
   },
-  typeText: { fontSize: 11, fontWeight: "BOLD", letterSpacing: 1 },
+  typeText: { fontSize: 11, fontWeight: "bold", letterSpacing: 1 },
   content: { padding: 20, paddingBottom: 50 },
   card: {
     flexDirection: "row",
@@ -622,20 +623,19 @@ const styles = StyleSheet.create({
   empty: { padding: 80, alignItems: "center" },
   fab: {
     position: "absolute",
-    bottom: 120,
+    bottom: 160,
     right: 24,
     zIndex: 100,
   },
   fabGradient: {
-    width: 64,
-    height: 64,
-    borderRadius: 20,
+    width: 58,
+    height: 58,
+    borderRadius: 18,
     justifyContent: "center",
     alignItems: "center",
-    borderWidth: 2.5,
-    borderColor: '#171717',
-    shadowColor: '#171717',
-    shadowOffset: { width: 4, height: 4 },
+    shadowColor: '#16a34a',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
     shadowOpacity: 1,
     shadowRadius: 0,
     elevation: 0,

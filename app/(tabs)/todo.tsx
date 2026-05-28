@@ -1,5 +1,6 @@
 import { FlowBannerAd } from "@/components/FlowBannerAd";
-import { useDatabase } from "@/hooks/useDatabase";
+import { useDatabase, Habit } from "@/hooks/useDatabase";
+import { interstitialAdManager } from "@/utils/ads";
 import {
   cancelReminderNotification,
   requestNotificationPermissions,
@@ -11,17 +12,17 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import { Audio } from "expo-av";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Haptics from "expo-haptics";
-import * as Print from "expo-print";
+import * as ImagePicker from "expo-image-picker";
 import * as Sharing from "expo-sharing";
-import { captureRef } from "react-native-view-shot";
-import LottieView from "lottie-react-native";
 import {
   Activity,
   Bell,
   Book,
   Briefcase,
   Calendar,
+  Camera,
   CheckCircle2,
+  CheckSquare,
   ChevronLeft,
   ChevronRight,
   Circle,
@@ -31,8 +32,10 @@ import {
   Dumbbell,
   Edit2,
   FileText,
+  Heading,
   Heart,
   LayoutGrid,
+  List,
   Mic,
   Palette,
   Pause,
@@ -47,6 +50,7 @@ import {
   Star,
   StickyNote,
   StopCircle,
+  Target,
   Trash2,
   Trophy,
   User,
@@ -54,25 +58,28 @@ import {
   X,
   Zap
 } from "lucide-react-native";
-import React, { useMemo, useState, useRef, useEffect } from "react";
+import { useLocalSearchParams } from "expo-router";
+import { useLanguage } from "@/context/LanguageContext";
+import React, { useMemo, useState } from "react";
 import {
-  Animated,
-  PanResponder,
   Alert,
+  Animated,
   Dimensions,
+  Image,
   KeyboardAvoidingView,
   Modal,
+  PanResponder,
   Platform,
+  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
-  SafeAreaView,
-  Image,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { captureRef } from "react-native-view-shot";
 
 const TODO_KEY = "@productivity_todos_v5";
 const NOTE_COLORS = ["#FEFF9C", "#7AFEC6", "#FF7EB9", "#7AFBFF", "#FFF3B0"];
@@ -93,8 +100,8 @@ interface Todo {
   id: string;
   text: string;
   date: string;
-  time: string;
-  category: "work" | "personal" | "shopping" | "finance";
+  time?: string;
+  category: string;
   starred: boolean;
   completed: boolean;
   reminderDate?: string;
@@ -184,7 +191,7 @@ const SwipeToMark = ({
         if (!latestWidth) return;
 
         const currentVal = latestDone ? latestMax + gestureState.dx : gestureState.dx;
-        
+
         if (!latestDone) {
           // If not completed and swiped right past 70%
           if (currentVal > latestMax * 0.7) {
@@ -338,6 +345,29 @@ const parseChallengeDays = (challenge?: string) => {
   return null;
 };
 
+const getNotePreview = (text: string) => {
+  if (!text) return "";
+  try {
+    if (text.startsWith('{"blocks":')) {
+      const parsed = JSON.parse(text);
+      if (parsed.blocks && Array.isArray(parsed.blocks)) {
+        return parsed.blocks
+          .map((b: any) => {
+            if (b.type === 'paragraph') return b.content;
+            if (b.type === 'headline') return b.content;
+            if (b.type === 'todo') return `[${b.checked ? '✓' : ' '}] ${b.content}`;
+            if (b.type === 'bullet') return `• ${b.content}`;
+            if (b.type === 'image') return `[🖼️ Image]`;
+            return '';
+          })
+          .filter(Boolean)
+          .join('\n');
+      }
+    }
+  } catch (e) { }
+  return text;
+};
+
 export default function TodoScreen() {
   const shareCardRef = React.useRef<any>(null);
   const insets = useSafeAreaInsets();
@@ -366,17 +396,26 @@ export default function TodoScreen() {
     const dayOfYear = Math.floor(
       (new Date().getTime() -
         new Date(new Date().getFullYear(), 0, 0).getTime()) /
-        1000 /
-        60 /
-        60 /
-        24,
+      1000 /
+      60 /
+      60 /
+      24,
     );
     return DAILY_QUOTES[dayOfYear % DAILY_QUOTES.length];
   }, []);
 
+  const params = useLocalSearchParams<{ tab?: string }>();
+  const { t } = useLanguage();
+
   const [mainTab, setMainTab] = useState<
     "todos" | "notes" | "habits" | "voice"
   >("todos");
+
+  React.useEffect(() => {
+    if (params?.tab && ["todos", "notes", "habits", "voice"].includes(params.tab)) {
+      setMainTab(params.tab as any);
+    }
+  }, [params?.tab]);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isNoteModalVisible, setIsNoteModalVisible] = useState(false);
   const [selectedTab, setSelectedTab] = useState<
@@ -404,6 +443,75 @@ export default function TodoScreen() {
   const [noteText, setNoteText] = useState("");
   const [noteColor, setNoteColor] = useState(NOTE_COLORS[0]);
   const [isNotePinned, setIsNotePinned] = useState(false);
+  const [noteBlocks, setNoteBlocks] = useState<any[]>([
+    { id: '1', type: 'paragraph', content: '' }
+  ]);
+  const [showColorPicker, setShowColorPicker] = useState(false);
+  const [isNoteEditing, setIsNoteEditing] = useState(false);
+
+  const addBlock = async (type: 'headline' | 'paragraph' | 'todo' | 'bullet' | 'image') => {
+    const id = Date.now().toString() + Math.random().toString().slice(2, 6);
+    if (type === 'image') {
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permissionResult.granted) {
+        Alert.alert("Permission Required", "Camera roll access is needed to upload images.");
+        return;
+      }
+      const pickerResult = await ImagePicker.launchImageLibraryAsync({
+        allowsEditing: true,
+        quality: 0.8,
+      });
+      if (!pickerResult.canceled && pickerResult.assets?.[0]?.uri) {
+        setNoteBlocks((prev) => [
+          ...prev,
+          { id, type, content: '', uri: pickerResult.assets[0].uri },
+        ]);
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      }
+    } else {
+      setNoteBlocks((prev) => [
+        ...prev,
+        { id, type, content: '', checked: false },
+      ]);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+  };
+
+  const updateBlock = (id: string, content: string) => {
+    setNoteBlocks((prev) =>
+      prev.map((b) => (b.id === id ? { ...b, content } : b)),
+    );
+  };
+
+  const toggleTodoBlock = (id: string) => {
+    setNoteBlocks((prev) =>
+      prev.map((b) => (b.id === id ? { ...b, checked: !b.checked } : b)),
+    );
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  };
+
+  const removeBlock = (id: string) => {
+    setNoteBlocks((prev) => prev.filter((b) => b.id !== id));
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  };
+
+  const pickImageForBlock = async (id: string) => {
+    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permissionResult.granted) {
+      Alert.alert("Permission Required", "Camera roll access is needed to upload images.");
+      return;
+    }
+    const pickerResult = await ImagePicker.launchImageLibraryAsync({
+      allowsEditing: true,
+      quality: 0.8,
+    });
+    if (!pickerResult.canceled && pickerResult.assets?.[0]?.uri) {
+      setNoteBlocks((prev) =>
+        prev.map((b) => (b.id === id ? { ...b, uri: pickerResult.assets[0].uri } : b)),
+      );
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+  };
 
   // Habit Form State
   const [habitSelectedDate, setHabitSelectedDate] = useState<Date>(new Date());
@@ -441,7 +549,7 @@ export default function TodoScreen() {
   const [editingVnId, setEditingVnId] = useState<string | null>(null);
 
   React.useEffect(() => {
-    let interval: NodeJS.Timeout;
+    let interval: any;
     if (isRecording) {
       interval = setInterval(() => {
         setRecordingDuration((prev) => prev + 1);
@@ -462,7 +570,7 @@ export default function TodoScreen() {
     if (!sharingHabit) return;
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-      
+
       // Capture the React Native View directly as a pixel-perfect PNG!
       const uri = await captureRef(shareCardRef, {
         format: "png",
@@ -522,54 +630,57 @@ export default function TodoScreen() {
     if (isSubmitting || !task) return;
     setIsSubmitting(true);
 
-    if (editingTodoId) {
-      await updateTodo(editingTodoId, {
-        text: task,
-        date: todoDate.toLocaleDateString(),
-        time: todoDate.toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
-        category: cat,
-        starred: isStarred,
-        reminderDate: todoDate.toISOString(),
-      });
-      // Reschedule notification
-      const hasPermission = await requestNotificationPermissions();
-      if (hasPermission) {
-        await cancelReminderNotification(editingTodoId);
-        if (todoDate.getTime() > Date.now()) {
-          await scheduleTodoNotification(editingTodoId, task, todoDate);
+    try {
+      if (editingTodoId) {
+        await updateTodo(editingTodoId, {
+          text: task,
+          date: todoDate.toLocaleDateString(),
+          time: todoDate.toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+          category: cat,
+          starred: isStarred,
+          reminderDate: todoDate.toISOString(),
+        });
+        const hasPermission = await requestNotificationPermissions();
+        if (hasPermission) {
+          await cancelReminderNotification(editingTodoId);
+          if (todoDate.getTime() > Date.now()) {
+            await scheduleTodoNotification(editingTodoId, task, todoDate);
+          }
         }
+      } else {
+        const item: Omit<Todo, "id"> = {
+          text: task,
+          date: todoDate.toLocaleDateString(),
+          time: todoDate.toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+          category: cat,
+          starred: isStarred,
+          completed: false,
+          reminderDate: todoDate.toISOString(),
+        };
+        const todoId = await addTodoToDb(item);
+        const hasPermission = await requestNotificationPermissions();
+        if (hasPermission && todoDate.getTime() > Date.now()) {
+          await scheduleTodoNotification(todoId, task, todoDate);
+        }
+        interstitialAdManager.showAd();
       }
-    } else {
-      const item: Omit<Todo, "id"> = {
-        text: task,
-        date: todoDate.toLocaleDateString(),
-        time: todoDate.toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
-        category: cat,
-        starred: isStarred,
-        completed: false,
-        reminderDate: todoDate.toISOString(),
-      };
-      const todoId = await addTodoToDb(item);
 
-      // Schedule notification
-      const hasPermission = await requestNotificationPermissions();
-      if (hasPermission && todoDate.getTime() > Date.now()) {
-        await scheduleTodoNotification(todoId, task, todoDate);
-      }
+      setTask("");
+      setTodoDate(new Date(Date.now() + 5 * 60000));
+      setIsStarred(false);
+      setEditingTodoId(null);
+      setIsModalVisible(false);
+    } catch (e) {
+      console.error("Failed to save todo", e);
+    } finally {
+      setIsSubmitting(false);
     }
-
-    setTask("");
-    setTodoDate(new Date(Date.now() + 5 * 60000));
-    setIsStarred(false);
-    setEditingTodoId(null);
-    setIsSubmitting(false);
-    setIsModalVisible(false);
   };
 
   const handleTodoPress = (todo: Todo) => {
@@ -621,45 +732,74 @@ export default function TodoScreen() {
     if (note) {
       setEditingNoteId(note.id);
       setNoteTitle(note.title);
-      setNoteText(note.text);
       setNoteColor(note.color || NOTE_COLORS[0]);
       setIsNotePinned(note.pinned || false);
+      setIsNoteEditing(false);
+
+      try {
+        if (note.text && note.text.startsWith('{"blocks":')) {
+          const parsed = JSON.parse(note.text);
+          setNoteBlocks(parsed.blocks || []);
+          setNoteText("");
+        } else {
+          setNoteBlocks([{ id: '1', type: 'paragraph', content: note.text || "" }]);
+          setNoteText(note.text || "");
+        }
+      } catch (e) {
+        setNoteBlocks([{ id: '1', type: 'paragraph', content: note.text || "" }]);
+        setNoteText(note.text || "");
+      }
     } else {
       setEditingNoteId(null);
       setNoteTitle("");
       setNoteText("");
+      setNoteBlocks([{ id: Date.now().toString(), type: 'paragraph', content: '' }]);
       setNoteColor(NOTE_COLORS[0]);
       setIsNotePinned(false);
+      setIsNoteEditing(true);
     }
+    setShowColorPicker(false);
     setIsNoteModalVisible(true);
   };
 
   const handleAddNote = async () => {
-    if (isSubmitting || !noteTitle || !noteText) return;
+    const hasContent = noteBlocks.some(b => (b.content && b.content.trim().length > 0) || b.uri);
+    if (isSubmitting || !noteTitle || !hasContent) return;
     setIsSubmitting(true);
 
-    if (editingNoteId) {
-      await updateNote(editingNoteId, {
-        title: noteTitle,
-        text: noteText,
-        color: noteColor,
-        pinned: isNotePinned,
-      });
-    } else {
-      await addNote({
-        title: noteTitle,
-        text: noteText,
-        color: noteColor,
-        date: new Date().toLocaleDateString(),
-        pinned: isNotePinned,
-      });
-    }
+    try {
+      const serializedText = JSON.stringify({ blocks: noteBlocks });
 
-    setNoteTitle("");
-    setNoteText("");
-    setEditingNoteId(null);
-    setIsSubmitting(false);
-    setIsNoteModalVisible(false);
+      if (editingNoteId) {
+        await updateNote(editingNoteId, {
+          title: noteTitle,
+          text: serializedText,
+          color: noteColor,
+          pinned: isNotePinned,
+        });
+        interstitialAdManager.showAd();
+      } else {
+        await addNote({
+          title: noteTitle,
+          text: serializedText,
+          color: noteColor,
+          date: new Date().toLocaleDateString(),
+          pinned: isNotePinned,
+        });
+        interstitialAdManager.showAd();
+      }
+
+      setNoteTitle("");
+      setNoteText("");
+      setNoteBlocks([{ id: Date.now().toString(), type: 'paragraph', content: '' }]);
+      setEditingNoteId(null);
+      setShowColorPicker(false);
+      setIsNoteModalVisible(false);
+    } catch (e) {
+      console.error("Failed to save note", e);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const toggleHabitDay = async (habit: any, date: string) => {
@@ -682,42 +822,48 @@ export default function TodoScreen() {
     if (isSubmitting || !hName) return;
     setIsSubmitting(true);
 
-    if (editingHabitId) {
-      await updateHabit(editingHabitId, {
-        name: hName,
-        color: hColor,
-        icon: hIcon,
-        reminderTime: hTime || undefined,
-        challenge: hChallenge !== "Regular" ? hChallenge : undefined,
-      });
-      await cancelReminderNotification(editingHabitId);
-      if (hTime) {
-        const hasPermission = await requestNotificationPermissions();
-        if (hasPermission) {
-          await scheduleHabitNotification(editingHabitId, hName, hTime);
+    try {
+      if (editingHabitId) {
+        await updateHabit(editingHabitId, {
+          name: hName,
+          color: hColor,
+          icon: hIcon,
+          reminderTime: hTime || undefined,
+          challenge: hChallenge !== "Regular" ? hChallenge : undefined,
+        });
+        await cancelReminderNotification(editingHabitId);
+        if (hTime) {
+          const hasPermission = await requestNotificationPermissions();
+          if (hasPermission) {
+            await scheduleHabitNotification(editingHabitId, hName, hTime);
+          }
         }
-      }
-    } else {
-      const id = await addHabit({
-        name: hName,
-        color: hColor,
-        icon: hIcon,
-        reminderTime: hTime || undefined,
-        challenge: hChallenge !== "Regular" ? hChallenge : undefined,
-      });
-      if (hTime) {
-        const hasPermission = await requestNotificationPermissions();
-        if (hasPermission) {
-          await scheduleHabitNotification(id, hName, hTime);
+      } else {
+        const id = await addHabit({
+          name: hName,
+          color: hColor,
+          icon: hIcon,
+          reminderTime: hTime || undefined,
+          challenge: hChallenge !== "Regular" ? hChallenge : undefined,
+        });
+        if (hTime) {
+          const hasPermission = await requestNotificationPermissions();
+          if (hasPermission) {
+            await scheduleHabitNotification(id, hName, hTime);
+          }
         }
+        interstitialAdManager.showAd();
       }
-    }
 
-    setHName("");
-    setHTime("");
-    setEditingHabitId(null);
-    setIsSubmitting(false);
-    setIsHabitModalVisible(false);
+      setHName("");
+      setHTime("");
+      setEditingHabitId(null);
+      setIsHabitModalVisible(false);
+    } catch (e) {
+      console.error("Failed to save habit", e);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleOpenHabitModal = (habit?: Habit) => {
@@ -964,7 +1110,7 @@ export default function TodoScreen() {
           }),
           reminderDate: vnDate.toISOString(),
         });
-        
+
         await cancelReminderNotification(editingVnId);
         if (vnDate.getTime() > Date.now()) {
           await scheduleVoiceNoteNotification(
@@ -1001,6 +1147,9 @@ export default function TodoScreen() {
             vnDate,
           );
         }
+
+        // Show Google Mobile Ads Interstitial Ad on new Voice Note entry
+        interstitialAdManager.showAd();
       }
 
       setIsVoiceModalVisible(false);
@@ -1049,6 +1198,7 @@ export default function TodoScreen() {
     <SafeAreaView
       style={[styles.container, { backgroundColor: Colors.background }]}
     >
+
       <View style={styles.header}>
         <View>
           <Text style={[styles.title, { color: Colors.text }]}>
@@ -1089,18 +1239,33 @@ export default function TodoScreen() {
           </View>
         </View>
 
-        <View style={{ flexDirection: "row", gap: 10 }}>
+        <View style={{ flexDirection: "row", gap: 8 }}>
           {mainTab === "todos" && isSelectionMode && (
             <>
               <TouchableOpacity
-                style={[
-                  styles.litAddBtn,
-                  {
-                    backgroundColor: Colors.card,
-                    borderWidth: 1,
-                    borderColor: Colors.primary,
-                  },
-                ]}
+                style={[styles.litAddBtn, { backgroundColor: '#EF4444' }]}
+                onPress={() => {
+                  if (selectedIds.length === 0) return;
+                  Alert.alert("Delete Tasks?", `${selectedIds.length} task(s) will be removed.`, [
+                    { text: "Cancel", style: "cancel" },
+                    {
+                      text: "Delete All",
+                      style: "destructive",
+                      onPress: async () => {
+                        const updated = todos.filter((t) => !selectedIds.includes(t.id));
+                        await saveTodos(updated);
+                        selectedIds.forEach(id => cancelReminderNotification(id));
+                        setSelectedIds([]);
+                        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+                      },
+                    },
+                  ]);
+                }}
+              >
+                <Trash2 color="#FFF" size={18} strokeWidth={2.5} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.litAddBtn, { backgroundColor: Colors.card }]}
                 onPress={() => {
                   if (selectedIds.length === filteredTodos.length) {
                     setSelectedIds([]);
@@ -1113,14 +1278,7 @@ export default function TodoScreen() {
                 <CheckCircle2 color={Colors.primary} size={20} />
               </TouchableOpacity>
               <TouchableOpacity
-                style={[
-                  styles.litAddBtn,
-                  {
-                    backgroundColor: Colors.card,
-                    borderWidth: 1,
-                    borderColor: Colors.border,
-                  },
-                ]}
+                style={[styles.litAddBtn, { backgroundColor: Colors.card }]}
                 onPress={() => setSelectedIds([])}
               >
                 <X color={Colors.text} size={20} />
@@ -1151,7 +1309,7 @@ export default function TodoScreen() {
               { color: mainTab === "todos" ? Colors.text : Colors.textMuted },
             ]}
           >
-            TODOS
+            {t.todos.toUpperCase()}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -1174,7 +1332,7 @@ export default function TodoScreen() {
               { color: mainTab === "habits" ? Colors.text : Colors.textMuted },
             ]}
           >
-            HABITS
+            {t.habits.toUpperCase()}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -1197,30 +1355,24 @@ export default function TodoScreen() {
               { color: mainTab === "notes" ? Colors.text : Colors.textMuted },
             ]}
           >
-            NOTES
+            {t.notes.toUpperCase()}
           </Text>
         </TouchableOpacity>
       </View>
 
       {mainTab === "todos" && (
         <View style={{ flex: 1 }}>
-          <View
-            style={[
-              styles.searchContainer,
-              { flexDirection: "row", alignItems: "center", gap: 10 },
-            ]}
-          >
+          <View style={styles.searchContainer}>
             <View
               style={[
                 styles.litSearchBox,
                 {
                   backgroundColor: Colors.card,
-                  borderColor: Colors.border,
                   flex: 1,
                 },
               ]}
             >
-              <Search size={20} color={Colors.primary} />
+              <Search size={18} color={Colors.primary} strokeWidth={2.5} />
               <TextInput
                 style={[styles.litSearchInput, { color: Colors.text }]}
                 placeholder="Search your daily missions..."
@@ -1233,9 +1385,7 @@ export default function TodoScreen() {
               style={[
                 styles.starFilterBtn,
                 {
-                  backgroundColor:
-                    selectedTab === "starred" ? Colors.primary : Colors.card,
-                  borderColor: Colors.border,
+                  backgroundColor: Colors.card,
                 },
               ]}
               onPress={() =>
@@ -1243,12 +1393,12 @@ export default function TodoScreen() {
               }
             >
               <Star
-                size={22}
+                size={20}
                 color={
-                  selectedTab === "starred" ? Colors.background : Colors.primary
+                  selectedTab === "starred" ? Colors.primary : Colors.textMuted
                 }
                 fill={
-                  selectedTab === "starred" ? Colors.background : "transparent"
+                  selectedTab === "starred" ? Colors.primary : "transparent"
                 }
               />
             </TouchableOpacity>
@@ -1258,7 +1408,7 @@ export default function TodoScreen() {
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ paddingHorizontal: 20, gap: 12 }}
+              contentContainerStyle={{ paddingHorizontal: 16, gap: 10 }}
             >
               {[
                 { id: "all", label: "All", emoji: "📋" },
@@ -1272,8 +1422,6 @@ export default function TodoScreen() {
                     {
                       backgroundColor:
                         selectedTab === tab.id ? Colors.primary : Colors.card,
-                      borderColor:
-                        selectedTab === tab.id ? Colors.primary : Colors.border,
                     },
                   ]}
                   onPress={() => setSelectedTab(tab.id as any)}
@@ -1299,16 +1447,11 @@ export default function TodoScreen() {
           >
             {filteredTodos.length === 0 ? (
               <View style={styles.empty}>
-                <LayoutGrid size={50} color={Colors.textMuted} opacity={0.3} />
-                <Text
-                  style={{
-                    color: Colors.textMuted,
-                    marginTop: 15,
-                    fontWeight: "bold",
-                  }}
-                >
-                  No matches found
-                </Text>
+                <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: Colors.card, justifyContent: "center", alignItems: "center", shadowColor: "#171717", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 2 }}>
+                  <LayoutGrid size={36} color={Colors.textMuted} strokeWidth={1.5} />
+                </View>
+                <Text style={[styles.emptyTitle, { color: Colors.text }]}>All clear!</Text>
+                <Text style={[styles.emptySub, { color: Colors.textMuted }]}>No tasks match your current filter. Add a new task or change the filter.</Text>
               </View>
             ) : (
               filteredTodos.map((item) => {
@@ -1321,12 +1464,16 @@ export default function TodoScreen() {
                   item.reminderDate &&
                   new Date(item.reminderDate).getTime() < Date.now() &&
                   !item.completed;
+                const isToday =
+                  item.reminderDate &&
+                  new Date(item.reminderDate).toDateString() === new Date().toDateString();
 
                 return (
                   <TouchableOpacity
                     key={item.id}
                     onPress={() => handleTodoPress(item)}
                     onLongPress={() => toggleSelection(item.id)}
+                    activeOpacity={0.9}
                     style={[
                       styles.litCard,
                       {
@@ -1334,160 +1481,131 @@ export default function TodoScreen() {
                           isSelectionMode && selectedIds.includes(item.id)
                             ? Colors.primary
                             : Colors.card,
-                        borderColor: selectedIds.includes(item.id)
-                          ? Colors.primary
-                          : item.completed
-                            ? Colors.border
-                            : Colors.primary + "30",
-                        borderWidth: selectedIds.includes(item.id) ? 2 : 1,
-                        opacity: item.completed && !isSelectionMode ? 0.5 : 1,
-                        overflow: "hidden",
+                        opacity: item.completed && !isSelectionMode ? 0.55 : 1,
                       },
                     ]}
                   >
-                    {isSelectionMode ? (
-                      <View style={styles.litCheckContainer}>
-                        <View
-                          style={[
-                            styles.selectionCircle,
-                            {
-                              backgroundColor: selectedIds.includes(item.id)
-                                ? "#000"
-                                : "transparent",
-                              borderColor: selectedIds.includes(item.id)
-                                ? "#000"
-                                : Colors.border,
-                            },
-                          ]}
-                        >
-                          {selectedIds.includes(item.id) && (
-                            <CheckCircle2 color={Colors.primary} size={18} />
-                          )}
+                    <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
+                      {isSelectionMode ? (
+                        <View style={styles.litCheckContainer}>
+                          <View
+                            style={[
+                              styles.selectionCircle,
+                              {
+                                backgroundColor: selectedIds.includes(item.id)
+                                  ? "#171717"
+                                  : "transparent",
+                                borderColor: selectedIds.includes(item.id)
+                                  ? "#171717"
+                                  : "#d4d4d4",
+                              },
+                            ]}
+                          >
+                            {selectedIds.includes(item.id) && (
+                              <Text style={{ color: "#FFF", fontSize: 12, fontWeight: "900" }}>✓</Text>
+                            )}
+                          </View>
                         </View>
-                      </View>
-                    ) : (
-                      <TouchableOpacity
-                        style={styles.litCheckContainer}
-                        onPress={() =>
-                          saveTodos(
-                            todos.map((t) =>
-                              t.id === item.id
-                                ? { ...t, completed: !t.completed }
-                                : t,
-                            ),
-                          )
-                        }
-                      >
-                        {item.completed ? (
-                          <CheckCircle2 color={Colors.primary} size={28} />
-                        ) : (
-                          <Circle color={Colors.textMuted} size={28} />
-                        )}
-                      </TouchableOpacity>
-                    )}
-                    <View style={styles.litMain}>
-                      <View style={styles.litHeaderRow}>
-                        <Text
-                          style={[
-                            styles.litText,
-                            {
-                              color: selectedIds.includes(item.id)
-                                ? "#000"
-                                : Colors.text,
-                            },
-                            item.completed && styles.litStrike,
-                          ]}
-                        >
-                          {item.text}
-                        </Text>
+                      ) : (
                         <TouchableOpacity
+                          style={styles.litCheckContainer}
                           onPress={() =>
                             saveTodos(
                               todos.map((t) =>
                                 t.id === item.id
-                                  ? { ...t, starred: !t.starred }
+                                  ? { ...t, completed: !t.completed }
                                   : t,
                               ),
                             )
                           }
+                          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                         >
-                          <Star
-                            size={16}
-                            color={
-                              item.starred
-                                ? selectedIds.includes(item.id)
-                                  ? "#000"
-                                  : Colors.primary
-                                : selectedIds.includes(item.id)
-                                  ? "rgba(0,0,0,0.4)"
-                                  : Colors.textMuted
-                            }
-                            fill={
-                              item.starred
-                                ? selectedIds.includes(item.id)
-                                  ? "#000"
-                                  : Colors.primary
-                                : "transparent"
-                            }
-                          />
+                          <View style={{
+                            width: 26, height: 26, borderRadius: 13,
+                            backgroundColor: item.completed ? Colors.primary : "transparent",
+                            borderWidth: item.completed ? 0 : 2,
+                            borderColor: "#d4d4d4",
+                            justifyContent: "center", alignItems: "center",
+                          }}>
+                            {item.completed && (
+                              <Text style={{ color: "#FFF", fontSize: 13, fontWeight: "900" }}>✓</Text>
+                            )}
+                          </View>
                         </TouchableOpacity>
-                      </View>
+                      )}
 
-                      <View style={styles.litMeta}>
-                        <View
-                          style={[
-                            styles.litTag,
-                            {
-                              backgroundColor: selectedIds.includes(item.id)
-                                ? "rgba(0,0,0,0.1)"
-                                : catColor + "20",
-                            },
-                          ]}
-                        >
-                          <CategoryIcon
-                            size={10}
-                            color={
-                              selectedIds.includes(item.id) ? "#000" : catColor
-                            }
-                          />
+                      <View style={styles.litMain}>
+                        <View style={styles.litHeaderRow}>
                           <Text
                             style={[
-                              styles.litTagText,
+                              styles.litText,
                               {
                                 color: selectedIds.includes(item.id)
                                   ? "#000"
-                                  : catColor,
+                                  : Colors.text,
+                              },
+                              item.completed && styles.litStrike,
+                            ]}
+                            numberOfLines={2}
+                          >
+                            {item.text}
+                          </Text>
+                          <TouchableOpacity
+                            onPress={() =>
+                              saveTodos(
+                                todos.map((t) =>
+                                  t.id === item.id
+                                    ? { ...t, starred: !t.starred }
+                                    : t,
+                                ),
+                              )
+                            }
+                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                          >
+                            <Star
+                              size={15}
+                              color={
+                                item.starred
+                                  ? selectedIds.includes(item.id)
+                                    ? "#000"
+                                    : "#eab308"
+                                  : selectedIds.includes(item.id)
+                                    ? "rgba(0,0,0,0.3)"
+                                    : "#d4d4d4"
+                              }
+                              fill={
+                                item.starred
+                                  ? selectedIds.includes(item.id)
+                                    ? "#000"
+                                    : "#eab308"
+                                  : "transparent"
+                              }
+                            />
+                          </TouchableOpacity>
+                        </View>
+
+                        <View style={styles.litMeta}>
+                          <View
+                            style={[
+                              styles.litTag,
+                              {
+                                backgroundColor: catColor + "15",
                               },
                             ]}
                           >
-                            {item.category.toUpperCase()}
+                            <CategoryIcon size={9} color={catColor} />
+                            <Text style={[styles.litTagText, { color: catColor }]}>
+                              {item.category.toUpperCase()}
+                            </Text>
+                          </View>
+                          <View style={styles.dot} />
+                          <Text style={{
+                            color: isOverdue ? "#EF4444" : "#a3a3a3",
+                            fontSize: 10, fontWeight: "700",
+                          }}>
+                            {isOverdue ? "OVERDUE" : isToday ? item.time : item.date || "Today"}
                           </Text>
                         </View>
-                        <View
-                          style={[
-                            styles.dot,
-                            {
-                              backgroundColor: selectedIds.includes(item.id)
-                                ? "rgba(0,0,0,0.3)"
-                                : "rgba(255,255,255,0.2)",
-                            },
-                          ]}
-                        />
-                        <Text
-                          style={{
-                            color: isOverdue
-                              ? "#EF4444"
-                              : selectedIds.includes(item.id)
-                                ? "#000"
-                                : Colors.textMuted,
-                            fontSize: 10,
-                            fontWeight: "700",
-                          }}
-                        >
-                          {isOverdue
-                            ? "OVERDUE"
-                            : item.time || item.date || "Today"}
-                        </Text>
                       </View>
                     </View>
                   </TouchableOpacity>
@@ -1504,10 +1622,11 @@ export default function TodoScreen() {
               }}
               style={[
                 styles.mainFab,
-                { backgroundColor: Colors.primary, bottom: 120 },
+                { backgroundColor: Colors.primary, bottom: 150 },
               ]}
+              activeOpacity={0.85}
             >
-              <Plus size={32} color="#000" strokeWidth={3.5} />
+              <Plus size={28} color="#FFFFFF" strokeWidth={3} />
             </TouchableOpacity>
           )}
         </View>
@@ -1535,8 +1654,8 @@ export default function TodoScreen() {
                   style={[styles.emptyBtn, { backgroundColor: Colors.primary }]}
                   onPress={() => handleOpenNote()}
                 >
-                  <Plus size={20} color="#000" />
-                  <Text style={{ fontWeight: "bold", color: "#000" }}>
+                  <Plus size={20} color="#FFF" />
+                  <Text style={{ fontWeight: "bold", color: "#FFF" }}>
                     START WRITING
                   </Text>
                 </TouchableOpacity>
@@ -1601,7 +1720,7 @@ export default function TodoScreen() {
                         style={[styles.noteText, { color: "rgba(0,0,0,0.7)" }]}
                         numberOfLines={5}
                       >
-                        {note.text}
+                        {getNotePreview(note.text)}
                       </Text>
 
                       <Text
@@ -1876,10 +1995,10 @@ export default function TodoScreen() {
             onPress={() => handleOpenNote()}
             style={[
               styles.mainFab,
-              { backgroundColor: Colors.primary, bottom: 120 },
+              { backgroundColor: Colors.primary, bottom: 160 },
             ]}
           >
-            <Plus size={32} color="#000" strokeWidth={3.5} />
+            <Plus size={28} color="#FFF" strokeWidth={3} />
           </TouchableOpacity>
         </>
       )}
@@ -1938,8 +2057,8 @@ export default function TodoScreen() {
                     style={[styles.emptyBtn, { backgroundColor: Colors.primary }]}
                     onPress={() => handleOpenHabitModal()}
                   >
-                    <Plus size={20} color="#000" />
-                    <Text style={{ fontWeight: "bold", color: "#000" }}>
+                    <Plus size={20} color="#FFF" />
+                    <Text style={{ fontWeight: "bold", color: "#FFF" }}>
                       ADD HABIT
                     </Text>
                   </TouchableOpacity>
@@ -2056,8 +2175,8 @@ export default function TodoScreen() {
                     style={[styles.emptyBtn, { backgroundColor: Colors.primary }]}
                     onPress={() => handleOpenHabitModal()}
                   >
-                    <Plus size={20} color="#000" />
-                    <Text style={{ fontWeight: "bold", color: "#000" }}>
+                    <Plus size={20} color="#FFF" />
+                    <Text style={{ fontWeight: "bold", color: "#FFF" }}>
                       ADD HABIT
                     </Text>
                   </TouchableOpacity>
@@ -2071,13 +2190,13 @@ export default function TodoScreen() {
                     "0",
                   );
                   const todayDayNum = today.getDate();
-                  
+
                   const calYear = habitCalendarDate.getFullYear();
                   const calMonth = habitCalendarDate.getMonth();
                   const calMonthStr = String(calMonth + 1).padStart(2, "0");
                   const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
                   const firstDayOfMonth = new Date(calYear, calMonth, 1).getDay();
-                  
+
                   const currentMonthPrefix = `${calYear}-${calMonthStr}-`;
                   const Icon = HABIT_ICONS[habit.icon] || Zap;
                   const challengeDaysVal = parseChallengeDays(habit.challenge);
@@ -2271,9 +2390,9 @@ export default function TodoScreen() {
                                   borderColor: "#171717",
                                 },
                                 isToday &&
-                                  !isDone && {
-                                    backgroundColor: Colors.primary + "30",
-                                  },
+                                !isDone && {
+                                  backgroundColor: Colors.primary + "30",
+                                },
                                 isDone && {
                                   backgroundColor: habit.color,
                                   borderColor: "#171717",
@@ -2388,15 +2507,15 @@ export default function TodoScreen() {
             onPress={() => handleOpenHabitModal()}
             style={[
               styles.mainFab,
-              { backgroundColor: Colors.primary, bottom: 120 },
+              { backgroundColor: Colors.primary, bottom: 160 },
             ]}
           >
-            <Plus size={32} color="#000" strokeWidth={3.5} />
+            <Plus size={28} color="#FFF" strokeWidth={3} />
           </TouchableOpacity>
         </>
       )}
 
-      
+
       <Modal visible={!!progressHabit} animationType="fade" transparent>
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { padding: 0, overflow: 'hidden', backgroundColor: Colors.card }]}>
@@ -2418,7 +2537,7 @@ export default function TodoScreen() {
                   const isDone = progressHabit.logs.includes(dateStr);
                   const isToday = day === new Date().getDate();
                   const isPast = day < new Date().getDate();
-                  
+
                   return (
                     <View key={day} style={{
                       width: 40,
@@ -2443,12 +2562,12 @@ export default function TodoScreen() {
                   )
                 })}
               </View>
-              
+
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 25, paddingHorizontal: 10 }}>
                 <View style={{ alignItems: 'center' }}>
                   <Text style={{ color: Colors.textMuted, fontSize: 10, fontWeight: '800' }}>TOTAL</Text>
                   <Text style={{ color: Colors.text, fontSize: 24, fontWeight: '900' }}>
-                    {progressHabit?.logs.filter(l => l.startsWith(`${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`)).length || 0}
+                    {progressHabit?.logs.filter((l: string) => l.startsWith(`${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`)).length || 0}
                   </Text>
                 </View>
                 <View style={{ alignItems: 'center' }}>
@@ -2483,7 +2602,7 @@ export default function TodoScreen() {
       <Modal visible={!!sharingHabit} animationType="slide" transparent statusBarTranslucent>
         <View style={[styles.modalOverlay, { backgroundColor: "rgba(0,0,0,0.85)" }]}>
           <SafeAreaView style={{ flex: 1, justifyContent: 'center', alignItems: 'center', width: '100%' }}>
-            
+
             {/* Modal Header */}
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '90%', marginBottom: 15 }}>
               <Text style={{ color: '#ffffff', fontSize: 18, fontWeight: '900', letterSpacing: 0.5 }}>SHARE YOUR PROGRESS</Text>
@@ -2569,7 +2688,7 @@ export default function TodoScreen() {
                     <Text style={{ color: '#facc15', fontSize: 11, fontWeight: '900', letterSpacing: 0.5 }}>TRACKSY</Text>
                   </View>
                 </View>
-                
+
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                   <Text style={{ color: '#171717', fontSize: 11, fontWeight: '900', letterSpacing: 0.5 }}>@{shareUserName.toUpperCase()}</Text>
                   {settings.userImage ? (
@@ -2661,7 +2780,7 @@ export default function TodoScreen() {
                   shadowRadius: 0,
                 }}>
                   <Text style={{ fontSize: 24, fontWeight: '900', color: '#facc15' }}>
-                    {sharingHabit ? (parseChallengeDays(sharingHabit.challenge) !== null ? sharingHabit.logs.length : sharingHabit.logs.filter(l => l.startsWith(`${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-`)).length) : 0}
+                    {sharingHabit ? (parseChallengeDays(sharingHabit.challenge) !== null ? sharingHabit.logs.length : sharingHabit.logs.filter((l: string) => l.startsWith(`${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-`)).length) : 0}
                     <Text style={{ fontSize: 13, color: '#ffffff' }}>/{sharingHabit ? (parseChallengeDays(sharingHabit.challenge) !== null ? parseChallengeDays(sharingHabit.challenge) : new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate()) : 30}</Text>
                   </Text>
                   <Text style={{ color: '#a3a3a3', fontSize: 8, fontWeight: '900', letterSpacing: 1.5, marginTop: 4 }}>COMPLETED</Text>
@@ -2688,7 +2807,7 @@ export default function TodoScreen() {
                     const day = i + 1;
                     const dateStr = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
                     const isDone = sharingHabit.logs.includes(dateStr);
-                    
+
                     return (
                       <View key={day} style={{
                         width: 22,
@@ -3061,7 +3180,7 @@ export default function TodoScreen() {
                       </Text>
                     </View>
                   </View>
-                  
+
                   <View
                     style={{
                       width: 28,
@@ -3120,6 +3239,7 @@ export default function TodoScreen() {
             { backgroundColor: noteColor || "#FEFF9C" },
           ]}
         >
+          {/* Ambient Neubrutalist Decorative Graphics */}
           <View style={StyleSheet.absoluteFill} pointerEvents="none">
             <StickyNote
               size={300}
@@ -3196,7 +3316,8 @@ export default function TodoScreen() {
             </View>
           </View>
 
-          <SafeAreaView style={{ flex: 1 }}>
+          {/* Safe Area Layout Wrapper */}
+          <View style={{ flex: 1, paddingTop: insets.top }}>
             <View style={styles.screenHeader}>
               <TouchableOpacity
                 onPress={() => setIsNoteModalVisible(false)}
@@ -3205,149 +3326,373 @@ export default function TodoScreen() {
                 <ChevronLeft color="#000" size={28} />
               </TouchableOpacity>
               <Text style={[styles.screenTitle, { color: "#000" }]}>
-                {editingNoteId ? "Edit Note" : "New Note"}
+                {editingNoteId ? (isNoteEditing ? "Edit Note" : noteTitle) : "New Note"}
               </Text>
-              <TouchableOpacity
-                onPress={handleAddNote}
-                style={[styles.screenAction, { backgroundColor: "#000" }]}
-              >
-                <Text
-                  style={[
-                    styles.screenActionText,
-                    { color: noteColor || "#FEFF9C" },
-                  ]}
+              {isNoteEditing ? (
+                <TouchableOpacity
+                  onPress={handleAddNote}
+                  style={[styles.screenAction, { backgroundColor: "#000" }]}
                 >
-                  {editingNoteId ? "UPDATE" : "SAVE"}
-                </Text>
-              </TouchableOpacity>
+                  <Text style={[styles.screenActionText, { color: noteColor || "#FEFF9C" }]}>
+                    {editingNoteId ? "UPDATE" : "SAVE"}
+                  </Text>
+                </TouchableOpacity>
+              ) : (
+                <View style={{ flexDirection: "row", gap: 8 }}>
+                  <TouchableOpacity
+                    onPress={async () => {
+                      try {
+                        const blocksText = noteBlocks
+                          .map(b => {
+                            if (b.type === 'headline') return `# ${b.content}`;
+                            if (b.type === 'todo') return `[${b.checked ? '✓' : ' '}] ${b.content}`;
+                            if (b.type === 'bullet') return `• ${b.content}`;
+                            if (b.type === 'image') return '[Image]';
+                            return b.content;
+                          })
+                          .filter(Boolean)
+                          .join('\n\n');
+                        const content = `${noteTitle}\n\n${blocksText}`;
+                        const fileUri = FileSystem.documentDirectory + `note_${Date.now()}.txt`;
+                        await FileSystem.writeAsStringAsync(fileUri, content, {
+                          encoding: FileSystem.EncodingType.UTF8,
+                        });
+                        if (await Sharing.isAvailableAsync()) {
+                          await Sharing.shareAsync(fileUri, {
+                            dialogTitle: `Share ${noteTitle}`,
+                          });
+                        }
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      } catch (e) {
+                        console.error("Share failed", e);
+                      }
+                    }}
+                    style={[styles.screenAction, { backgroundColor: "#000" }]}
+                  >
+                    <Share2 size={16} color={noteColor || "#FEFF9C"} strokeWidth={2.5} />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => {
+                      setIsNoteEditing(true);
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    }}
+                    style={[styles.screenAction, { backgroundColor: "#000" }]}
+                  >
+                    <Text style={[styles.screenActionText, { color: noteColor || "#FEFF9C" }]}>
+                      EDIT
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
 
-            <FlowBannerAd />
-
             <ScrollView
-              contentContainerStyle={styles.screenBody}
+              contentContainerStyle={[styles.screenBody, { paddingBottom: 60 }]}
               showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
             >
-              <TextInput
-                style={[styles.screenTitleInput, { color: "#000" }]}
-                placeholder="Title"
-                placeholderTextColor="rgba(0,0,0,0.3)"
-                value={noteTitle}
-                onChangeText={setNoteTitle}
-              />
+              {/* Title Input */}
+              {isNoteEditing ? (
+                <TextInput
+                  style={[styles.screenTitleInput, { color: "#000", paddingHorizontal: 6 }]}
+                  placeholder="Note Title"
+                  placeholderTextColor="rgba(0,0,0,0.3)"
+                  value={noteTitle}
+                  onChangeText={setNoteTitle}
+                />
+              ) : (
+                <Text style={[styles.screenTitleInput, { color: "#000", paddingHorizontal: 6, paddingVertical: 4 }]}>
+                  {noteTitle}
+                </Text>
+              )}
 
-              <View style={styles.screenMeta}>
+              <View style={[styles.screenMeta, { paddingHorizontal: 6 }]}>
                 <Calendar size={12} color="rgba(0,0,0,0.5)" />
                 <Text style={{ color: "rgba(0,0,0,0.5)", fontSize: 12 }}>
                   {new Date().toLocaleDateString()}
                 </Text>
-                <View
-                  style={[styles.dot, { backgroundColor: "rgba(0,0,0,0.2)" }]}
-                />
-                <Palette size={12} color="#000" />
-                <Text
-                  style={{ color: "#000", fontSize: 12, fontWeight: "bold" }}
+                <View style={[styles.dot, { backgroundColor: "rgba(0,0,0,0.2)" }]} />
+                <TouchableOpacity
+                  onPress={() => {
+                    setShowColorPicker(!showColorPicker);
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  }}
+                  style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
                 >
-                  STYLE THEME
-                </Text>
+                  <Palette size={14} color="#000" />
+                  <Text style={{ color: "#000", fontSize: 12, fontWeight: "900", letterSpacing: 0.5 }}>
+                    NOTE STYLE
+                  </Text>
+                </TouchableOpacity>
               </View>
 
-              <TextInput
-                style={[styles.screenNoteArea, { color: "rgba(0,0,0,0.8)" }]}
-                placeholder="Start typing your note..."
-                placeholderTextColor="rgba(0,0,0,0.3)"
-                multiline
-                value={noteText}
-                onChangeText={setNoteText}
-              />
+              {/* Dynamic Rich Blocks Editor */}
+              <View style={styles.blocksEditorContainer}>
+                {noteBlocks.map((block) => {
+                  if (!isNoteEditing) {
+                    if (block.type === 'headline') {
+                      return (
+                        <View key={block.id} style={styles.blockRow}>
+                          <Text style={[styles.blockHeadlineView, { color: "#000" }]}>{block.content}</Text>
+                        </View>
+                      );
+                    }
+                    if (block.type === 'todo') {
+                      return (
+                        <View key={block.id} style={styles.blockRow}>
+                          <View style={styles.todoRowContainer}>
+                            <View style={[styles.blockCheckbox, block.checked && styles.blockCheckboxChecked]}>
+                              {block.checked && <CheckCircle2 size={12} color="#000" strokeWidth={3.5} />}
+                            </View>
+                            <Text style={[styles.blockTextView, block.checked && { textDecorationLine: 'line-through', opacity: 0.6 }]}>
+                              {block.content}
+                            </Text>
+                          </View>
+                        </View>
+                      );
+                    }
+                    if (block.type === 'bullet') {
+                      return (
+                        <View key={block.id} style={styles.blockRow}>
+                          <View style={styles.bulletRowContainer}>
+                            <Text style={styles.blockBulletDot}>•</Text>
+                            <Text style={styles.blockTextView}>{block.content}</Text>
+                          </View>
+                        </View>
+                      );
+                    }
+                    if (block.type === 'image') {
+                      return (
+                        <View key={block.id} style={styles.blockRow}>
+                          <View style={styles.blockImageWrapper}>
+                            {block.uri ? (
+                              <View style={styles.blockImageContainer}>
+                                <Image source={{ uri: block.uri }} style={styles.blockImage} resizeMode="cover" />
+                              </View>
+                            ) : null}
+                          </View>
+                        </View>
+                      );
+                    }
+                    return (
+                      <View key={block.id} style={styles.blockRow}>
+                        <Text style={styles.blockTextView}>{block.content}</Text>
+                      </View>
+                    );
+                  }
 
-              <Text
-                style={[styles.screenColorLabel, { color: "rgba(0,0,0,0.4)" }]}
-              >
-                CHOOSE STICKY STYLE
-              </Text>
-              <View style={styles.colorPicker}>
-                {NOTE_COLORS.map((c) => (
+                  if (block.type === 'headline') {
+                    return (
+                      <View key={block.id} style={styles.blockRow}>
+                        <TextInput
+                          style={styles.blockHeadlineInput}
+                          value={block.content}
+                          onChangeText={(text) => updateBlock(block.id, text)}
+                          placeholder="HEADING"
+                          placeholderTextColor="rgba(0,0,0,0.25)"
+                          multiline
+                          scrollEnabled={false}
+                        />
+                        <TouchableOpacity onPress={() => removeBlock(block.id)} style={styles.blockDeleteBtn}>
+                          <X size={14} color="rgba(0,0,0,0.4)" />
+                        </TouchableOpacity>
+                      </View>
+                    );
+                  }
+                  if (block.type === 'todo') {
+                    return (
+                      <View key={block.id} style={styles.blockRow}>
+                        <View style={styles.todoRowContainer}>
+                          <TouchableOpacity onPress={() => toggleTodoBlock(block.id)}>
+                            <View style={[styles.blockCheckbox, block.checked && styles.blockCheckboxChecked]}>
+                              {block.checked && <CheckCircle2 size={12} color="#000" strokeWidth={3.5} />}
+                            </View>
+                          </TouchableOpacity>
+                          <TextInput
+                            style={[styles.blockTextInput, block.checked && { textDecorationLine: 'line-through', opacity: 0.6 }]}
+                            value={block.content}
+                            onChangeText={(text) => updateBlock(block.id, text)}
+                            placeholder="To-do item..."
+                            placeholderTextColor="rgba(0,0,0,0.25)"
+                            multiline
+                            scrollEnabled={false}
+                          />
+                        </View>
+                        <TouchableOpacity onPress={() => removeBlock(block.id)} style={styles.blockDeleteBtn}>
+                          <X size={14} color="rgba(0,0,0,0.4)" />
+                        </TouchableOpacity>
+                      </View>
+                    );
+                  }
+                  if (block.type === 'bullet') {
+                    return (
+                      <View key={block.id} style={styles.blockRow}>
+                        <View style={styles.bulletRowContainer}>
+                          <Text style={styles.blockBulletDot}>•</Text>
+                          <TextInput
+                            style={styles.blockTextInput}
+                            value={block.content}
+                            onChangeText={(text) => updateBlock(block.id, text)}
+                            placeholder="List item..."
+                            placeholderTextColor="rgba(0,0,0,0.25)"
+                            multiline
+                            scrollEnabled={false}
+                          />
+                        </View>
+                        <TouchableOpacity onPress={() => removeBlock(block.id)} style={styles.blockDeleteBtn}>
+                          <X size={14} color="rgba(0,0,0,0.4)" />
+                        </TouchableOpacity>
+                      </View>
+                    );
+                  }
+                  if (block.type === 'image') {
+                    return (
+                      <View key={block.id} style={styles.blockRow}>
+                        <View style={styles.blockImageWrapper}>
+                          {block.uri ? (
+                            <View style={styles.blockImageContainer}>
+                              <Image source={{ uri: block.uri }} style={styles.blockImage} resizeMode="cover" />
+                              <TouchableOpacity onPress={() => pickImageForBlock(block.id)} style={styles.changeImageOverlay}>
+                                <Camera size={20} color="#FFF" />
+                              </TouchableOpacity>
+                            </View>
+                          ) : (
+                            <TouchableOpacity onPress={() => pickImageForBlock(block.id)} style={styles.blockImagePlaceholder}>
+                              <Camera size={28} color="rgba(0,0,0,0.4)" />
+                              <Text style={{ color: "rgba(0,0,0,0.5)", fontSize: 13, fontWeight: "700", marginTop: 6 }}>
+                                UPLOAD IMAGE
+                              </Text>
+                            </TouchableOpacity>
+                          )}
+                        </View>
+                        <TouchableOpacity onPress={() => removeBlock(block.id)} style={styles.blockDeleteBtn}>
+                          <X size={14} color="rgba(0,0,0,0.4)" />
+                        </TouchableOpacity>
+                      </View>
+                    );
+                  }
+                  return (
+                    <View key={block.id} style={styles.blockRow}>
+                      <TextInput
+                        style={styles.blockTextInput}
+                        value={block.content}
+                        onChangeText={(text) => updateBlock(block.id, text)}
+                        placeholder="Start typing..."
+                        placeholderTextColor="rgba(0,0,0,0.25)"
+                        multiline
+                        scrollEnabled={false}
+                      />
+                      <TouchableOpacity onPress={() => removeBlock(block.id)} style={styles.blockDeleteBtn}>
+                        <X size={14} color="rgba(0,0,0,0.4)" />
+                      </TouchableOpacity>
+                    </View>
+                  );
+                })}
+              </View>
+
+              {isNoteEditing && (
+                <>
+                  {/* Theme Sticky Style Selector */}
+                  {showColorPicker && (
+                    <View style={styles.floatingColorPicker}>
+                      {NOTE_COLORS.map((c) => (
+                        <TouchableOpacity
+                          key={c}
+                          onPress={() => {
+                            setNoteColor(c);
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                          }}
+                          style={[
+                            styles.colorCircle,
+                            { backgroundColor: c },
+                            noteColor === c && { borderColor: "#000", borderWidth: 3.5 },
+                          ]}
+                        />
+                      ))}
+                    </View>
+                  )}
+
+                  {/* Formatting Toolbar */}
+                  <View style={styles.noteToolbar}>
+                    <TouchableOpacity onPress={() => addBlock('headline')} style={styles.toolbarBtn}>
+                      <Heading size={18} color="#000" />
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => addBlock('paragraph')} style={styles.toolbarBtn}>
+                      <FileText size={18} color="#000" />
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => addBlock('todo')} style={styles.toolbarBtn}>
+                      <CheckSquare size={18} color="#000" />
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => addBlock('bullet')} style={styles.toolbarBtn}>
+                      <List size={18} color="#000" />
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => addBlock('image')} style={styles.toolbarBtn}>
+                      <Camera size={18} color="#000" />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => {
+                        setShowColorPicker(!showColorPicker);
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      }}
+                      style={[styles.toolbarBtn, showColorPicker && { backgroundColor: '#facc15' }]}
+                    >
+                      <Palette size={18} color="#000" />
+                    </TouchableOpacity>
+                  </View>
+
+                  {editingNoteId && (
+                    <TouchableOpacity
+                      style={[styles.deleteNoteBtn, { borderTopColor: "rgba(0,0,0,0.1)", marginBottom: 20 }]}
+                      onPress={() => {
+                        Alert.alert("Delete", "Delete this note?", [
+                          { text: "Cancel" },
+                          {
+                            text: "Delete",
+                            style: "destructive",
+                            onPress: () => {
+                              deleteNote(editingNoteId);
+                              setIsNoteModalVisible(false);
+                            },
+                          },
+                        ]);
+                      }}
+                    >
+                      <Trash2 size={20} color="#FF4500" />
+                      <Text style={{ color: "#FF4500", fontWeight: "bold" }}>DELETE NOTE</Text>
+                    </TouchableOpacity>
+                  )}
+
                   <TouchableOpacity
-                    key={c}
-                    onPress={() => setNoteColor(c)}
                     style={[
-                      styles.colorCircle,
-                      { backgroundColor: c },
-                      noteColor === c && {
+                      styles.pickerBtn,
+                      {
+                        backgroundColor: isNotePinned ? "#000" : "transparent",
                         borderColor: "#000",
-                        borderWidth: 3,
+                        borderWidth: 2,
+                        padding: 15,
+                        borderRadius: 12,
+                        flexDirection: "row",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: 10,
+                        marginTop: 10,
                       },
                     ]}
-                  />
-                ))}
-              </View>
-
-              {editingNoteId && (
-                <TouchableOpacity
-                  style={[
-                    styles.deleteNoteBtn,
-                    { borderTopColor: "rgba(0,0,0,0.1)" },
-                  ]}
-                  onPress={() => {
-                    Alert.alert("Delete", "Delete this note?", [
-                      { text: "Cancel" },
-                      {
-                        text: "Delete",
-                        style: "destructive",
-                        onPress: () => {
-                          deleteNote(editingNoteId);
-                          setIsNoteModalVisible(false);
-                        },
-                      },
-                    ]);
-                  }}
-                >
-                  <Trash2 size={20} color="#FF4500" />
-                  <Text style={{ color: "#FF4500", fontWeight: "bold" }}>
-                    DELETE NOTE
-                  </Text>
-                </TouchableOpacity>
-              )}
-
-              <View style={{ marginTop: 20 }}>
-                <TouchableOpacity
-                  style={[
-                    styles.pickerBtn,
-                    {
-                      backgroundColor: isNotePinned
-                        ? "rgba(0,0,0,0.8)"
-                        : "transparent",
-                      borderColor: "rgba(0,0,0,0.8)",
-                      borderWidth: 2,
-                      padding: 15,
-                      borderRadius: 12,
-                      flexDirection: "row",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: 10,
-                    },
-                  ]}
-                  onPress={() => setIsNotePinned(!isNotePinned)}
-                >
-                  <Star
-                    size={18}
-                    color={isNotePinned ? "#FEFF9C" : "#000"}
-                    fill={isNotePinned ? "#FEFF9C" : "transparent"}
-                  />
-                  <Text
-                    style={{
-                      color: isNotePinned ? "#FEFF9C" : "#000",
-                      fontSize: 13,
-                      fontWeight: "700",
-                    }}
+                    onPress={() => setIsNotePinned(!isNotePinned)}
                   >
-                    {isNotePinned ? "Pinned to Top" : "Pin to Top"}
-                  </Text>
-                </TouchableOpacity>
-              </View>
+                    <Star
+                      size={18}
+                      color={isNotePinned ? "#fcd002" : "#000"}
+                      fill={isNotePinned ? "#fcd002" : "transparent"}
+                    />
+                    <Text style={{ color: isNotePinned ? "#fcd002" : "#000", fontSize: 13, fontWeight: "700" }}>
+                      {isNotePinned ? "Pinned to Top" : "Pin to Top"}
+                    </Text>
+                  </TouchableOpacity>
+                </>
+              )}
             </ScrollView>
-          </SafeAreaView>
+          </View>
         </View>
       </Modal>
 
@@ -3428,8 +3773,8 @@ export default function TodoScreen() {
               </Text>
               <View style={[styles.catGrid, { justifyContent: 'space-between' }]}>
                 {[
-                  "🔥", "💧", "🏃", "📚", "💰", "🧘", "🥗", "🧠", "🛌", "💪", 
-                  "🚀", "💻", "🎨", "✍️", "🌿", "🍎", "🚴", "🎸", "🎯", "🏆", 
+                  "🔥", "💧", "🏃", "📚", "💰", "🧘", "🥗", "🧠", "🛌", "💪",
+                  "🚀", "💻", "🎨", "✍️", "🌿", "🍎", "🚴", "🎸", "🎯", "🏆",
                   "🌟", "💡", "🎮", "📱", "🧹", "🛒", "💊", "🌞", "🎧", "✈️"
                 ].map((emoji) => {
                   return (
@@ -3830,50 +4175,50 @@ export default function TodoScreen() {
                   </Text>
                 </TouchableOpacity>
 
-              {showVnDate && (
-                <DateTimePicker
-                  value={vnDate}
-                  mode="date"
-                  display={Platform.OS === "android" ? "default" : "default"}
-                  onChange={(event, d) => {
-                    if (Platform.OS === "android") {
-                      setShowVnDate(false);
-                    }
-                    if (event.type === "set" && d) {
-                      const next = new Date(vnDate);
-                      next.setFullYear(d.getFullYear());
-                      next.setMonth(d.getMonth());
-                      next.setDate(d.getDate());
-                      setVnDate(next);
-                    }
-                    if (Platform.OS === "ios") {
-                      setShowVnDate(false);
-                    }
-                  }}
-                />
-              )}
-              {showVnTime && (
-                <DateTimePicker
-                  value={vnDate}
-                  mode="time"
-                  display={Platform.OS === "android" ? "clock" : "default"}
-                  is24Hour={false}
-                  onChange={(event, d) => {
-                    if (Platform.OS === "android") {
-                      setShowVnTime(false);
-                    }
-                    if (event.type === "set" && d) {
-                      const next = new Date(vnDate);
-                      next.setHours(d.getHours());
-                      next.setMinutes(d.getMinutes());
-                      setVnDate(next);
-                    }
-                    if (Platform.OS === "ios") {
-                      setShowVnTime(false);
-                    }
-                  }}
-                />
-              )}
+                {showVnDate && (
+                  <DateTimePicker
+                    value={vnDate}
+                    mode="date"
+                    display={Platform.OS === "android" ? "default" : "default"}
+                    onChange={(event, d) => {
+                      if (Platform.OS === "android") {
+                        setShowVnDate(false);
+                      }
+                      if (event.type === "set" && d) {
+                        const next = new Date(vnDate);
+                        next.setFullYear(d.getFullYear());
+                        next.setMonth(d.getMonth());
+                        next.setDate(d.getDate());
+                        setVnDate(next);
+                      }
+                      if (Platform.OS === "ios") {
+                        setShowVnDate(false);
+                      }
+                    }}
+                  />
+                )}
+                {showVnTime && (
+                  <DateTimePicker
+                    value={vnDate}
+                    mode="time"
+                    display={Platform.OS === "android" ? "clock" : "default"}
+                    is24Hour={false}
+                    onChange={(event, d) => {
+                      if (Platform.OS === "android") {
+                        setShowVnTime(false);
+                      }
+                      if (event.type === "set" && d) {
+                        const next = new Date(vnDate);
+                        next.setHours(d.getHours());
+                        next.setMinutes(d.getMinutes());
+                        setVnDate(next);
+                      }
+                      if (Platform.OS === "ios") {
+                        setShowVnTime(false);
+                      }
+                    }}
+                  />
+                )}
               </ScrollView>
             </View>
           </KeyboardAvoidingView>
@@ -3900,25 +4245,24 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   litAddBtn: {
-    width: 54,
-    height: 54,
-    borderRadius: 18,
+    width: 48,
+    height: 48,
+    borderRadius: 14,
     justifyContent: "center",
     alignItems: "center",
-    borderWidth: 2.5,
-    borderColor: "#171717",
     shadowColor: "#171717",
-    shadowOffset: { width: 4, height: 4 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 0,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 1,
   },
   mainTabContainer: {
     flexDirection: "row",
-    marginHorizontal: 20,
+    marginHorizontal: 16,
     marginBottom: 20,
-    padding: 2,
-    borderRadius: 18,
+    padding: 4,
+    borderRadius: 16,
+    backgroundColor: "rgba(0,0,0,0.04)",
   },
   mainTabBtn: {
     flex: 1,
@@ -3932,76 +4276,80 @@ const styles = StyleSheet.create({
     borderColor: "transparent",
   },
   mainTabText: { fontSize: 13, fontWeight: "900", letterSpacing: 1 },
-  searchContainer: { paddingHorizontal: 20, marginBottom: 15 },
+  searchContainer: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, marginBottom: 16, gap: 10 },
   litSearchBox: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 18,
-    height: 56,
-    borderRadius: 20,
-    borderWidth: 2.5,
-    borderColor: "#171717",
-    gap: 12,
+    paddingHorizontal: 16,
+    height: 50,
+    borderRadius: 16,
+    gap: 10,
+    shadowColor: "#171717",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 1,
   },
-  litSearchInput: { flex: 1, fontSize: 15, fontWeight: "700" },
-  tabScroll: { marginBottom: 15 },
+  litSearchInput: { flex: 1, fontSize: 14, fontWeight: "600" },
+  tabScroll: { marginBottom: 16 },
   litTab: {
-    paddingVertical: 6,
-    paddingHorizontal: 20,
-    borderRadius: 14,
-    borderWidth: 2,
-    borderColor: "#171717",
+    paddingVertical: 8,
+    paddingHorizontal: 18,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
+    shadowColor: "#171717",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 3,
+    elevation: 1,
   },
-  litTabText: { fontSize: 12, fontWeight: "900", letterSpacing: 1 },
-  content: { padding: 20, paddingBottom: 100 },
+  litTabText: { fontSize: 11, fontWeight: "800", letterSpacing: 0.8 },
+  content: { padding: 16, paddingBottom: 100 },
   litCard: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 18,
-    borderRadius: 32,
-    marginBottom: 15,
-    borderWidth: 2.5,
-    borderColor: "#171717",
+    padding: 16,
+    borderRadius: 20,
+    marginBottom: 12,
     shadowColor: "#171717",
-    shadowOffset: { width: 4, height: 4 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 0,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
   },
-  litCheckContainer: { paddingRight: 15 },
+  litCheckContainer: { paddingRight: 14 },
   litMain: { flex: 1 },
   litHeaderRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
   },
-  litText: { fontSize: 16, fontWeight: "800", lineHeight: 22, marginRight: 10 },
-  litStrike: { textDecorationLine: "line-through", opacity: 0.4 },
+  litText: { fontSize: 15, fontWeight: "700", lineHeight: 21, marginRight: 10, letterSpacing: -0.2 },
+  litStrike: { textDecorationLine: "line-through", opacity: 0.35 },
   litMeta: {
     flexDirection: "row",
     alignItems: "center",
-    marginTop: 10,
-    gap: 6,
+    marginTop: 8,
+    gap: 8,
   },
   litTag: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
   },
-  litTagText: { fontSize: 9, fontWeight: "900", letterSpacing: 0.5 },
+  litTagText: { fontSize: 8, fontWeight: "900", letterSpacing: 0.8 },
   litDelete: { paddingLeft: 15 },
   dot: {
     width: 3,
     height: 3,
     borderRadius: 1.5,
-    backgroundColor: "rgba(255,255,255,0.2)",
+    backgroundColor: "rgba(0,0,0,0.15)",
   },
-  empty: { padding: 40, alignItems: "center" },
+  empty: { padding: 60, alignItems: "center", justifyContent: "center" },
   emptyTitle: {
     fontSize: 22,
     fontWeight: "900",
@@ -4333,18 +4681,20 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    padding: 20,
+    paddingHorizontal: 8,
+    paddingVertical: 10,
   },
   screenTitle: { fontSize: 18, fontWeight: "900" },
   screenAction: { paddingHorizontal: 20, paddingVertical: 8, borderRadius: 12 },
   screenActionText: { color: "black", fontWeight: "900", fontSize: 13 },
-  screenBody: { padding: 25 },
-  screenTitleInput: { fontSize: 32, fontWeight: "900", marginBottom: 15 },
+  screenBody: { paddingHorizontal: 6, paddingTop: 8 },
+  screenTitleInput: { fontSize: 32, fontWeight: "900", marginBottom: 15, paddingHorizontal: 6 },
   screenMeta: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    marginBottom: 30,
+    marginBottom: 20,
+    paddingHorizontal: 6,
   },
   screenNoteArea: {
     fontSize: 18,
@@ -4403,12 +4753,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   habitName: { fontSize: 18, fontWeight: "900" },
-  habitGrid: { 
-    flexDirection: "row", 
-    flexWrap: "wrap", 
-    borderTopWidth: 2, 
-    borderLeftWidth: 2, 
-    borderColor: "#171717" 
+  habitGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    borderTopWidth: 2,
+    borderLeftWidth: 2,
+    borderColor: "#171717"
   },
   habitDay: {
     width: "14.285%",
@@ -4480,19 +4830,17 @@ const styles = StyleSheet.create({
   },
   mainFab: {
     position: "absolute",
-    right: 24,
-    width: 64,
-    height: 64,
-    borderRadius: 20,
+    right: 20,
+    width: 58,
+    height: 58,
+    borderRadius: 18,
     justifyContent: "center",
     alignItems: "center",
-    elevation: 0,
-    shadowColor: "#171717",
-    shadowOffset: { width: 4, height: 4 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    borderWidth: 2.5,
-    borderColor: "#171717",
+    shadowColor: "#16a34a",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 6,
     zIndex: 1000,
   },
   batchBtn: {
@@ -4518,22 +4866,25 @@ const styles = StyleSheet.create({
     width: 6,
   },
   selectionCircle: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    borderWidth: 2.5,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    borderWidth: 2,
     borderColor: "#171717",
     justifyContent: "center",
     alignItems: "center",
   },
   starFilterBtn: {
-    width: 48,
-    height: 48,
+    width: 50,
+    height: 50,
     borderRadius: 16,
     justifyContent: "center",
     alignItems: "center",
-    borderWidth: 2.5,
-    borderColor: "#171717",
+    shadowColor: "#171717",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 1,
   },
   importantToggle: {
     flexDirection: "row",
@@ -4644,5 +4995,176 @@ const styles = StyleSheet.create({
     left: 0,
     bottom: 0,
     zIndex: -1,
+  },
+  blocksEditorContainer: {
+    marginTop: 20,
+  },
+  blockRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+    minHeight: 38,
+  },
+  blockDeleteBtn: {
+    padding: 8,
+    marginLeft: 6,
+  },
+  blockTextInput: {
+    flex: 1,
+    fontSize: 16,
+    lineHeight: 24,
+    paddingLeft: 6,
+    color: '#334155',
+    paddingTop: 8,
+    paddingBottom: 8,
+  },
+  blockTextView: {
+    flex: 1,
+    fontSize: 16,
+    lineHeight: 24,
+    paddingLeft: 6,
+    color: '#334155',
+    paddingVertical: 8,
+  },
+  blockHeadlineInput: {
+    flex: 1,
+    fontSize: 20,
+    fontWeight: '900',
+    lineHeight: 28,
+    paddingLeft: 6,
+    color: '#0f172a',
+    paddingTop: 8,
+    paddingBottom: 8,
+  },
+  blockHeadlineView: {
+    flex: 1,
+    fontSize: 20,
+    fontWeight: '900',
+    lineHeight: 28,
+    paddingLeft: 6,
+    color: '#0f172a',
+    paddingVertical: 8,
+  },
+  todoRowContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingLeft: 6,
+  },
+  blockCheckbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: '#171717',
+    marginRight: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#FFF',
+  },
+  blockCheckboxChecked: {
+    backgroundColor: '#FEFF9C',
+  },
+  bulletRowContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingLeft: 6,
+  },
+  blockBulletDot: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#171717',
+    marginRight: 12,
+  },
+  blockImageWrapper: {
+    flex: 1,
+    paddingLeft: 6,
+    height: 180,
+    marginVertical: 10,
+  },
+  blockImageContainer: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: '#171717',
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  blockImage: {
+    width: '100%',
+    height: '100%',
+  },
+  changeImageOverlay: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  blockImagePlaceholder: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 16,
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    borderColor: '#94A3B8',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.02)',
+  },
+  noteToolbar: {
+    flexDirection: 'row',
+    backgroundColor: '#171717',
+    borderRadius: 20,
+    borderWidth: 2.5,
+    borderColor: '#171717',
+    padding: 8,
+    marginHorizontal: 10,
+    marginBottom: 15,
+    justifyContent: 'space-around',
+    shadowColor: '#171717',
+    shadowOffset: { width: 3, height: 3 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 3,
+  },
+  toolbarBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#171717',
+  },
+  floatingColorPicker: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#171717',
+    borderRadius: 20,
+    borderWidth: 2.5,
+    borderColor: '#171717',
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    marginHorizontal: 10,
+    marginBottom: 10,
+    gap: 12,
+    shadowColor: '#171717',
+    shadowOffset: { width: 3, height: 3 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 3,
+  },
+  pickerBtn: {
+    justifyContent: "center",
+    alignItems: "center",
   },
 });

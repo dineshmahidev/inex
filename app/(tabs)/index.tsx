@@ -1,33 +1,37 @@
 import { AddTransactionModal } from "@/components/AddTransactionModal";
 import { BalanceCard } from "@/components/BalanceCard";
+import { formatWithCommas } from "@/constants/theme";
 import { useAI } from "@/hooks/useAI";
 import { useDatabase } from "@/hooks/useDatabase";
 import { initNotifications } from "@/utils/notifications";
+import { checkForUpdates, openStoreLink, UpdateInfo } from "@/utils/updates";
 import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
 import {
-    ChevronLeft,
-    ChevronRight,
-    Ghost,
-    Plus,
-    Smile,
-    Sparkles,
-    Star,
-    Target,
-    User,
-    Zap
+  ChevronLeft,
+  ChevronRight,
+  Ghost,
+  Plus,
+  Smile,
+  Sparkles,
+  Star,
+  Target,
+  User,
+  Zap
 } from "lucide-react-native";
 import React, { useEffect, useMemo, useState } from "react";
+import { useLanguage } from "@/context/LanguageContext";
 import {
-    Alert,
-    Dimensions,
-    Image,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Alert,
+  Dimensions,
+  Image,
+  Modal,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { PieChart } from "react-native-gifted-charts";
 
@@ -48,13 +52,23 @@ export default function DashboardScreen() {
     globalMonth,
     setGlobalMonth,
   } = useDatabase();
-  const { insights } = useAI(transactions, categories);
+  const { t, language } = useLanguage();
+  const { insights } = useAI(transactions, categories, language);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editingTx, setEditingTx] = useState<any>(null);
   const [isLocked, setIsLocked] = useState(settings.isLocked);
+  const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
 
   useEffect(() => {
     initNotifications();
+    
+    async function checkUpdates() {
+      const update = await checkForUpdates();
+      if (update && update.hasUpdate) {
+        setUpdateInfo(update);
+      }
+    }
+    checkUpdates();
   }, []);
 
   const currentMonthLabel = useMemo(() => {
@@ -109,41 +123,46 @@ export default function DashboardScreen() {
     );
   }, [habits]);
 
+  const averageTicks = useMemo(() => {
+    if (!habits || habits.length === 0) return 0;
+    return parseFloat((totalMonthlyLogs / habits.length).toFixed(1));
+  }, [totalMonthlyLogs, habits]);
+
   const productivityLevel = useMemo(() => {
-    if (totalMonthlyLogs < 10)
-      return { stage: "Seedling", icon: "🌱", msg: "Started" };
-    if (totalMonthlyLogs < 30)
-      return { stage: "Sprouter", icon: "🌿", msg: "Flowering" };
-    if (totalMonthlyLogs < 60)
-      return { stage: "Grower", icon: "🌳", msg: "Flourishing" };
-    if (totalMonthlyLogs < 100)
-      return { stage: "Master", icon: "🏆", msg: "Exceptional" };
-    return { stage: "Legend", icon: "👑", msg: "Elite" };
-  }, [totalMonthlyLogs]);
+    if (averageTicks < 5)
+      return { stage: t.seedling, icon: "🌱", msg: t.started };
+    if (averageTicks < 12)
+      return { stage: t.sprouter, icon: "🌿", msg: t.flowering };
+    if (averageTicks < 20)
+      return { stage: t.grower, icon: "🌳", msg: t.flourishing };
+    if (averageTicks < 26)
+      return { stage: t.master, icon: "🏆", msg: t.exceptional };
+    return { stage: t.legend, icon: "👑", msg: t.elite };
+  }, [averageTicks, t]);
 
   const handleTxPress = (tx: any) => {
-    Alert.alert("Options", "Manage this transaction", [
+    Alert.alert(t.options, t.manageTransaction, [
       {
-        text: "Edit",
+        text: t.edit,
         onPress: () => {
           setEditingTx(tx);
           setIsModalVisible(true);
         },
       },
       {
-        text: "Delete",
+        text: t.delete,
         style: "destructive",
         onPress: () => confirmDelete(tx.id),
       },
-      { text: "Cancel", style: "cancel" },
+      { text: t.cancel, style: "cancel" },
     ]);
   };
 
   const confirmDelete = (id: string) => {
-    Alert.alert("Delete Record?", "This action cannot be undone.", [
-      { text: "Keep" },
+    Alert.alert(t.deleteRecord, t.cannotUndo, [
+      { text: t.keep },
       {
-        text: "Delete",
+        text: t.delete,
         style: "destructive",
         onPress: () => {
           deleteTransaction(id);
@@ -196,14 +215,15 @@ export default function DashboardScreen() {
     <SafeAreaView
       style={[styles.container, { backgroundColor: Colors.background }]}
     >
+
       {/* Screen Header */}
       <View style={styles.header}>
         <View>
-          <Text style={[styles.title, { color: Colors.text }]}>Tracksy</Text>
+          <Text style={[styles.title, { color: Colors.text }]}>{t.appName}</Text>
           <View style={styles.scoreRow}>
             <Sparkles size={12} color={Colors.primary} />
             <Text style={[styles.brandElite, { color: Colors.primary }]}>
-              ELITE PRODUCTIVITY
+              {t.eliteProductivity}
             </Text>
           </View>
         </View>
@@ -220,12 +240,6 @@ export default function DashboardScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        <BalanceCard
-          total={stats.balance}
-          income={stats.income}
-          expense={stats.expense}
-        />
-
         {/* Month Selector */}
         <View
           style={{
@@ -277,6 +291,21 @@ export default function DashboardScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* Dynamic Net Portfolio Balance Card (Clickable to detailed analysis screen) */}
+        <TouchableOpacity
+          activeOpacity={0.85}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            router.push("/portfolio");
+          }}
+        >
+          <BalanceCard
+            total={stats.balance}
+            income={stats.income}
+            expense={stats.expense}
+          />
+        </TouchableOpacity>
+
         {/* Productivity Hub Quick Access */}
         <TouchableOpacity
           style={[
@@ -286,8 +315,14 @@ export default function DashboardScreen() {
               borderColor: Colors.primary + "20",
             },
           ]}
-          onPress={() => router.push("/todo")}
+          onPress={() => router.push("/todo?tab=habits")}
         >
+          {/* Neubrutalist grid dots background overlay */}
+          <View style={styles.gridOverlay} pointerEvents="none">
+            {Array.from({ length: 25 }).map((_, i) => (
+              <View key={i} style={styles.gridDot} />
+            ))}
+          </View>
           <View style={styles.prodLeft}>
             <View
               style={[
@@ -302,13 +337,13 @@ export default function DashboardScreen() {
                 {productivityLevel.stage.toUpperCase()}
               </Text>
               <Text style={[styles.prodSub, { color: Colors.textMuted }]}>
-                EVOLUTION STAGE • {productivityLevel.msg}
+                {t.evolutionStage} • {productivityLevel.msg}
               </Text>
             </View>
           </View>
           <View style={styles.prodRight}>
             <Text style={[styles.prodScore, { color: Colors.primary }]}>
-              {totalMonthlyLogs}
+              {averageTicks % 1 === 0 ? averageTicks.toFixed(0) : averageTicks.toFixed(1)}
             </Text>
             <Text
               style={{
@@ -317,8 +352,45 @@ export default function DashboardScreen() {
                 fontWeight: "900",
               }}
             >
-              TICKS
+              {t.avgTicks}
             </Text>
+          </View>
+        </TouchableOpacity>
+
+        {/* AI Financial Insights & Chat Container */}
+        <TouchableOpacity
+          activeOpacity={0.9}
+          style={[styles.aiContainer, { backgroundColor: Colors.card }]}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            router.push("/chat");
+          }}
+        >
+          {/* Neubrutalist grid dots background overlay */}
+          <View style={styles.gridOverlay} pointerEvents="none">
+            {Array.from({ length: 30 }).map((_, i) => (
+              <View key={i} style={styles.gridDot} />
+            ))}
+          </View>
+          <View style={[styles.aiGlow, { backgroundColor: Colors.primary }]} />
+          <View style={styles.aiContent}>
+            <View style={styles.aiHeader}>
+              <View style={{ backgroundColor: '#171717', width: 26, height: 26, borderRadius: 8, justifyContent: 'center', alignItems: 'center' }}>
+                <Text style={{ fontSize: 14 }}>🤖</Text>
+              </View>
+              <Text style={[styles.aiTitle, { color: Colors.text }]}>
+                {t.aiAdvisor}
+              </Text>
+            </View>
+            <Text style={[styles.aiBody, { color: Colors.text }]}>
+              {insights}
+            </Text>
+            <View style={[styles.aiFooter, { borderTopColor: Colors.text + "15" }]}>
+              <Text style={[styles.askText, { color: Colors.primary }]}>
+                {t.askAdvice.toUpperCase()}
+              </Text>
+              <ChevronRight color={Colors.primary} size={16} />
+            </View>
           </View>
         </TouchableOpacity>
 
@@ -330,13 +402,19 @@ export default function DashboardScreen() {
               { backgroundColor: Colors.card, borderColor: Colors.border },
             ]}
           >
+            {/* Neubrutalist grid dots background overlay */}
+            <View style={styles.gridOverlay} pointerEvents="none">
+              {Array.from({ length: 15 }).map((_, i) => (
+                <View key={i} style={styles.gridDot} />
+              ))}
+            </View>
             <View
               style={[styles.gridIcon, { backgroundColor: Colors.background }]}
             >
               <Text style={{ fontSize: 18 }}>📈</Text>
             </View>
             <Text style={[styles.gridLabel, { color: Colors.textMuted }]}>
-              Savings Rate
+              {t.savingsRate}
             </Text>
             <Text style={[styles.gridVal, { color: Colors.text }]}>
               {stats.income > 0
@@ -351,16 +429,22 @@ export default function DashboardScreen() {
               { backgroundColor: Colors.card, borderColor: Colors.border },
             ]}
           >
+            {/* Neubrutalist grid dots background overlay */}
+            <View style={styles.gridOverlay} pointerEvents="none">
+              {Array.from({ length: 15 }).map((_, i) => (
+                <View key={i} style={styles.gridDot} />
+              ))}
+            </View>
             <View
               style={[styles.gridIcon, { backgroundColor: Colors.background }]}
             >
               <Text style={{ fontSize: 18 }}>🔔</Text>
             </View>
             <Text style={[styles.gridLabel, { color: Colors.textMuted }]}>
-              Reminders
+              {t.reminders}
             </Text>
             <Text style={[styles.gridVal, { color: Colors.text }]}>
-              {reminders.filter((r) => !r.lastPaidMonth).length} Bills
+              {reminders.filter((r) => !r.lastPaidMonth).length} {t.bills}
             </Text>
           </View>
         </View>
@@ -373,6 +457,12 @@ export default function DashboardScreen() {
               { backgroundColor: Colors.card, borderColor: Colors.border },
             ]}
           >
+            {/* Neubrutalist grid dots background overlay */}
+            <View style={styles.gridOverlay} pointerEvents="none">
+              {Array.from({ length: 30 }).map((_, i) => (
+                <View key={i} style={styles.gridDot} />
+              ))}
+            </View>
             <PieChart
               data={pieData}
               donut
@@ -420,13 +510,13 @@ export default function DashboardScreen() {
         {/* Recent Feed */}
         <View style={styles.feedHeader}>
           <Text style={[styles.sectionHeading, { color: Colors.text }]}>
-            Recent Transactions
+            {t.recentTransactions}
           </Text>
           <TouchableOpacity onPress={() => router.push("/history")}>
             <Text
               style={{ color: Colors.primary, fontSize: 12, fontWeight: "900" }}
             >
-              VIEW ALL
+              {t.viewAll}
             </Text>
           </TouchableOpacity>
         </View>
@@ -435,36 +525,36 @@ export default function DashboardScreen() {
           <View style={{ padding: 40, alignItems: "center" }}>
             <Zap size={40} color={Colors.border} />
             <Text style={{ color: Colors.textMuted, marginTop: 10 }}>
-              No records this month
+              {t.noRecords}
             </Text>
           </View>
         ) : (
-          filteredTransactions.slice(0, 3).map((t) => {
-            const cat = categories.find((c) => c.id === t.categoryId);
+          filteredTransactions.slice(0, 3).map((tx) => {
+            const cat = categories.find((c) => c.id === tx.categoryId);
             return (
               <TouchableOpacity
-                key={t.id}
+                key={tx.id}
                 style={[
                   styles.txCard,
                   { backgroundColor: Colors.card, borderColor: Colors.border },
                 ]}
-                onPress={() => handleTxPress(t)}
+                onPress={() => handleTxPress(tx)}
               >
                 <View
                   style={[
                     styles.txIndicator,
                     {
                       backgroundColor:
-                        t.type === "income" ? Colors.primary : Colors.secondary,
+                        tx.type === "income" ? Colors.primary : Colors.secondary,
                     },
                   ]}
                 />
                 <View style={styles.txMain}>
                   <Text style={[styles.txTitle, { color: Colors.text }]}>
-                    {t.note || "Untitled"}
+                    {tx.note || t.untitled}
                   </Text>
                   <Text style={[styles.txMeta, { color: Colors.textMuted }]}>
-                    {cat?.name} • {new Date(t.date).toLocaleDateString()}
+                    {cat?.name} • {new Date(tx.date).toLocaleDateString()}
                   </Text>
                 </View>
                 <View style={styles.txRight}>
@@ -472,13 +562,13 @@ export default function DashboardScreen() {
                     style={[
                       styles.txAmount,
                       {
-                        color: t.type === "income" ? Colors.primary : "#EF4444",
+                        color: tx.type === "income" ? Colors.primary : "#EF4444",
                       },
                     ]}
                   >
-                    {t.type === "income" ? "+" : "-"}
+                    {tx.type === "income" ? "+" : "-"}
                     {settings.currency}
-                    {t.amount.toLocaleString()}
+                    {formatWithCommas(tx.amount)}
                   </Text>
                 </View>
               </TouchableOpacity>
@@ -494,7 +584,7 @@ export default function DashboardScreen() {
         onPress={() => setIsModalVisible(true)}
       >
         <View style={[styles.fabInner, { backgroundColor: Colors.primary }]}>
-          <Plus color="#000" size={32} strokeWidth={3.5} />
+          <Plus color="#FFF" size={28} strokeWidth={3} />
         </View>
       </TouchableOpacity>
 
@@ -508,6 +598,118 @@ export default function DashboardScreen() {
         initialData={editingTx}
         onUpdate={updateTransaction}
       />
+
+      {/* Neubrutalist In-App Update Modal */}
+      {updateInfo && (
+        <Modal
+          visible={!!updateInfo}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => {
+            if (!updateInfo.isForceUpdate) {
+              setUpdateInfo(null);
+            }
+          }}
+        >
+          <View style={{
+            flex: 1,
+            backgroundColor: "rgba(0, 0, 0, 0.6)",
+            justifyContent: "center",
+            alignItems: "center",
+            padding: 24,
+          }}>
+            <View style={{
+              width: "100%",
+              backgroundColor: Colors.card,
+              borderWidth: 3,
+              borderColor: "#171717",
+              borderRadius: 24,
+              padding: 24,
+              shadowColor: "#171717",
+              shadowOffset: { width: 6, height: 6 },
+              shadowOpacity: 1,
+              shadowRadius: 0,
+              elevation: 5,
+              position: "relative",
+              overflow: "hidden",
+            }}>
+              {/* Grid dots texture overlay */}
+              <View style={styles.gridOverlay} pointerEvents="none">
+                {Array.from({ length: 25 }).map((_, i) => (
+                  <View key={i} style={styles.gridDot} />
+                ))}
+              </View>
+
+              {/* Title Section */}
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 15 }}>
+                <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: "#facc15", justifyContent: "center", alignItems: "center", borderWidth: 2, borderColor: "#171717" }}>
+                  <Text style={{ fontSize: 18 }}>🚀</Text>
+                </View>
+                <Text style={{ fontSize: 20, fontWeight: "900", color: Colors.text, letterSpacing: -0.5 }}>
+                  NEW UPDATE AVAILABLE!
+                </Text>
+              </View>
+
+              {/* Body Text */}
+              <Text style={{ fontSize: 14, fontWeight: "600", lineHeight: 22, color: Colors.text, marginBottom: 20 }}>
+                {"A fresh, highly optimized version of Tracksy (" + updateInfo.latestVersion + ") is ready. Upgrade now to get elite performance boosts, smoother animations, and gorgeous UI enhancements!"}
+              </Text>
+
+              {/* Buttons Row */}
+              <View style={{ gap: 12 }}>
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  style={{
+                    backgroundColor: Colors.primary,
+                    borderWidth: 2.5,
+                    borderColor: "#171717",
+                    borderRadius: 16,
+                    height: 52,
+                    justifyContent: "center",
+                    alignItems: "center",
+                    shadowColor: "#171717",
+                    shadowOffset: { width: 3, height: 3 },
+                    shadowOpacity: 1,
+                    shadowRadius: 0,
+                    elevation: 3,
+                  }}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+                    openStoreLink(updateInfo.storeUrl);
+                  }}
+                >
+                  <Text style={{ color: "#000", fontWeight: "900", fontSize: 14, letterSpacing: 0.5 }}>
+                    UPDATE NOW
+                  </Text>
+                </TouchableOpacity>
+
+                {!updateInfo.isForceUpdate && (
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    style={{
+                      backgroundColor: "transparent",
+                      borderWidth: 2.5,
+                      borderColor: "#171717",
+                      borderRadius: 16,
+                      height: 52,
+                      justifyContent: "center",
+                      alignItems: "center",
+                    }}
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      setUpdateInfo(null);
+                    }}
+                  >
+                    <Text style={{ color: Colors.text, fontWeight: "900", fontSize: 14, letterSpacing: 0.5 }}>
+                      LATER
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
     </SafeAreaView>
   );
 }
@@ -581,7 +783,7 @@ const styles = StyleSheet.create({
   monthBox: { alignItems: "center" },
   monthText: { fontSize: 18, fontWeight: "800", textTransform: "uppercase" },
   yearText: { fontSize: 10, fontWeight: "bold" },
-  scrollContent: { padding: 20, paddingBottom: 80 },
+  scrollContent: { padding: 20, paddingBottom: 180 },
   aiContainer: {
     marginVertical: 10,
     borderRadius: 16,
@@ -605,10 +807,10 @@ const styles = StyleSheet.create({
   aiTitle: { fontSize: 12, fontWeight: "900", textTransform: "uppercase" },
   aiBody: { fontSize: 14, lineHeight: 22, fontWeight: "500" },
   gridRow: { flexDirection: "row", gap: 15, marginVertical: 15 },
-  gridItem: { 
-    flex: 1, 
-    borderRadius: 16, 
-    padding: 20, 
+  gridItem: {
+    flex: 1,
+    borderRadius: 16,
+    padding: 20,
     borderWidth: 2.5,
     borderColor: '#171717',
     shadowColor: '#171717',
@@ -616,6 +818,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 1,
     shadowRadius: 0,
     elevation: 0,
+    position: "relative",
+    overflow: "hidden",
   },
   gridIcon: {
     width: 36,
@@ -642,6 +846,8 @@ const styles = StyleSheet.create({
     shadowRadius: 0,
     elevation: 0,
     marginBottom: 20,
+    position: "relative",
+    overflow: "hidden",
   },
   chartLegend: { flex: 1, marginLeft: 20, gap: 12 },
   legendRow: { flexDirection: "row", alignItems: "center", gap: 10 },
@@ -671,21 +877,19 @@ const styles = StyleSheet.create({
   txAmount: { fontSize: 16, fontWeight: "900" },
   fab: {
     position: "absolute",
-    bottom: 110,
+    bottom: 160,
     right: 24,
     zIndex: 100,
   },
   fabInner: {
-    width: 64,
-    height: 64,
-    borderRadius: 20,
+    width: 58,
+    height: 58,
+    borderRadius: 18,
     justifyContent: "center",
     alignItems: "center",
-    borderWidth: 2.5,
-    borderColor: '#171717',
-    shadowColor: '#171717',
-    shadowOffset: { width: 4, height: 4 },
-    shadowOpacity: 1,
+    shadowColor: '#16a34a',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
     shadowRadius: 0,
     elevation: 0,
   },
@@ -714,6 +918,8 @@ const styles = StyleSheet.create({
     elevation: 0,
     marginTop: 15,
     marginBottom: 5,
+    position: "relative",
+    overflow: "hidden",
   },
   prodLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
   prodIconBox: {
@@ -734,4 +940,19 @@ const styles = StyleSheet.create({
   },
   prodRight: { alignItems: "flex-end" },
   prodScore: { fontSize: 22, fontWeight: "900" },
+  gridOverlay: {
+    position: "absolute",
+    top: 0, left: 0, right: 0, bottom: 0,
+    opacity: 0.12,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    padding: 10,
+  },
+  gridDot: {
+    width: 2.5,
+    height: 2.5,
+    borderRadius: 1.5,
+    backgroundColor: "#000",
+    margin: 14,
+  },
 });

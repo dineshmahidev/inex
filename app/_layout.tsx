@@ -1,52 +1,45 @@
 import 'react-native-reanimated';
 import { DarkTheme, ThemeProvider } from '@react-navigation/native';
-import { Stack, useRouter } from 'expo-router';
+import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import * as SystemUI from 'expo-system-ui';
 import * as Notifications from 'expo-notifications';
-import * as SplashScreen from 'expo-splash-screen';
 import { DatabaseProvider, useDatabase } from '@/context/DatabaseContext';
+import { LanguageProvider } from '@/context/LanguageContext';
 import { requestNotificationPermissions, initNotifications } from '@/utils/notifications';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-
-// Keep the splash screen visible while we fetch resources
-SplashScreen.preventAutoHideAsync();
+import AnimatedSplash from '@/components/AnimatedSplash';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
     shouldPlaySound: true,
     shouldSetBadge: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
   }),
 });
 
 function AppContent() {
-  const { isLoading, settings } = useDatabase();
-  const router = useRouter();
+  const { isLoading } = useDatabase();
+  const [dbReady, setDbReady] = useState(false);
+  const [animDone, setAnimDone] = useState(false);
 
-  // 1. Native Initialization (Runs once)
   useEffect(() => {
     async function nativeInit() {
       try {
-        // System UI background
-        await SystemUI.setBackgroundColorAsync('#facc15').catch(() => {});
-        
-        // Notifications
+        await SystemUI.setBackgroundColorAsync('#fcd002').catch(() => {});
         try {
           await requestNotificationPermissions();
           await initNotifications();
         } catch (error) {
           console.warn("Notification init failed:", error);
         }
-
-        // AdMob
         try {
           const mobileAds = require('react-native-google-mobile-ads').default;
           await mobileAds().initialize();
-        } catch (e) {
-          // Fallback handled
-        }
+        } catch (e) {}
       } catch (error) {
         console.error("Native init error:", error);
       }
@@ -54,23 +47,32 @@ function AppContent() {
     nativeInit();
   }, []);
 
-  // 2. Splash Screen Hiding (Watches isLoading)
-  useEffect(() => {
-    if (!isLoading) {
-      const timer = setTimeout(() => {
-        SplashScreen.hideAsync().catch(() => {});
-      }, 500);
-      return () => clearTimeout(timer);
-    }
-  }, [isLoading]);
+  const [minSplashDone, setMinSplashDone] = useState(false);
 
-  // 3. Global Absolute Fallback
+  useEffect(() => {
+    const timer = setTimeout(() => setMinSplashDone(true), 4500);
+    return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    if (!isLoading && minSplashDone) {
+      setDbReady(true);
+    }
+  }, [isLoading, minSplashDone]);
+
   useEffect(() => {
     const fallback = setTimeout(() => {
-      SplashScreen.hideAsync().catch(() => {});
-    }, 7000);
+      setDbReady(true);
+      setAnimDone(true);
+    }, 8000);
     return () => clearTimeout(fallback);
   }, []);
+
+  const showSplash = !animDone || !dbReady;
+
+  if (showSplash) {
+    return <AnimatedSplash ready={dbReady} onFinish={() => setAnimDone(true)} />;
+  }
 
   return (
     <ThemeProvider value={DarkTheme}>
@@ -80,6 +82,8 @@ function AppContent() {
         <Stack.Screen name="chat" />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="lock" />
+        <Stack.Screen name="portfolio" />
+        <Stack.Screen name="splash-transition" />
       </Stack>
       <StatusBar style="dark" />
     </ThemeProvider>
@@ -90,7 +94,9 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <DatabaseProvider>
-        <AppContent />
+        <LanguageProvider>
+          <AppContent />
+        </LanguageProvider>
       </DatabaseProvider>
     </SafeAreaProvider>
   );

@@ -6,6 +6,8 @@ Notifications.setNotificationHandler({
     shouldShowAlert: true,
     shouldPlaySound: true,
     shouldSetBadge: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
   }),
 });
 
@@ -55,11 +57,33 @@ export async function scheduleMonthlyReminderNotification(id: string, name: stri
   await cancelReminderNotification(id);
   await cancelReminderNotification(id + '_early');
 
+  const getNextDueDate = (day: number) => {
+    const now = new Date();
+    let safeDay = day;
+    
+    // simple wrap around for day boundaries
+    if (safeDay <= 0) {
+      safeDay = 28 + safeDay;
+    }
+    if (safeDay > 28) {
+      // safe cap to avoid month length issues
+      safeDay = 28;
+    }
+    
+    let target = new Date(now.getFullYear(), now.getMonth(), safeDay, 9, 0, 0, 0);
+    if (target.getTime() <= now.getTime()) {
+      target = new Date(now.getFullYear(), now.getMonth() + 1, safeDay, 9, 0, 0, 0);
+    }
+    return target;
+  };
+
   const schedule = async (dayToTrigger: number, isEarly: boolean) => {
     let safeDay = dayToTrigger;
     if (safeDay <= 0) safeDay = 28 + safeDay; // simple wrap around
-    if (safeDay > 31) safeDay = 31;
+    if (safeDay > 28) safeDay = 28; // safe cap
     
+    const nextDate = getNextDueDate(dayToTrigger);
+
     await Notifications.scheduleNotificationAsync({
       identifier: isEarly ? id + '_early' : id,
       content: {
@@ -70,13 +94,17 @@ export async function scheduleMonthlyReminderNotification(id: string, name: stri
         data: { id },
         sound: Platform.OS === 'ios' ? 'mixkit_bell_notification_933.wav' : 'mixkit_bell_notification_933',
       },
-      trigger: {
+      trigger: Platform.OS === 'android' ? {
+        type: Notifications.SchedulableTriggerInputTypes.DATE,
+        date: nextDate,
+        channelId: 'default',
+      } as any : {
+        type: Notifications.SchedulableTriggerInputTypes.CALENDAR,
         day: safeDay,
         hour: 9,
         minute: 0,
         repeats: true,
-        ...(Platform.OS === 'android' ? { channelId: 'default' } : { type: Notifications.SchedulableTriggerInputTypes.CALENDAR })
-      },
+      } as any,
     });
   };
 
@@ -142,6 +170,9 @@ export async function scheduleHabitNotification(id: string, name: string, time: 
   const [hour, minute] = time.split(':').map(Number);
   const quote = HABIT_QUOTES[Math.floor(Math.random() * HABIT_QUOTES.length)];
 
+  // Cancel any existing reminder for this habit to prevent double scheduling
+  await Notifications.cancelScheduledNotificationAsync('habit_' + id);
+
   await Notifications.scheduleNotificationAsync({
     identifier: 'habit_' + id,
     content: {
@@ -151,11 +182,11 @@ export async function scheduleHabitNotification(id: string, name: string, time: 
       sound: Platform.OS === 'ios' ? 'mixkit_bell_notification_933.wav' : 'mixkit_bell_notification_933',
     },
     trigger: {
+      type: Notifications.SchedulableTriggerInputTypes.DAILY,
       hour,
       minute,
-      repeats: true,
-      ...(Platform.OS === 'android' ? { channelId: 'default' } : { type: Notifications.SchedulableTriggerInputTypes.CALENDAR })
-    },
+      channelId: 'default',
+    } as any,
   });
 }
 

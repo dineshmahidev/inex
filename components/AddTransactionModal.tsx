@@ -11,11 +11,12 @@ import {
   Platform,
   Alert
 } from 'react-native';
-import { Colors } from '@/constants/theme';
+import { Colors, formatInputWithCommas } from '@/constants/theme';
 import { useDatabase } from '@/hooks/useDatabase';
 import { X, Mic, Sparkles } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { FlowBannerAd } from './FlowBannerAd';
+import { interstitialAdManager } from '@/utils/ads';
 
 const EMOJI_MAP: Record<string, string> = {
   'Food & Dining': '🍔',
@@ -45,7 +46,7 @@ export function AddTransactionModal({ visible, onClose, onAdd, initialData, onUp
   useEffect(() => {
     if (visible && initialData) {
       setType(initialData.type);
-      setAmount(initialData.amount.toString());
+      setAmount(formatInputWithCommas(initialData.amount.toString()));
       setCategoryId(initialData.categoryId);
       setNote(initialData.note);
     } else if (visible) {
@@ -72,33 +73,43 @@ export function AddTransactionModal({ visible, onClose, onAdd, initialData, onUp
     }
   }, [visible]);
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     if (isSubmitting) return;
-    if (!amount || !categoryId) {
+    const cleanAmountStr = amount.replace(/,/g, '');
+    if (!cleanAmountStr || !categoryId) {
       Alert.alert("Missing Info", "Please enter amount and category");
       return;
     }
-    
+
     setIsSubmitting(true);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    if (initialData && onUpdate) {
-        onUpdate(initialData.id, {
-            amount: parseFloat(amount),
-            type,
-            categoryId,
-            note,
-            date: initialData.date,
+
+    try {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      const parsedAmount = parseFloat(cleanAmountStr);
+      if (initialData && onUpdate) {
+        await onUpdate(initialData.id, {
+          amount: parsedAmount,
+          type,
+          categoryId,
+          note,
+          date: initialData.date,
         });
-    } else {
-        onAdd({
-            amount: parseFloat(amount),
-            type,
-            categoryId,
-            note,
-            date: new Date().toISOString(),
+      } else {
+        await onAdd({
+          amount: parsedAmount,
+          type,
+          categoryId,
+          note,
+          date: new Date().toISOString(),
         });
+        interstitialAdManager.showAd();
+      }
+      onClose();
+    } catch (e) {
+      console.error("Failed to save transaction", e);
+    } finally {
+      setIsSubmitting(false);
     }
-    onClose();
   };
 
   const reset = () => {
@@ -139,7 +150,7 @@ export function AddTransactionModal({ visible, onClose, onAdd, initialData, onUp
               placeholderTextColor={Colors.textMuted}
               keyboardType="decimal-pad"
               value={amount}
-              onChangeText={setAmount}
+              onChangeText={(text) => setAmount(formatInputWithCommas(text))}
               autoFocus
             />
 
