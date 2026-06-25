@@ -20,15 +20,17 @@ import {
   Dimensions,
   Image,
   Modal,
-  SafeAreaView,
+  Platform,
   ScrollView,
   StyleSheet,
   Switch,
   Text,
   TextInput,
   TouchableOpacity,
-  View
+  View,
+  KeyboardAvoidingView
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 const { width } = Dimensions.get("window");
 
@@ -432,101 +434,107 @@ export default function SettingsScreen() {
       {/* ───────────────────────── Language Picker Modal ─────────────────────── */}
       <Modal
         visible={isLangModalVisible}
-        transparent
-        animationType="fade"
+        transparent={false}
+        animationType="slide"
         onRequestClose={() => setIsLangModalVisible(false)}
       >
-        <View style={{
-          flex: 1,
-          backgroundColor: 'rgba(0,0,0,0.55)',
-          justifyContent: 'center',
-          alignItems: 'center',
-          padding: 28,
-        }}>
-          <View style={{
-            width: '100%',
-            backgroundColor: Colors.card,
-            borderWidth: 3,
-            borderColor: '#171717',
-            borderRadius: 24,
-            padding: 24,
-            shadowColor: '#171717',
-            shadowOffset: { width: 6, height: 6 },
-            shadowOpacity: 1,
-            shadowRadius: 0,
-            elevation: 5,
-          }}>
-            {/* Modal Title */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 20 }}>
-              <View style={{ width: 36, height: 36, borderRadius: 12, backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#171717' }}>
-                <Text style={{ fontSize: 18 }}>🌐</Text>
-              </View>
-              <Text style={{ fontSize: 18, fontWeight: '900', color: Colors.text, letterSpacing: -0.5 }}>
-                {t.selectLanguage}
-              </Text>
-            </View>
-
-            {/* Language Options */}
-            {languages.map((lang, idx) => {
-              const isActive = lang.code === language;
-              return (
-                <TouchableOpacity
-                  key={lang.code}
-                  activeOpacity={0.8}
-                  onPress={async () => {
-                    await setLanguage(lang.code);
-                    setIsLangModalVisible(false);
-                  }}
-                  style={{
-                    flexDirection: 'row',
+        <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background }} edges={["top", "bottom"]}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
+            style={{ flex: 1 }}
+          >
+            <ScrollView
+              contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 16, paddingBottom: 34 }}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              {/* Title Row */}
+              <View style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: 20,
+              }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                  <View style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 12,
+                    backgroundColor: Colors.primary + '15',
+                    justifyContent: 'center',
                     alignItems: 'center',
-                    gap: 14,
-                    padding: 16,
+                  }}>
+                    <Text style={{ fontSize: 18 }}>🌐</Text>
+                  </View>
+                  <Text style={{ fontSize: 18, fontWeight: '900', color: Colors.text, letterSpacing: -0.5 }}>
+                    {t.selectLanguage}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => setIsLangModalVisible(false)}
+                  style={{
+                    width: 32,
+                    height: 32,
                     borderRadius: 16,
-                    borderWidth: 2.5,
-                    borderColor: isActive ? Colors.primary : '#171717',
-                    backgroundColor: isActive ? Colors.primary + '18' : 'transparent',
-                    marginBottom: idx < languages.length - 1 ? 10 : 0,
+                    backgroundColor: '#F3F4F6',
+                    alignItems: 'center',
+                    justifyContent: 'center',
                   }}
                 >
-                  <Text style={{ fontSize: 26 }}>{lang.flag}</Text>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ color: Colors.text, fontWeight: '900', fontSize: 16 }}>
-                      {lang.nativeLabel}
-                    </Text>
-                    <Text style={{ color: Colors.textMuted, fontSize: 11, fontWeight: '600', marginTop: 2 }}>
-                      {lang.label}
-                    </Text>
-                  </View>
-                  {isActive && (
-                    <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#171717' }}>
-                      <Text style={{ color: '#000', fontSize: 12, fontWeight: '900' }}>✓</Text>
-                    </View>
-                  )}
+                  <Text style={{ fontSize: 14, color: '#6B7280', fontWeight: '700' }}>✕</Text>
                 </TouchableOpacity>
-              );
-            })}
+              </View>
 
-            {/* Close */}
-            <TouchableOpacity
-              activeOpacity={0.8}
-              onPress={() => setIsLangModalVisible(false)}
-              style={{
-                marginTop: 16,
-                height: 48,
-                borderRadius: 16,
-                borderWidth: 2.5,
-                borderColor: '#171717',
-                justifyContent: 'center',
-                alignItems: 'center',
-              }}
-            >
-              <Text style={{ color: Colors.text, fontWeight: '900', fontSize: 14 }}>
-                {t.cancel}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+              {/* Language Options */}
+              {languages.map((lang, idx) => {
+                const isActive = lang.code === language;
+                return (
+                  <TouchableOpacity
+                    key={lang.code}
+                    activeOpacity={0.8}
+                    onPress={async () => {
+                      await setLanguage(lang.code);
+                      setIsLangModalVisible(false);
+                    }}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 14,
+                      padding: 16,
+                      borderRadius: 16,
+                      borderWidth: 1.5,
+                      borderColor: isActive ? Colors.primary : '#E5E7EB',
+                      backgroundColor: isActive ? Colors.primary + '12' : 'transparent',
+                      marginBottom: idx < languages.length - 1 ? 10 : 0,
+                    }}
+                  >
+                    <Text style={{ fontSize: 26 }}>{lang.flag}</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ color: Colors.text, fontWeight: '800', fontSize: 16 }}>
+                        {lang.nativeLabel}
+                      </Text>
+                      <Text style={{ color: Colors.textMuted, fontSize: 12, fontWeight: '600', marginTop: 2 }}>
+                        {lang.label}
+                      </Text>
+                    </View>
+                    {isActive && (
+                      <View style={{
+                        width: 22,
+                        height: 22,
+                        borderRadius: 11,
+                        backgroundColor: Colors.primary,
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                      }}>
+                        <Text style={{ color: '#FFF', fontSize: 12, fontWeight: '900' }}>✓</Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </KeyboardAvoidingView>
+        </SafeAreaView>
       </Modal>
 
       {/* PIN Setup Modal */}
@@ -725,8 +733,13 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     justifyContent: "center",
     alignItems: "center",
-    borderWidth: 2.5,
-    borderColor: "#171717",
+    borderWidth: 2,
+    borderColor: "#FFFFFF",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   nameContainer: { alignItems: "center" },
   profileName: { fontSize: 22, fontWeight: "900", letterSpacing: -0.5 },
@@ -756,14 +769,15 @@ const styles = StyleSheet.create({
     marginLeft: 5,
   },
   card: {
-    borderRadius: 16,
-    borderWidth: 2.5,
-    borderColor: '#171717',
-    shadowColor: '#171717',
-    shadowOffset: { width: 4, height: 4 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 0,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 2,
     overflow: "hidden"
   },
   settingItem: {
@@ -779,11 +793,9 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     justifyContent: "center",
     alignItems: "center",
-    borderWidth: 2.5,
-    borderColor: '#171717',
   },
   settingLabel: { fontSize: 16, fontWeight: "700" },
-  divider: { height: 1, marginHorizontal: 16 },
+  divider: { height: 1, marginHorizontal: 16, backgroundColor: '#F3F4F6' },
   footer: { alignItems: "center", padding: 40, gap: 4 },
   versionText: { fontSize: 14, fontWeight: "900", letterSpacing: 1 },
   footerInfo: { fontSize: 9, fontWeight: "bold", letterSpacing: 2 },

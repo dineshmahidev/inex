@@ -4,18 +4,18 @@
     "slug": "flow-ledger",
     "version": "1.0.4",
     "orientation": "portrait",
-    "icon": "./assets/app_logo.png",
+    "icon": "./assets/tracksy_logo.png",
     "notification": {
-      "icon": "./assets/notification_icon.png",
+      "icon": "./assets/splash_logo.png",
       "color": "#fcd002"
     },
     "scheme": "flowledger",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/app_logo.png",
+      "image": "./assets/splash_logo.png",
       "resizeMode": "contain",
-      "backgroundColor": "#fcd002"
+      "backgroundColor": "#ffffff"
     },
     "ios": {
       "supportsTablet": true,
@@ -27,15 +27,15 @@
       "allowBackup": true,
       "fullBackupOnly": false,
       "splash": {
-        "image": "./assets/app_logo.png",
+        "image": "./assets/splash_logo.png",
         "resizeMode": "contain",
-        "backgroundColor": "#fcd002"
+        "backgroundColor": "#ffffff"
       },
 "adaptiveIcon": {
           "backgroundColor": "#fcd002",
-          "foregroundImage": "./assets/app_logo.png",
-          "backgroundImage": "./assets/app_logo.png",
-          "monochromeImage": "./assets/app_logo.png"
+          "foregroundImage": "./assets/tracksy_logo.png",
+          "backgroundImage": "./assets/tracksy_logo.png",
+          "monochromeImage": "./assets/tracksy_logo.png"
         },
       "config": {
         "googleMobileAdsAppId": "ca-app-pub-2141805169615611~2090173992"
@@ -56,9 +56,9 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/app_logo.png",
+          "image": "./assets/splash_logo.png",
           "resizeMode": "contain",
-          "backgroundColor": "#fcd002"
+          "backgroundColor": "#ffffff"
         }
       ],
       "@react-native-community/datetimepicker",
@@ -74,7 +74,7 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/notification_icon.png",
+          "icon": "./assets/splash_logo.png",
           "color": "#fcd002",
           "sounds": [
             "./assets/mixkit_bell_notification_933.wav"

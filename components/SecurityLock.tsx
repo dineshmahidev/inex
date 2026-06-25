@@ -105,15 +105,15 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   input: {
-    backgroundColor: Colors.card,
+    backgroundColor: '#F3F4F6',
     width: 200,
     height: 60,
     borderRadius: 20,
     textAlign: 'center',
     fontSize: 32,
-    color: Colors.text, // FIXED: Changed from default to white
-    borderWidth: 2.5,
-    borderColor: '#171717',
+    color: Colors.text,
+    borderWidth: 1.5,
+    borderColor: '#E5E7EB',
     letterSpacing: 20,
     paddingLeft: 20,
   },
@@ -125,6 +125,6 @@ const styles = StyleSheet.create({
   bioText: {
     color: Colors.primary,
     fontSize: 14,
-    fontWeight: 'bold',
+    fontWeight: '800',
   },
 });

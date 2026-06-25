@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { TextInput, TextInputProps, StyleSheet, View, Text, ViewStyle } from 'react-native';
 import { Colors } from '@/constants/theme';
+import { useDatabase } from '@/hooks/useDatabase';
 
 interface NeoTextInputProps extends TextInputProps {
   label?: string;
@@ -9,17 +10,19 @@ interface NeoTextInputProps extends TextInputProps {
 }
 
 export function NeoTextInput({ label, error, containerStyle, style, ...props }: NeoTextInputProps) {
+  const { Colors } = useDatabase();
   const [isFocused, setIsFocused] = useState(false);
 
   return (
     <View style={[styles.container, containerStyle]}>
-      {label && <Text style={styles.label}>{label}</Text>}
+      {label && <Text style={[styles.label, { color: Colors.text }]}>{label}</Text>}
       <View style={styles.inputWrapper}>
-        <View style={styles.shadowLayer} />
+        <View style={[styles.shadowLayer, { backgroundColor: Colors.border }]} />
         <TextInput
           {...props}
           style={[
             styles.input,
+            { backgroundColor: Colors.card, borderColor: Colors.border, color: Colors.text },
             style,
             isFocused && styles.inputFocused,
             error && styles.inputError,

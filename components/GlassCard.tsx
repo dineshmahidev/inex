@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, StyleSheet, ViewStyle } from 'react-native';
-import { Colors } from '@/constants/theme';
+import { Colors as StaticColors } from '@/constants/theme';
+import { useDatabase } from '@/hooks/useDatabase';
 
 interface GlassCardProps {
   children: React.ReactNode;
@@ -8,8 +9,9 @@ interface GlassCardProps {
 }
 
 export function GlassCard({ children, style }: GlassCardProps) {
+  const { Colors } = useDatabase();
   return (
-    <View style={[styles.card, style]}>
+    <View style={[styles.card, { backgroundColor: Colors.card, borderColor: Colors.border }, style]}>
       {children}
     </View>
   );
@@ -17,11 +19,11 @@ export function GlassCard({ children, style }: GlassCardProps) {
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: Colors.card,
+    backgroundColor: StaticColors.card,
     borderRadius: 24,
     padding: 20,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: StaticColors.border,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.3,

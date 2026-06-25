@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, StyleSheet, ViewStyle } from 'react-native';
-import { Colors } from '@/constants/theme';
+import { Colors as StaticColors } from '@/constants/theme';
+import { useDatabase } from '@/hooks/useDatabase';
 
 interface NeoCardProps {
   children: React.ReactNode;
@@ -8,8 +9,9 @@ interface NeoCardProps {
 }
 
 export function NeoCard({ children, style }: NeoCardProps) {
+  const { Colors } = useDatabase();
   return (
-    <View style={[styles.card, style]}>
+    <View style={[styles.card, { backgroundColor: Colors.card, borderColor: Colors.border, shadowColor: Colors.border }, style]}>
       {children}
     </View>
   );
@@ -17,15 +19,15 @@ export function NeoCard({ children, style }: NeoCardProps) {
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: Colors.card,
+    backgroundColor: StaticColors.card,
     borderRadius: 16,
     padding: 20,
     borderWidth: 2.5,
-    borderColor: Colors.border,
-    shadowColor: Colors.border,
+    borderColor: StaticColors.border,
+    shadowColor: StaticColors.border,
     shadowOffset: { width: 4, height: 4 },
     shadowOpacity: 1,
     shadowRadius: 0,
-    elevation: 0, // Disable Android default shadow as we emulate it if possible, but Android elevation doesn't do hard shadows well. We might need a wrapper for Android if this fails, but stick to standard shadow properties first.
+    elevation: 0,
   },
 });

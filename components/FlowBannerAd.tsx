@@ -20,22 +20,6 @@ try {
 export const FlowBannerAd = () => {
   // ADS DISABLED FOR NOW
   return null;
-
-  return (
-    <View style={styles.container}>
-      <BannerAd
-        unitId={__DEV__ ? TestIds.ADAPTIVE_BANNER : ADMOB_CONFIG.bannerAdUnitId}
-        size={BannerAdSize.BANNER}
-        requestOptions={{
-          requestNonPersonalizedAdsOnly: true,
-        }}
-        onAdFailedToLoad={(error: any) => {
-          console.warn('Ad failed to load: ', error);
-          setAdFailed(true);
-        }}
-      />
-    </View>
-  );
 };
 
 const styles = StyleSheet.create({

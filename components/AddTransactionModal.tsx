@@ -1,30 +1,36 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Modal, 
-  View, 
-  Text, 
-  StyleSheet, 
-  TextInput, 
-  TouchableOpacity, 
+import {
+  Modal,
+  View,
+  Text,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
   ScrollView,
   KeyboardAvoidingView,
   Platform,
-  Alert
+  Alert,
+  Dimensions,
 } from 'react-native';
-import { Colors, formatInputWithCommas } from '@/constants/theme';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { formatInputWithCommas } from '@/constants/theme';
 import { useDatabase } from '@/hooks/useDatabase';
-import { X, Mic, Sparkles } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
-import { FlowBannerAd } from './FlowBannerAd';
 import { interstitialAdManager } from '@/utils/ads';
+
+const { width } = Dimensions.get('window');
 
 const EMOJI_MAP: Record<string, string> = {
   'Food & Dining': '🍔',
   'Travel & Cabs': '🚕',
   'Home Bills': '🏠',
   'EMI & Loans': '💳',
-  'Salary': '💰',
+  'Salary': '💼',
   'Other Income': '✨',
+  'Shopping': '🛍️',
+  'Health': '💊',
+  'Entertainment': '🎬',
+  'Education': '📚',
 };
 
 interface AddTransactionModalProps {
@@ -35,24 +41,35 @@ interface AddTransactionModalProps {
   onUpdate?: (id: string, tx: any) => void;
 }
 
-export function AddTransactionModal({ visible, onClose, onAdd, initialData, onUpdate }: AddTransactionModalProps) {
+export function AddTransactionModal({
+  visible,
+  onClose,
+  onAdd,
+  initialData,
+  onUpdate,
+}: AddTransactionModalProps) {
   const { categories, detectCategory, Colors } = useDatabase();
   const [type, setType] = useState<'income' | 'expense'>('expense');
   const [amount, setAmount] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [note, setNote] = useState('');
   const [isAiSuggesting, setIsAiSuggesting] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (visible && initialData) {
       setType(initialData.type);
       setAmount(formatInputWithCommas(initialData.amount.toString()));
       setCategoryId(initialData.categoryId);
-      setNote(initialData.note);
+      setNote(initialData.note || '');
     } else if (visible) {
       reset();
     }
   }, [visible, initialData]);
+
+  useEffect(() => {
+    if (visible) setIsSubmitting(false);
+  }, [visible]);
 
   useEffect(() => {
     if (!initialData && note.length > 3) {
@@ -65,177 +82,333 @@ export function AddTransactionModal({ visible, onClose, onAdd, initialData, onUp
     }
   }, [note]);
 
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const reset = () => {
+    setAmount('');
+    setNote('');
+    setCategoryId('');
+    setType('expense');
+  };
 
-  useEffect(() => {
-    if (visible) {
-      setIsSubmitting(false);
-    }
-  }, [visible]);
-
-  const handleAdd = async () => {
+  const handleSave = async () => {
     if (isSubmitting) return;
     const cleanAmountStr = amount.replace(/,/g, '');
     if (!cleanAmountStr || !categoryId) {
-      Alert.alert("Missing Info", "Please enter amount and category");
+      Alert.alert('Missing Info', 'Please enter an amount and select a category.');
       return;
     }
-
     setIsSubmitting(true);
-
     try {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       const parsedAmount = parseFloat(cleanAmountStr);
       if (initialData && onUpdate) {
         await onUpdate(initialData.id, {
-          amount: parsedAmount,
-          type,
-          categoryId,
-          note,
-          date: initialData.date,
+          amount: parsedAmount, type, categoryId, note, date: initialData.date,
         });
       } else {
-        await onAdd({
-          amount: parsedAmount,
-          type,
-          categoryId,
-          note,
-          date: new Date().toISOString(),
-        });
+        await onAdd({ amount: parsedAmount, type, categoryId, note, date: new Date().toISOString() });
         interstitialAdManager.showAd();
       }
       onClose();
     } catch (e) {
-      console.error("Failed to save transaction", e);
+      console.error('Failed to save transaction', e);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const reset = () => {
-    setAmount('');
-    setNote('');
-    setCategoryId('');
-  };
+  const filteredCats = categories.filter((c) => c.type === type);
+  const isIncome = type === 'income';
 
   return (
-    <Modal visible={visible} animationType="slide" transparent>
-      <View style={styles.overlay}>
-        <KeyboardAvoidingView 
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined} 
-          style={[styles.content, { backgroundColor: Colors.card }]}
+    <Modal visible={visible} animationType="slide" transparent={false}>
+      <SafeAreaView style={styles.fullScreenContainer} edges={['top', 'bottom']}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ flex: 1 }}
         >
-          <ScrollView 
-            contentContainerStyle={{ flexGrow: 1, paddingBottom: 20 }} 
+          <ScrollView
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
+            contentContainerStyle={styles.fullScreenContent}
           >
-            <View style={styles.header}>
-              <Text style={[styles.title, { color: Colors.text }]}>{initialData ? 'Edit Transaction' : 'New Transaction'}</Text>
-              <TouchableOpacity onPress={onClose}><X color={Colors.text} size={24} /></TouchableOpacity>
-            </View>
-
-            <View style={[styles.typeSwitcher, { backgroundColor: Colors.background }]}>
-              <TouchableOpacity style={[styles.typeBtn, type === 'income' && styles.typeBtnActiveIn]} onPress={() => setType('income')}>
-                <Text style={[styles.typeBtnText, type === 'income' ? styles.textWhite : { color: Colors.textMuted }]}>Income</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.typeBtn, type === 'expense' && styles.typeBtnActiveEx]} onPress={() => setType('expense')}>
-                <Text style={[styles.typeBtnText, type === 'expense' ? styles.textWhite : { color: Colors.textMuted }]}>Expense</Text>
+            {/* Title */}
+            <View style={styles.sheetTitleRow}>
+              <Text style={styles.sheetTitle}>
+                {initialData ? '✏️ Edit Transaction' : '💸 New Transaction'}
+              </Text>
+              <TouchableOpacity onPress={onClose} style={styles.sheetClose}>
+                <Text style={styles.sheetCloseText}>✕</Text>
               </TouchableOpacity>
             </View>
 
-            <TextInput 
-              style={[styles.amountInput, { color: Colors.text }]}
-              placeholder="₹0.00"
-              placeholderTextColor={Colors.textMuted}
-              keyboardType="decimal-pad"
-              value={amount}
-              onChangeText={(text) => setAmount(formatInputWithCommas(text))}
-              autoFocus
-            />
+            {/* Income / Expense Toggle */}
+            <View style={styles.typeToggle}>
+              <TouchableOpacity
+                style={[styles.typeBtn, isIncome && styles.typeBtnIncome]}
+                onPress={() => setType('income')}
+              >
+                <Text style={styles.typeBtnIcon}>📈</Text>
+                <Text style={[styles.typeBtnText, isIncome && styles.typeBtnTextActive]}>
+                  Income
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.typeBtn, !isIncome && styles.typeBtnExpense]}
+                onPress={() => setType('expense')}
+              >
+                <Text style={styles.typeBtnIcon}>📉</Text>
+                <Text style={[styles.typeBtnText, !isIncome && styles.typeBtnTextActive]}>
+                  Expense
+                </Text>
+              </TouchableOpacity>
+            </View>
 
-            <View style={styles.noteContainer}>
-              <TextInput 
-                style={[styles.noteInput, { color: Colors.text, borderColor: Colors.border }]}
-                placeholder="What was this for? (e.g. Pizza with friends)"
-                placeholderTextColor={Colors.textMuted}
+            {/* Amount Input */}
+            <View style={[styles.amountBox, { borderColor: isIncome ? '#10B981' : Colors.primary }]}>
+              <Text style={[styles.amountPrefix, { color: isIncome ? '#10B981' : Colors.primary }]}>
+                {isIncome ? '+' : '-'}
+              </Text>
+              <TextInput
+                style={[styles.amountInput, { color: isIncome ? '#10B981' : Colors.primary }]}
+                placeholder="0.00"
+                placeholderTextColor="#D1D5DB"
+                keyboardType="decimal-pad"
+                value={amount}
+                onChangeText={(text) => setAmount(formatInputWithCommas(text))}
+                autoFocus
+              />
+            </View>
+
+            {/* Note Input */}
+            <View style={styles.noteBox}>
+              <Text style={styles.inputLabel}>📝 Note</Text>
+              <TextInput
+                style={styles.noteInput}
+                placeholder="What was this for?"
+                placeholderTextColor="#9CA3AF"
                 value={note}
                 onChangeText={setNote}
                 multiline
               />
               {isAiSuggesting && (
-                <View style={styles.aiLabel}>
-                  <Sparkles size={10} color={Colors.primary} />
-                  <Text style={[styles.aiLabelText, { color: Colors.primary }]}>AI Categorized</Text>
+                <View style={styles.aiTag}>
+                  <Text style={styles.aiTagText}>✨ AI auto-categorized</Text>
                 </View>
               )}
             </View>
 
-            <Text style={[styles.sectionLabel, { color: Colors.textMuted }]}>Select Category</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={[styles.catScroll, { marginHorizontal: -24 }]} contentContainerStyle={{ paddingHorizontal: 24 }}>
-              {categories.filter(c => c.type === type).map(cat => (
-                <TouchableOpacity 
-                  key={cat.id} 
-                  style={[styles.catItem, { backgroundColor: Colors.background, borderColor: Colors.border }, categoryId === cat.id && { backgroundColor: cat.color + '20', borderColor: cat.color }]}
-                  onPress={() => setCategoryId(cat.id)}
-                >
-                  <Text style={[styles.catText, { color: Colors.textMuted }, categoryId === cat.id && { color: cat.color }]}>
-                    {EMOJI_MAP[cat.name] || '📌'} {cat.name}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+            {/* Category Picker */}
+            <Text style={styles.inputLabel}>🏷️ Category</Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.catScroll}
+              contentContainerStyle={styles.catScrollContent}
+            >
+              {filteredCats.map((cat) => {
+                const isSelected = categoryId === cat.id;
+                return (
+                  <TouchableOpacity
+                    key={cat.id}
+                    style={[
+                      styles.catChip,
+                      isSelected && { backgroundColor: cat.color + '20', borderColor: cat.color, borderWidth: 1.5 },
+                    ]}
+                    onPress={() => setCategoryId(cat.id)}
+                  >
+                    <Text style={styles.catChipEmoji}>
+                      {EMOJI_MAP[cat.name] || '📌'}
+                    </Text>
+                    <Text style={[styles.catChipText, isSelected && { color: cat.color }]}>
+                      {cat.name}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </ScrollView>
 
-            <TouchableOpacity style={[styles.saveBtn, { backgroundColor: Colors.primary }]} onPress={handleAdd}>
-              <Text style={[styles.saveBtnText, { color: Colors.background }]}>
-                {initialData ? 'Update Transaction' : 'Record Transaction'}
+            {/* Save Button */}
+            <TouchableOpacity
+              style={[
+                styles.saveBtn,
+                { backgroundColor: isIncome ? '#10B981' : Colors.primary, shadowColor: isIncome ? '#10B981' : Colors.primary },
+                isSubmitting && { opacity: 0.7 },
+              ]}
+              onPress={handleSave}
+              disabled={isSubmitting}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.saveBtnText}>
+                {isSubmitting ? 'Saving…' : initialData ? 'Update Transaction' : '+ Add Transaction'}
               </Text>
             </TouchableOpacity>
-
-            <FlowBannerAd />
           </ScrollView>
         </KeyboardAvoidingView>
-      </View>
+      </SafeAreaView>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,1)' },
-  content: { flex: 1, padding: 24, paddingTop: Platform.OS === 'ios' ? 60 : 40 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
-  title: { fontSize: 20, fontWeight: 'bold' },
-  typeSwitcher: { flexDirection: 'row', borderRadius: 12, padding: 4, marginBottom: 24, borderWidth: 2.5, borderColor: '#171717', shadowColor: '#171717', shadowOffset: { width: 4, height: 4 }, shadowOpacity: 1, shadowRadius: 0 },
-  typeBtn: { flex: 1, paddingVertical: 12, alignItems: 'center', borderRadius: 8 },
-  typeBtnActiveIn: { backgroundColor: '#10B981', borderWidth: 2.5, borderColor: '#171717' },
-  typeBtnActiveEx: { backgroundColor: '#EF4444', borderWidth: 2.5, borderColor: '#171717' },
-  typeBtnText: { fontWeight: '700' },
-  textWhite: { color: '#fff' },
-  amountInput: { fontSize: 48, fontWeight: '800', textAlign: 'center', marginBottom: 8 },
-  noteContainer: { marginBottom: 16 },
-  noteInput: { fontSize: 16, borderBottomWidth: 1, paddingVertical: 12 },
-  aiLabel: { flexDirection: 'row', alignItems: 'center', gap: 4, position: 'absolute', right: 0, bottom: -20 },
-  aiLabelText: { fontSize: 10, fontWeight: '600' },
-  sectionLabel: { fontSize: 14, fontWeight: '600', marginBottom: 8 },
-  catScroll: { marginBottom: 24 },
-  catItem: { paddingHorizontal: 18, height: 44, justifyContent: 'center', borderRadius: 12, marginRight: 10, borderWidth: 2.5, borderColor: '#171717', shadowColor: '#171717', shadowOffset: { width: 4, height: 4 }, shadowOpacity: 1, shadowRadius: 0 },
-  catText: { fontWeight: '700', fontSize: 14 },
-  saveBtn: { paddingVertical: 18, borderRadius: 16, alignItems: 'center', marginBottom: 20, borderWidth: 2.5, borderColor: '#171717', shadowColor: '#171717', shadowOffset: { width: 4, height: 4 }, shadowOpacity: 1, shadowRadius: 0 },
-  saveBtnText: { fontSize: 16, fontWeight: 'bold' },
-  adPlaceholder: {
-    height: 60,
-    width: '100%',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 10,
-    opacity: 0.6
+  fullScreenContainer: { flex: 1, backgroundColor: '#FFFFFF' },
+  fullScreenContent: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 34 },
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'flex-end',
   },
-  adLabel: {
-    fontSize: 10,
-    fontWeight: '900',
-    letterSpacing: 1
-  }
+  dismissArea: { flex: 1 },
+
+  sheet: {
+    backgroundColor: '#FFF',
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    maxHeight: '90%',
+    paddingBottom: Platform.OS === 'ios' ? 40 : 24,
+  },
+  handle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#E5E7EB',
+    alignSelf: 'center',
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  scrollContent: { paddingHorizontal: 24, paddingTop: 8, paddingBottom: 16 },
+
+  titleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  sheetTitleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  sheetTitle: { fontSize: 18, fontWeight: '800', color: '#171717' },
+  closeBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  closeBtnText: { fontSize: 14, color: '#6B7280', fontWeight: '700' },
+  sheetClose: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sheetCloseText: { fontSize: 14, color: '#6B7280', fontWeight: '700' },
+
+  // Type Toggle
+  typeToggle: {
+    flexDirection: 'row',
+    backgroundColor: '#F9FAFB',
+    borderRadius: 18,
+    padding: 5,
+    marginBottom: 20,
+    gap: 6,
+  },
+  typeBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 12,
+    borderRadius: 14,
+  },
+  typeBtnIncome: {
+    backgroundColor: '#DCFCE7',
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  typeBtnExpense: {
+    backgroundColor: '#FFF0F6',
+    shadowColor: '#F472B6',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  typeBtnIcon: { fontSize: 18 },
+  typeBtnText: { fontSize: 15, fontWeight: '700', color: '#9CA3AF' },
+  typeBtnTextActive: { color: '#171717' },
+
+  // Amount
+  amountBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderRadius: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    marginBottom: 20,
+  },
+  amountPrefix: { fontSize: 36, fontWeight: '900', marginRight: 4 },
+  amountInput: { flex: 1, fontSize: 40, fontWeight: '900', letterSpacing: -1 },
+
+  // Note
+  noteBox: { marginBottom: 20, position: 'relative' },
+  inputLabel: { fontSize: 13, fontWeight: '700', color: '#374151', marginBottom: 8 },
+  noteInput: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 16,
+    padding: 14,
+    fontSize: 15,
+    color: '#171717',
+    minHeight: 64,
+    textAlignVertical: 'top',
+  },
+  aiTag: {
+    position: 'absolute',
+    bottom: -20,
+    right: 0,
+    backgroundColor: '#F0FDF4',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
+  },
+  aiTagText: { fontSize: 11, color: '#10B981', fontWeight: '700' },
+
+  // Category
+  catScroll: { marginBottom: 24, marginHorizontal: -24 },
+  catScrollContent: { paddingHorizontal: 24, gap: 10 },
+  catChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 14,
+    backgroundColor: '#F9FAFB',
+    borderWidth: 1.5,
+    borderColor: '#F3F4F6',
+  },
+  catChipEmoji: { fontSize: 18 },
+  catChipText: { fontSize: 13, fontWeight: '700', color: '#6B7280' },
+
+  // Save
+  saveBtn: {
+    borderRadius: 20,
+    paddingVertical: 17,
+    alignItems: 'center',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 5,
+  },
+  saveBtnText: { color: '#FFF', fontSize: 16, fontWeight: '800' },
 });

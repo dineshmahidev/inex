@@ -2,6 +2,7 @@ import React, { useRef } from 'react';
 import { Animated, Pressable, StyleSheet, Text, ViewStyle, TextStyle } from 'react-native';
 import { Colors } from '@/constants/theme';
 import * as Haptics from 'expo-haptics';
+import { useDatabase } from '@/hooks/useDatabase';
 
 interface NeoButtonProps {
   onPress?: () => void;
@@ -13,7 +14,9 @@ interface NeoButtonProps {
   disabled?: boolean;
 }
 
-export function NeoButton({ onPress, title, children, style, textStyle, color = Colors.primary, disabled = false }: NeoButtonProps) {
+export function NeoButton({ onPress, title, children, style, textStyle, color, disabled = false }: NeoButtonProps) {
+  const { Colors } = useDatabase();
+  const buttonColor = color || Colors.primary;
   const pan = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
 
   const handlePressIn = () => {
@@ -46,19 +49,20 @@ export function NeoButton({ onPress, title, children, style, textStyle, color = 
       style={{ position: 'relative' }}
     >
       {/* Background shadow layer */}
-      <Animated.View style={[styles.shadowLayer, style, { borderRadius: style?.borderRadius || 16 }]} />
+      <Animated.View style={[styles.shadowLayer, { backgroundColor: Colors.border }, style, { borderRadius: style?.borderRadius || 16 }]} />
       
       {/* Foreground interactive layer */}
       <Animated.View
         style={[
           styles.button,
+          { borderColor: Colors.border },
           style,
-          { backgroundColor: disabled ? Colors.textMuted : color },
+          { backgroundColor: disabled ? Colors.textMuted : buttonColor },
           { transform: pan.getTranslateTransform() }
         ]}
       >
         {children ? children : (
-          <Text style={[styles.text, textStyle]}>{title}</Text>
+          <Text style={[styles.text, { color: Colors.text }, textStyle]}>{title}</Text>
         )}
       </Animated.View>
     </Pressable>

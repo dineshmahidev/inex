@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Theme } from '@/constants/theme';
 import * as Sharing from 'expo-sharing';
@@ -57,6 +57,8 @@ export interface UserSettings {
   userName: string;
   userImage: string | null;
   hasOnboarded: boolean;
+  themeColor?: string; // App-wide theme accent color
+  hasSeenTour?: boolean; // App tour completed
 }
 
 export interface Note {
@@ -87,6 +89,8 @@ export interface Habit {
   logs: string[]; // ['2024-04-01', ...]
   reminderTime?: string; // HH:mm
   challenge?: string; // e.g. "10 Days", "30 Days"
+  goal?: number;
+  goalUnit?: string;
 }
 
 export interface VoiceNote {
@@ -170,13 +174,26 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
     theme: 'dark',
     userName: 'Guest',
     userImage: null,
-    hasOnboarded: false
+    hasOnboarded: false,
+    themeColor: '#F472B6', // Default pink
+    hasSeenTour: false
   });
 
   const [isLoading, setIsLoading] = useState(true);
   const [globalMonth, setGlobalMonth] = useState<Date>(new Date());
 
-  const Colors = settings.theme === 'light' ? Theme.light : Theme.dark;
+  const baseColors = settings.theme === 'light' ? Theme.light : Theme.dark;
+  const Colors = useMemo(() => {
+    const primaryColor = settings.themeColor || "#F472B6";
+    return {
+      ...baseColors,
+      primary: primaryColor,
+      secondary: primaryColor,
+      accent: primaryColor,
+      glass: `${primaryColor}15`,
+      gradient: [primaryColor, primaryColor] as [string, string, ...string[]],
+    };
+  }, [settings.theme, settings.themeColor]);
 
   const mergeLists = <T extends { id: string }>(listA: T[], listB: T[]): T[] => {
     const merged = [...listA, ...listB];
@@ -639,7 +656,8 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
         theme: 'dark', 
         userName: 'Guest',
         userImage: null,
-        hasOnboarded: false 
+        hasOnboarded: false,
+        hasSeenTour: false
     });
   };
 

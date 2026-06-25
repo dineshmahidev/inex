@@ -1,7 +1,5 @@
-import { FlowBannerAd } from "@/components/FlowBannerAd";
 import { formatInputWithCommas, formatWithCommas } from "@/constants/theme";
 import { Reminder, useDatabase } from "@/hooks/useDatabase";
-import { parseFinancialText } from "@/utils/billParser";
 import {
   cancelReminderNotification,
   requestNotificationPermissions,
@@ -11,1745 +9,1276 @@ import {
 import DateTimePicker from "@react-native-community/datetimepicker";
 import * as Haptics from "expo-haptics";
 import LottieView from "lottie-react-native";
-import {
-  Bell,
-  Calendar,
-  CheckCircle2,
-  Circle,
-  Clock,
-  Eye,
-  Plus,
-  Smile,
-  Sparkles,
-  Star,
-  Target,
-  Trash2,
-  X,
-  Zap
-} from "lucide-react-native";
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { useIsFocused } from "@react-navigation/native";
 import {
   Alert,
+  Dimensions,
   KeyboardAvoidingView,
   Modal,
   Platform,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
+  DeviceEventEmitter,
 } from "react-native";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { Bell, Eye, Trash2, Check, ChevronLeft, X, Edit2, Calendar, Clock } from "lucide-react-native";
+
+const { width } = Dimensions.get("window");
+
+const BILL_TYPES = [
+  { id: "emi",  emoji: "💳", label: "EMI",  color: "#6366F1" },
+  { id: "loan", emoji: "🏦", label: "Loan", color: "#F59E0B" },
+  { id: "bill", emoji: "📄", label: "Bill", color: "#F472B6" },
+];
+
+const ALERT_OPTIONS = [
+  { id: "none",          label: "No Alert" },
+  { id: "on_day",        label: "On Due Day" },
+  { id: "2_days_before", label: "2 Days Before" },
+  { id: "both",          label: "Both" },
+  { id: "custom",        label: "Custom Date" },
+];
+
+const TYPE_COLOR: Record<string, string> = {
+  emi:  "#6366F1",
+  loan: "#F59E0B",
+  bill: "#F472B6",
+};
+const TYPE_EMOJI: Record<string, string> = {
+  emi:  "💳",
+  loan: "🏦",
+  bill: "📄",
+};
 
 export default function RemindersScreen() {
+  const insets = useSafeAreaInsets();
+  const isFocused = useIsFocused();
   const {
-    reminders,
-    addReminder,
-    updateReminder,
-    deleteReminder,
-    markReminderPaid,
-    settings,
-    Colors,
-    smsBills,
-    setSmsBills,
+    reminders, addReminder, updateReminder, deleteReminder,
+    markReminderPaid, settings, Colors,
   } = useDatabase();
-  const [isModalVisible, setIsModalVisible] = useState(false);
-  const [tick, setTick] = useState(0); // Trigger live updates
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [activeTab, setActiveTab] = useState<"required" | "sms">("required");
-  const [historyRem, setHistoryRem] = useState<Reminder | null>(null);
-  const [payingRemId, setPayingRemId] = useState<string | null>(null);
-  const [showPaymentDatePicker, setShowPaymentDatePicker] = useState(false);
-  const [paymentDate, setPaymentDate] = useState(new Date());
 
-  const isSelectionMode = selectedIds.length > 0;
+  const TAB_BAR_HEIGHT = 70 + (insets.bottom > 0 ? insets.bottom : 0);
+  const currency = settings?.currency || "₹";
 
-  const toggleSelection = (id: string) => {
-    setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id],
-    );
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-  };
+  const [tick, setTick] = useState(0);
+  const [showModal, setShowModal] = useState(false);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [selectedReminder, setSelectedReminder] = useState<Reminder | null>(null);
+  const [detailTab, setDetailTab] = useState<"progress" | "history">("progress");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [filterType, setFilterType] = useState<"all" | "emi" | "loan" | "bill">("all");
 
-  const deleteSelected = () => {
-    Alert.alert(
-      "Delete Selected?",
-      `Remove ${selectedIds.length} bills/reminders?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            for (const id of selectedIds) {
-              await deleteReminder(id);
-            }
-            setSelectedIds([]);
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          },
-        },
-      ],
-    );
-  };
+  // Form state
+  const [name, setName]               = useState("");
+  const [amount, setAmount]           = useState("");
+  const [dueDay, setDueDay]           = useState("");
+  const [type, setType]               = useState<"loan" | "emi" | "bill">("emi");
+  const [totalMonths, setTotalMonths] = useState("");
+  const [paidMonthsInput, setPaidMonthsInput] = useState("");
+  const [alertType, setAlertType]     = useState<"on_day" | "2_days_before" | "both" | "none" | "custom">("on_day");
+  const [date, setDate]               = useState(new Date(Date.now() + 5 * 60000));
+  const [showDate, setShowDate]       = useState(false);
+  const [showTime, setShowTime]       = useState(false);
 
-  const markSelectedPaid = () => {
-    Alert.alert(
-      "Mark Selected Paid?",
-      `Mark ${selectedIds.length} bills as paid?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Mark Paid",
-          style: "default",
-          onPress: async () => {
-            for (const id of selectedIds) {
-              await markReminderPaid(id);
-            }
-            setSelectedIds([]);
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          },
-        },
-      ],
-    );
-  };
-
-  // Live countdown update every minute
-  React.useEffect(() => {
-    const timer = setInterval(() => setTick((t) => t + 1), 60000);
+  // Live countdown
+  useEffect(() => {
+    const timer = setInterval(() => setTick(t => t + 1), 60000);
     return () => clearInterval(timer);
   }, []);
 
-  const [name, setName] = useState("");
-  const [amount, setAmount] = useState("");
-  const [dueDay, setDueDay] = useState("");
-  const [type, setType] = useState<"loan" | "emi" | "bill">("emi");
-  const [totalMonths, setTotalMonths] = useState("");
-  const [alertType, setAlertType] = useState<
-    "on_day" | "2_days_before" | "both" | "none" | "custom"
-  >("none");
-  const [date, setDate] = useState(new Date(Date.now() + 5 * 60000));
-  const [showDate, setShowDate] = useState(false);
-  const [showTime, setShowTime] = useState(false);
+  // FAB listener
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener("fabPress", () => {
+      if (isFocused) openModal();
+    });
+    return () => sub.remove();
+  }, [isFocused]);
 
-  const [editingRemId, setEditingRemId] = useState<string | null>(null);
+  const currentMonth = new Date().toISOString().slice(0, 7);
 
-  const handleOpenModal = (rem?: Reminder) => {
+  const pendingReminders = useMemo(() =>
+    reminders?.filter(r => r.lastPaidMonth !== currentMonth && !r.isCompleted) || [],
+    [reminders, currentMonth]);
+
+  const paidReminders = useMemo(() =>
+    reminders?.filter(r => r.lastPaidMonth === currentMonth && !r.isCompleted) || [],
+    [reminders, currentMonth]);
+
+  const filteredPending = useMemo(() =>
+    filterType === "all" ? pendingReminders : pendingReminders.filter(r => r.type === filterType),
+    [pendingReminders, filterType]);
+
+  const filteredPaid = useMemo(() =>
+    filterType === "all" ? paidReminders : paidReminders.filter(r => r.type === filterType),
+    [paidReminders, filterType]);
+
+  const totalDue = useMemo(() =>
+    pendingReminders.reduce((s, r) => s + r.amount, 0), [pendingReminders]);
+
+  const totalPaid = useMemo(() =>
+    paidReminders.reduce((s, r) => s + r.amount, 0), [paidReminders]);
+
+  // Most urgent bill
+  const mostUrgent = useMemo(() => {
+    const active = reminders?.filter(r => !r.isCompleted) || [];
+    if (!active.length) return null;
+    return [...active].sort((a, b) => {
+      const now = new Date();
+      const dateA = new Date(now.getFullYear(), now.getMonth(), a.dueDay);
+      const dateB = new Date(now.getFullYear(), now.getMonth(), b.dueDay);
+      return dateA.getTime() - dateB.getTime();
+    }).find(r => r.lastPaidMonth !== currentMonth) || null;
+  }, [reminders, currentMonth, tick]);
+
+  const getCountdown = (dueDay: number, isPaid: boolean) => {
+    const now = new Date();
+    let year = now.getFullYear();
+    let month = now.getMonth();
+    
+    if (isPaid) {
+      // If already paid for this month, the next due date is in the next month
+      month += 1;
+      if (month > 11) {
+        month = 0;
+        year += 1;
+      }
+    } else {
+      // If unpaid and the due day has passed in the current month, it's overdue
+      const targetThisMonth = new Date(year, month, dueDay, 23, 59, 59);
+      if (now.getTime() > targetThisMonth.getTime()) {
+        const overdueDiff = now.getTime() - targetThisMonth.getTime();
+        const overdueDays = Math.floor(overdueDiff / 86400000);
+        if (overdueDays === 0) return "Due today";
+        return `Overdue by ${overdueDays}d`;
+      }
+    }
+
+    const target = new Date(year, month, dueDay, 9, 0, 0);
+    const diff = target.getTime() - now.getTime();
+    if (diff <= 0) return "Due today";
+    const days = Math.floor(diff / 86400000);
+    const hours = Math.floor((diff % 86400000) / 3600000);
+    if (days > 0) return `${days}d ${hours}h left`;
+    return `${hours}h left`;
+  };
+
+  // Sync selected reminder when database changes
+  const activeSelectedReminder = useMemo(() => {
+    if (!selectedReminder) return null;
+    return reminders?.find(r => r.id === selectedReminder.id) || null;
+  }, [reminders, selectedReminder]);
+
+  const openModal = (rem?: Reminder) => {
     if (rem) {
-      setEditingRemId(rem.id);
+      setEditingId(rem.id);
       setName(rem.name);
       setAmount(formatInputWithCommas(rem.amount.toString()));
       setDueDay(rem.dueDay.toString());
       setType(rem.type);
       setTotalMonths(rem.totalMonths ? rem.totalMonths.toString() : "");
-      setAlertType(rem.alertType || "none");
-      setDate(
-        rem.customDate
-          ? new Date(rem.customDate)
-          : new Date(Date.now() + 5 * 60000),
-      );
+      setPaidMonthsInput(rem.paidMonths ? rem.paidMonths.toString() : "0");
+      setAlertType(rem.alertType || "on_day");
+      setDate(rem.customDate ? new Date(rem.customDate) : new Date(Date.now() + 5 * 60000));
     } else {
-      setEditingRemId(null);
-      setName("");
-      setAmount("");
-      setDueDay("");
-      setType("emi");
-      setTotalMonths("");
-      setAlertType("none");
+      setEditingId(null);
+      setName(""); setAmount(""); setDueDay(""); setTotalMonths(""); setPaidMonthsInput("0");
+      setType("emi"); setAlertType("on_day");
       setDate(new Date(Date.now() + 5 * 60000));
     }
     setIsSubmitting(false);
-    setIsModalVisible(true);
+    setShowModal(true);
   };
 
-  const currentMonth = new Date().toISOString().slice(0, 7);
-
-  const pendingReminders = useMemo(() => {
-    return (
-      reminders?.filter(
-        (r) => r.lastPaidMonth !== currentMonth && !r.isCompleted,
-      ) || []
-    );
-  }, [reminders, currentMonth]);
-
-  const paidReminders = useMemo(() => {
-    return (
-      reminders?.filter(
-        (r) => r.lastPaidMonth === currentMonth && !r.isCompleted,
-      ) || []
-    );
-  }, [reminders, currentMonth]);
-
-  const completedReminders = useMemo(() => {
-    return reminders?.filter((r) => r.isCompleted) || [];
-  }, [reminders]);
-
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
   const handleSave = async () => {
-    if (isSubmitting) return;
-    if (!name || !amount || !dueDay) return;
+    if (isSubmitting || !name || !amount || !dueDay) return;
     setIsSubmitting(true);
-
     try {
-      const parsedAmount = parseFloat(amount.replace(/,/g, ''));
-      const parsedDueDay = parseInt(dueDay);
-      const parsedTotalMonths = totalMonths ? parseInt(totalMonths) : undefined;
+      const parsedAmount     = parseFloat(amount.replace(/,/g, ""));
+      const parsedDueDay     = parseInt(dueDay);
+      const parsedMonths     = totalMonths ? parseInt(totalMonths) : undefined;
+      const parsedPaidMonths = paidMonthsInput ? parseInt(paidMonthsInput) : 0;
 
-      if (editingRemId) {
-        await updateReminder(editingRemId, {
-          name,
-          amount: parsedAmount,
-          dueDay: parsedDueDay,
-          type,
-          totalMonths: parsedTotalMonths,
-          alertType,
-          customDate: date.toISOString(),
+      if (editingId) {
+        await updateReminder(editingId, {
+          name, amount: parsedAmount, dueDay: parsedDueDay,
+          type, totalMonths: parsedMonths, paidMonths: parsedPaidMonths, alertType, customDate: date.toISOString(),
         });
-        if (alertType === "custom") {
-          const hasPermission = await requestNotificationPermissions();
-          if (hasPermission) {
-            await scheduleReminderNotification(editingRemId, name, parsedAmount, date);
-          }
-        } else if (alertType !== "none") {
-          const hasPermission = await requestNotificationPermissions();
-          if (hasPermission) {
-            await scheduleMonthlyReminderNotification(editingRemId, name, parsedAmount, parsedDueDay, alertType);
-          }
-        } else {
-          await cancelReminderNotification(editingRemId);
+        const ok = await requestNotificationPermissions();
+        if (ok) {
+          if (alertType === "custom") await scheduleReminderNotification(editingId, name, parsedAmount, date);
+          else if (alertType !== "none") await scheduleMonthlyReminderNotification(editingId, name, parsedAmount, parsedDueDay, alertType);
+          else await cancelReminderNotification(editingId);
         }
       } else {
         const remId = Date.now().toString();
         await addReminder({
-          name,
-          amount: parsedAmount,
-          dueDay: parsedDueDay,
-          type,
-          totalMonths: parsedTotalMonths,
-          alertType,
-          paidMonths: 0,
-          customDate: date.toISOString(),
+          name, amount: parsedAmount, dueDay: parsedDueDay,
+          type, totalMonths: parsedMonths, alertType,
+          paidMonths: parsedPaidMonths, customDate: date.toISOString(),
         });
-        if (alertType === "custom") {
-          const hasPermission = await requestNotificationPermissions();
-          if (hasPermission) {
-            await scheduleReminderNotification(remId, name, parsedAmount, date);
-          }
-        } else if (alertType !== "none") {
-          const hasPermission = await requestNotificationPermissions();
-          if (hasPermission) {
-            await scheduleMonthlyReminderNotification(remId, name, parsedAmount, parsedDueDay, alertType);
-          }
+        const ok = await requestNotificationPermissions();
+        if (ok) {
+          if (alertType === "custom") await scheduleReminderNotification(remId, name, parsedAmount, date);
+          else if (alertType !== "none") await scheduleMonthlyReminderNotification(remId, name, parsedAmount, parsedDueDay, alertType);
         }
       }
-
-      setName("");
-      setAmount("");
-      setDueDay("");
-      setTotalMonths("");
-      setAlertType("none");
-      setIsModalVisible(false);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch (e) {
-      console.error("Failed to save reminder", e);
-    } finally {
-      setIsSubmitting(false);
-    }
+      setShowModal(false);
+    } catch (e) { console.error(e); }
+    finally { setIsSubmitting(false); }
   };
 
-  const getCountdownForDate = (target: Date) => {
-    const now = new Date();
-    const diffMs = target.getTime() - now.getTime();
-
-    if (diffMs <= 0) return "Due Today!";
-
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-    const diffHours = Math.floor(
-      (diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60),
-    );
-    const diffMins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-
-    if (diffDays > 0) return `${diffDays}d ${diffHours}h left`;
-    if (diffHours > 0) return `${diffHours}h ${diffMins}m left`;
-    if (diffMins > 0) return `${diffMins}m left`;
-    return "Due Today!";
+  const handleCardPress = (rem: Reminder) => {
+    setSelectedReminder(rem);
+    setDetailTab("progress");
+    setShowDetailsModal(true);
   };
 
-  const getCountdown = (dueDay: number) => {
-    const now = new Date();
-    const targetDate = new Date(now.getFullYear(), now.getMonth(), dueDay, 9, 0, 0, 0);
-    return getCountdownForDate(targetDate);
+  const handleMarkPaidInDetails = async (remId: string) => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    await markReminderPaid(remId);
   };
 
-  const mostUrgent = useMemo(() => {
-    const activeReminders = reminders?.filter((r) => !r.isCompleted) || [];
-    if (activeReminders.length === 0) return null;
+  const handleDeleteReminder = (remId: string) => {
+    Alert.alert("Delete Reminder?", "Are you sure you want to remove this bill reminder?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: async () => {
+          await deleteReminder(remId);
+          setShowDetailsModal(false);
+          setSelectedReminder(null);
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        },
+      },
+    ]);
+  };
 
-    const sorted = [...activeReminders].map((r) => {
-      const now = new Date();
-      const currentMonthStr = now.toISOString().slice(0, 7);
-      let targetDate: Date;
-      let status: "pending" | "settled" = "pending";
-
-      if (r.lastPaidMonth === currentMonthStr) {
-        // Settled this month, next due date is next month!
-        targetDate = new Date(now.getFullYear(), now.getMonth() + 1, r.dueDay, 9, 0, 0, 0);
-        status = "settled";
-      } else {
-        // Unpaid/pending for this month. 
-        targetDate = new Date(now.getFullYear(), now.getMonth(), r.dueDay, 9, 0, 0, 0);
-        status = "pending";
-      }
-
-      return {
-        reminder: r,
-        targetDate,
-        status,
-      };
-    }).sort((a, b) => a.targetDate.getTime() - b.targetDate.getTime());
-
-    return sorted[0];
-  }, [reminders, tick]);
-
-  const otherUpcoming = useMemo(() => {
-    const activeReminders = reminders?.filter((r) => !r.isCompleted) || [];
-    if (activeReminders.length <= 1) return [];
-
-    const sorted = [...activeReminders].map((r) => {
-      const now = new Date();
-      const currentMonthStr = now.toISOString().slice(0, 7);
-      let targetDate: Date;
-      let status: "pending" | "settled" = "pending";
-
-      if (r.lastPaidMonth === currentMonthStr) {
-        targetDate = new Date(now.getFullYear(), now.getMonth() + 1, r.dueDay, 9, 0, 0, 0);
-        status = "settled";
-      } else {
-        targetDate = new Date(now.getFullYear(), now.getMonth(), r.dueDay, 9, 0, 0, 0);
-        status = "pending";
-      }
-
-      return {
-        reminder: r,
-        targetDate,
-        status,
-      };
-    }).sort((a, b) => a.targetDate.getTime() - b.targetDate.getTime());
-
-    return sorted.slice(1, 4); // return next 3 upcoming reminders
-  }, [reminders, tick]);
+  const paidPct = (reminders?.length || 0) > 0
+    ? Math.round((paidReminders.length / (reminders?.filter(r => !r.isCompleted).length || 1)) * 100)
+    : 0;
 
   return (
-    <SafeAreaView
-      style={[styles.container, { backgroundColor: Colors.background }]}
-    >
-
+    <SafeAreaView style={styles.container} edges={["top"]}>
+      {/* ── HEADER ── */}
       <View style={styles.header}>
-        <Text style={[styles.title, { color: Colors.text }]}>Bills & EMIs</Text>
-        <TouchableOpacity
-          style={[styles.addBtn, { backgroundColor: Colors.primary }]}
-          onPress={() => handleOpenModal()}
-        >
-          <Plus color="#FFF" size={24} strokeWidth={2.5} />
+        <View>
+          <Text style={styles.headerTitle}>Bill Reminders</Text>
+          <Text style={styles.headerSub}>
+            {paidReminders.length}/{(paidReminders.length + pendingReminders.length)} paid this month
+          </Text>
+        </View>
+        <TouchableOpacity style={[styles.addBtn, { backgroundColor: Colors.primary, shadowColor: Colors.primary }]} onPress={() => openModal()}>
+          <Bell size={20} color="#FFF" fill="#FFF" />
         </TouchableOpacity>
       </View>
 
-      <ScrollView
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-      >
-        {mostUrgent && (
-          <View style={[styles.heroCard, { backgroundColor: Colors.primary }]}>
-            <LottieView
-              source={require("../../assets/cycle_rider.json")}
-              style={styles.rider}
-              autoPlay
-              loop
-            />
-            <View style={styles.heroHeader}>
-              <Bell color="#000" size={16} />
-              <Text style={styles.heroLabel}>
-                {mostUrgent.status === "settled"
-                  ? "SETTLED • UPCOMING NEXT"
-                  : "MOST URGENT PAYMENT"}
-              </Text>
-            </View>
-            <Text style={styles.heroName} numberOfLines={1}>
-              {mostUrgent.reminder.name}
-            </Text>
-            <View style={styles.heroTimeContainer}>
-              <Text style={styles.heroTime}>
-                {getCountdownForDate(mostUrgent.targetDate)}
-              </Text>
-            </View>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.scroll, { paddingBottom: TAB_BAR_HEIGHT + 80 }]}>
 
-            {otherUpcoming.length > 0 && (
-              <View style={styles.heroOthersContainer}>
-                <Text style={styles.heroOthersTitle}>ALSO UPCOMING QUEUE • 📋</Text>
-                {otherUpcoming.map((item) => (
-                  <View key={item.reminder.id} style={styles.heroOtherRow}>
-                    <Text style={styles.heroOtherName} numberOfLines={1}>
-                      • {item.reminder.name}
-                    </Text>
-                    <Text style={styles.heroOtherMeta}>
-                      {item.status === "settled"
-                        ? "Settled"
-                        : `${getCountdownForDate(item.targetDate)}`}{" "}
-                      • {settings.currency}
-                      {formatWithCommas(item.reminder.amount)}
-                    </Text>
-                  </View>
-                ))}
+        {/* ── HERO SUMMARY CARD ── */}
+        <View style={styles.heroCard}>
+          <View style={styles.heroCardInner}>
+            <View style={styles.heroLeft}>
+              <Text style={[styles.heroTitle, { color: Colors.primary }]}>
+                {mostUrgent ? `📅 ${getCountdown(mostUrgent.dueDay, false)}` : "🎉 All clear!"}
+              </Text>
+              {mostUrgent && (
+                <Text style={styles.heroName} numberOfLines={1}>{mostUrgent.name}</Text>
+              )}
+              <View style={styles.heroStatsRow}>
+                <View style={styles.heroStat}>
+                  <Text style={[styles.heroStatVal, { color: Colors.primary }]}>{currency}{formatWithCommas(totalDue)}</Text>
+                  <Text style={styles.heroStatLabel}>Due</Text>
+                </View>
+                <View style={styles.heroStatDivider} />
+                <View style={styles.heroStat}>
+                  <Text style={[styles.heroStatVal, { color: "#10B981" }]}>{currency}{formatWithCommas(totalPaid)}</Text>
+                  <Text style={styles.heroStatLabel}>Paid</Text>
+                </View>
               </View>
-            )}
-
-            <View style={styles.heroFooter}>
-              <Text style={styles.heroMeta}>
-                DUE ON {mostUrgent.reminder.dueDay}TH
-                {mostUrgent.status === "settled"
-                  ? ` ${mostUrgent.targetDate
-                    .toLocaleString("default", { month: "short" })
-                    .toUpperCase()}`
-                  : ""}{" "}
-                • {settings.currency}
-                {formatWithCommas(mostUrgent.reminder.amount)}
-              </Text>
+              {/* Progress bar */}
+              <View style={styles.heroBarBg}>
+                <View style={[styles.heroBarFill, { width: `${paidPct}%` }]} />
+              </View>
+              <Text style={styles.heroBarLabel}>{paidPct}% bills paid</Text>
             </View>
+            <LottieView
+              source={require("@/assets/cycle_rider.json")}
+              autoPlay loop
+              style={styles.heroLottie}
+            />
           </View>
-        )}
-
-        <View style={{ flexDirection: "row", gap: 10, marginBottom: 15 }}>
-          <TouchableOpacity
-            style={[
-              styles.tabBtn,
-              activeTab === "required"
-                ? { backgroundColor: Colors.primary }
-                : {
-                  backgroundColor: Colors.card,
-                  borderColor: Colors.border,
-                  borderWidth: 1,
-                },
-            ]}
-            onPress={() => setActiveTab("required")}
-          >
-            <Text
-              style={{
-                color: activeTab === "required" ? "#000" : Colors.textMuted,
-                fontSize: 11,
-                fontWeight: "900",
-                letterSpacing: 1,
-              }}
-            >
-              REQUIRED PAYMENTS
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.tabBtn,
-              activeTab === "sms"
-                ? { backgroundColor: Colors.primary }
-                : {
-                  backgroundColor: Colors.card,
-                  borderColor: Colors.border,
-                  borderWidth: 1,
-                },
-            ]}
-            onPress={() => setActiveTab("sms")}
-          >
-            <Text
-              style={{
-                color: activeTab === "sms" ? "#000" : Colors.textMuted,
-                fontSize: 11,
-                fontWeight: "900",
-                letterSpacing: 1,
-              }}
-            >
-              SMS PARSED
-            </Text>
-          </TouchableOpacity>
         </View>
 
-        {activeTab === "required" ? (
+        {/* ── FILTER CHIPS ── */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll} contentContainerStyle={styles.filterContent}>
+          {[{ id: "all", emoji: "📋", label: "All" }, ...BILL_TYPES].map(f => (
+            <TouchableOpacity
+              key={f.id}
+              style={[styles.filterChip, filterType === f.id && { backgroundColor: Colors.primary }]}
+              onPress={() => setFilterType(f.id as any)}
+            >
+              <Text style={styles.filterEmoji}>{f.emoji}</Text>
+              <Text style={[styles.filterText, filterType === f.id && styles.filterTextActive]}>{f.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
+        {/* ── PENDING BILLS ── */}
+        {filteredPending.length > 0 && (
           <>
-            <View style={styles.litHeaderRow}>
-              <Text
-                style={[
-                  styles.sectionTitle,
-                  { color: Colors.textMuted, marginTop: 10 },
-                ]}
-              >
-                Upcoming Bills
-              </Text>
-              {isSelectionMode && (
-                <View style={{ flexDirection: "row", gap: 10 }}>
-                  <TouchableOpacity
-                    style={[
-                      styles.litAddBtn,
-                      { backgroundColor: Colors.primary },
-                    ]}
-                    onPress={() => {
-                      if (selectedIds.length === pendingReminders.length) {
-                        setSelectedIds([]);
-                      } else {
-                        setSelectedIds(pendingReminders.map((r) => r.id));
-                      }
-                      Haptics.selectionAsync();
-                    }}
-                  >
-                    <CheckCircle2 color="#000" size={20} />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[
-                      styles.litAddBtn,
-                      {
-                        backgroundColor: Colors.card,
-                        borderWidth: 1,
-                        borderColor: Colors.border,
-                      },
-                    ]}
-                    onPress={() => setSelectedIds([])}
-                  >
-                    <X color={Colors.text} size={20} />
-                  </TouchableOpacity>
-                </View>
-              )}
-            </View>
-
-            {pendingReminders.length === 0 ? (
-              <View
-                style={[
-                  styles.emptyCard,
-                  { backgroundColor: Colors.card, borderColor: Colors.border },
-                ]}
-              >
-                <Text style={{ color: Colors.textMuted }}>
-                  No pending bills right now.
-                </Text>
-              </View>
-            ) : (
-              pendingReminders.map((rem) => {
-                const isSelected = selectedIds.includes(rem.id);
-                return (
-                  <TouchableOpacity
-                    key={rem.id}
-                    style={[
-                      styles.card,
-                      {
-                        backgroundColor: isSelected
-                          ? Colors.primary
-                          : Colors.card,
-                        borderColor: isSelected
-                          ? Colors.primary
-                          : Colors.border,
-                      },
-                      isSelected && { transform: [{ scale: 0.98 }] },
-                    ]}
-                    onLongPress={() => toggleSelection(rem.id)}
-                    delayLongPress={300}
-                    onPress={() => {
-                      if (isSelectionMode) {
-                        toggleSelection(rem.id);
-                        return;
-                      }
-                      Alert.alert(
-                        "Manage Bill",
-                        `Manage ${rem.name} (${settings.currency}${rem.amount})?`,
-                        [
-                          { text: "Cancel", style: "cancel" },
-                          { text: "Edit", onPress: () => handleOpenModal(rem) },
-                          {
-                            text: "Mark as Paid",
-                            onPress: () => {
-                              setPayingRemId(rem.id);
-                              setPaymentDate(new Date());
-                              setShowPaymentDatePicker(true);
-                            },
-                          },
-                        ],
-                      );
-                    }}
-                  >
-                    {isSelected ? (
-                      <View
-                        style={[
-                          styles.selectionCircle,
-                          { borderColor: "#000", backgroundColor: "#000" },
-                        ]}
-                      >
-                        <CheckCircle2 color={Colors.primary} size={16} />
-                      </View>
-                    ) : (
-                      <Circle size={26} color={Colors.secondary} />
-                    )}
-                    <View style={styles.cardInfo}>
-                      <Text
-                        style={[
-                          styles.cardName,
-                          { color: isSelected ? "#000" : Colors.text },
-                        ]}
-                      >
-                        {rem.name}
-                      </Text>
-                      <View style={styles.countdownRow}>
-                        <Text
-                          style={{
-                            color: isSelected
-                              ? "rgba(0,0,0,0.7)"
-                              : Colors.textMuted,
-                            fontSize: 11,
-                          }}
-                        >
-                          DUE ON {rem.dueDay}TH •{" "}
-                        </Text>
-                        <View
-                          style={[
-                            styles.countdownBadge,
-                            {
-                              backgroundColor: isSelected
-                                ? "rgba(0,0,0,0.1)"
-                                : Colors.primary + "20",
-                            },
-                          ]}
-                        >
-                          <Text
-                            style={[
-                              styles.countdownText,
-                              { color: isSelected ? "#000" : Colors.primary },
-                            ]}
-                          >
-                            {getCountdown(rem.dueDay)}
-                          </Text>
-                        </View>
-                      </View>
-                    </View>
-                    <View style={{ alignItems: "flex-end" }}>
-                      <Text
-                        style={[
-                          styles.cardAmount,
-                          { color: isSelected ? "#000" : Colors.text },
-                        ]}
-                      >
-                        {settings.currency}
-                        {formatWithCommas(rem.amount)}
-                      </Text>
-                      {rem.totalMonths && (
-                        <View style={{ marginTop: 6, width: 80 }}>
-                          <View
-                            style={{
-                              height: 4,
-                              backgroundColor: isSelected
-                                ? "rgba(0,0,0,0.1)"
-                                : Colors.border,
-                              borderRadius: 2,
-                              overflow: "hidden",
-                            }}
-                          >
-                            <View
-                              style={{
-                                height: "100%",
-                                width: `${((rem.paidMonths || 0) / rem.totalMonths) * 100}%`,
-                                backgroundColor: isSelected
-                                  ? "#000"
-                                  : Colors.primary,
-                              }}
-                            />
-                          </View>
-                          <Text
-                            style={{
-                              color: isSelected
-                                ? "rgba(0,0,0,0.7)"
-                                : Colors.textMuted,
-                              fontSize: 9,
-                              marginTop: 2,
-                              fontWeight: "bold",
-                              textAlign: "right",
-                            }}
-                          >
-                            {rem.paidMonths || 0}/{rem.totalMonths}
-                          </Text>
-                        </View>
-                      )}
-                      <TouchableOpacity
-                        onPress={() => setHistoryRem(rem)}
-                        style={{ padding: 10, marginTop: -5 }}
-                      >
-                        <Eye
-                          size={20}
-                          color={isSelected ? "#000" : Colors.primary}
-                        />
-                      </TouchableOpacity>
-                    </View>
-                  </TouchableOpacity>
-                );
-              })
-            )}
-
-            {paidReminders.length > 0 && (
-              <View style={{ marginTop: 25 }}>
-                <Text
-                  style={[styles.sectionTitle, { color: Colors.textMuted }]}
-                >
-                  Settled This Month
-                </Text>
-                {paidReminders.map((rem) => (
-                  <TouchableOpacity
-                    key={rem.id}
-                    style={[
-                      styles.card,
-                      {
-                        backgroundColor: Colors.card,
-                        borderColor: Colors.border,
-                        opacity: 0.8,
-                      },
-                    ]}
-                    onPress={() => {
-                      if (rem.totalMonths) {
-                        setPayingRemId(rem.id);
-                        setPaymentDate(new Date());
-                        setShowPaymentDatePicker(true);
-                      }
-                    }}
-                  >
-                    <CheckCircle2 size={26} color={Colors.primary} />
-                    <View style={styles.cardInfo}>
-                      <Text style={[styles.cardName, { color: Colors.text }]}>
-                        {rem.name}
-                      </Text>
-                      <View
-                        style={{
-                          flexDirection: "row",
-                          alignItems: "center",
-                          gap: 5,
-                        }}
-                      >
-                        <Text
-                          style={{
-                            color: Colors.primary,
-                            fontSize: 11,
-                            fontWeight: "bold",
-                          }}
-                        >
-                          PAID
-                        </Text>
-                        {rem.totalMonths && (
-                          <Text
-                            style={{ color: Colors.textMuted, fontSize: 11 }}
-                          >
-                            • {rem.paidMonths}/{rem.totalMonths} DONE
-                          </Text>
-                        )}
-                      </View>
-                    </View>
-                    <View style={{ alignItems: "flex-end", marginRight: 10 }}>
-                      <Text
-                        style={[
-                          styles.cardAmount,
-                          { color: Colors.text, opacity: 0.8, fontSize: 14 },
-                        ]}
-                      >
-                        {settings.currency}
-                        {formatWithCommas(rem.amount)}
-                      </Text>
-                      {rem.totalMonths && (
-                        <View style={{ marginTop: 4, width: 60 }}>
-                          <View
-                            style={{
-                              height: 3,
-                              backgroundColor: Colors.border,
-                              borderRadius: 1.5,
-                              overflow: "hidden",
-                            }}
-                          >
-                            <View
-                              style={{
-                                height: "100%",
-                                width: `${((rem.paidMonths || 0) / rem.totalMonths) * 100}%`,
-                                backgroundColor: Colors.primary,
-                              }}
-                            />
-                          </View>
-                        </View>
-                      )}
-                      <Text
-                        style={{
-                          color: Colors.textMuted,
-                          fontSize: 10,
-                          marginTop: 2,
-                        }}
-                      >
-                        Next: {rem.dueDay}th{" "}
-                        {new Date(
-                          new Date().setMonth(new Date().getMonth() + 1),
-                        ).toLocaleString("default", { month: "short" })}
-                      </Text>
-                    </View>
-                    <TouchableOpacity
-                      onPress={() => setHistoryRem(rem)}
-                      style={{ padding: 10 }}
-                    >
-                      <Eye size={18} color={Colors.primary} />
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      onPress={() => deleteReminder(rem.id)}
-                      style={{ padding: 10 }}
-                    >
-                      <Trash2 size={18} color={Colors.textMuted} />
-                    </TouchableOpacity>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
-
-            {completedReminders.length > 0 && (
-              <View style={{ marginTop: 25 }}>
-                <Text
-                  style={[
-                    styles.sectionTitle,
-                    { color: Colors.primary, fontWeight: "900" },
-                  ]}
-                >
-                  Fully Completed Dues
-                </Text>
-                {completedReminders.map((rem) => (
-                  <View
-                    key={rem.id}
-                    style={[
-                      styles.card,
-                      {
-                        backgroundColor: Colors.card,
-                        borderColor: Colors.primary,
-                        borderStyle: "dashed",
-                      },
-                    ]}
-                  >
-                    <CheckCircle2 size={26} color={Colors.primary} />
-                    <View style={styles.cardInfo}>
-                      <Text style={[styles.cardName, { color: Colors.text }]}>
-                        {rem.name}
-                      </Text>
-                      <Text
-                        style={{
-                          color: Colors.primary,
-                          fontSize: 11,
-                          fontWeight: "bold",
-                        }}
-                      >
-                        TENURE FINISHED ({rem.totalMonths}/{rem.totalMonths})
-                      </Text>
-                    </View>
-                    <TouchableOpacity
-                      onPress={() => setHistoryRem(rem)}
-                      style={{ padding: 10 }}
-                    >
-                      <Eye size={18} color={Colors.primary} />
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      onPress={() => deleteReminder(rem.id)}
-                      style={{ padding: 10 }}
-                    >
-                      <Trash2 size={18} color={Colors.textMuted} />
-                    </TouchableOpacity>
-                  </View>
-                ))}
-              </View>
-            )}
+            <Text style={styles.sectionLabel}>⏰ Upcoming · {filteredPending.length}</Text>
+            {filteredPending.map(rem => (
+              <BillCard
+                key={rem.id}
+                rem={rem}
+                currency={currency}
+                isPaid={false}
+                countdown={getCountdown(rem.dueDay, false)}
+                onPress={() => handleCardPress(rem)}
+                onMarkPaid={() => markReminderPaid(rem.id)}
+                onDelete={() => handleDeleteReminder(rem.id)}
+              />
+            ))}
           </>
-        ) : (
-          <View>
-            {smsBills.length === 0 ? (
-              <View
-                style={[
-                  styles.emptyCard,
-                  { backgroundColor: Colors.card, borderColor: Colors.border },
-                ]}
-              >
-                <Text style={{ color: Colors.textMuted }}>
-                  No parsed SMS bills found.
-                </Text>
-              </View>
-            ) : (
-              smsBills.map((sms) => (
-                <View
-                  key={sms.id}
-                  style={[
-                    styles.card,
-                    {
-                      backgroundColor: Colors.card,
-                      borderColor: Colors.border,
-                    },
-                  ]}
-                >
-                  <View style={styles.cardInfo}>
-                    <Text style={[styles.cardName, { color: Colors.text }]}>
-                      {sms.name}
-                    </Text>
-                    <Text
-                      style={{
-                        color: Colors.textMuted,
-                        fontSize: 11,
-                        marginTop: 4,
-                      }}
-                    >
-                      Detected Due: {sms.dueDay}th • {sms.type.toUpperCase()}
-                    </Text>
-                  </View>
-                  <Text
-                    style={[
-                      styles.cardAmount,
-                      { color: Colors.text, marginRight: 15 },
-                    ]}
-                  >
-                    {settings.currency}
-                    {formatWithCommas(sms.amount)}
-                  </Text>
-                  <TouchableOpacity
-                    style={{
-                      backgroundColor: Colors.primary,
-                      paddingHorizontal: 12,
-                      paddingVertical: 8,
-                      borderRadius: 10,
-                    }}
-                    onPress={() => {
-                      handleOpenModal({
-                        id: "",
-                        name: sms.name,
-                        amount: sms.amount,
-                        dueDay: sms.dueDay,
-                        type: sms.type,
-                      });
-                      setSmsBills((prev) =>
-                        prev.filter((s) => s.id !== sms.id),
-                      );
-                    }}
-                  >
-                    <Text
-                      style={{
-                        color: "#000",
-                        fontSize: 12,
-                        fontWeight: "bold",
-                      }}
-                    >
-                      Add
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              ))
-            )}
+        )}
+
+        {/* ── PAID BILLS ── */}
+        {filteredPaid.length > 0 && (
+          <>
+            <Text style={[styles.sectionLabel, { marginTop: 16 }]}>✅ Paid · {filteredPaid.length}</Text>
+            {filteredPaid.map(rem => (
+              <BillCard
+                key={rem.id}
+                rem={rem}
+                currency={currency}
+                isPaid={true}
+                countdown={getCountdown(rem.dueDay, true)}
+                onPress={() => handleCardPress(rem)}
+                onMarkPaid={() => markReminderPaid(rem.id)}
+                onDelete={() => handleDeleteReminder(rem.id)}
+              />
+            ))}
+          </>
+        )}
+
+        {/* ── EMPTY ── */}
+        {filteredPending.length === 0 && filteredPaid.length === 0 && (
+          <View style={styles.empty}>
+            <LottieView source={require("@/assets/smiley_emoji.json")} autoPlay loop style={styles.emptyLottie} />
+            <Text style={styles.emptyTitle}>No bills yet!</Text>
+            <Text style={styles.emptySubtitle}>Add your EMIs, loans and bills to track them</Text>
+            <TouchableOpacity style={[styles.emptyBtn, { backgroundColor: Colors.primary, shadowColor: Colors.primary }]} onPress={() => openModal()}>
+              <Text style={styles.emptyBtnText}>+ Add Bill</Text>
+            </TouchableOpacity>
           </View>
         )}
       </ScrollView>
 
-      {isSelectionMode && (
-        <View
-          style={[
-            styles.bottomActionBar,
-            { backgroundColor: Colors.card, borderTopColor: Colors.border },
-          ]}
-        >
-          <TouchableOpacity
-            style={[styles.batchBtn, { backgroundColor: Colors.primary }]}
-            onPress={markSelectedPaid}
-          >
-            <CheckCircle2 color="#000" size={18} />
-            <Text style={styles.batchBtnText}>
-              MARK PAID ({selectedIds.length})
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.batchBtn, { backgroundColor: "#FF3B30" }]}
-            onPress={deleteSelected}
-          >
-            <Trash2 color="#fff" size={18} />
-          </TouchableOpacity>
-        </View>
-      )}
+      {/* ── FAB ── */}
+      <TouchableOpacity
+        style={[styles.fab, { bottom: TAB_BAR_HEIGHT + 16, backgroundColor: Colors.primary, shadowColor: Colors.primary }]}
+        onPress={() => openModal()}
+        activeOpacity={0.85}
+      >
+        <Text style={styles.fabText}>＋</Text>
+      </TouchableOpacity>
 
-      <Modal visible={isModalVisible} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <KeyboardAvoidingView
-            behavior={Platform.OS === "ios" ? "padding" : undefined}
-            style={[
-              styles.modalContent,
-              { backgroundColor: Colors.card, borderColor: Colors.border },
-            ]}
-          >
-            <ScrollView
-              contentContainerStyle={{ flexGrow: 1, paddingBottom: 30 }}
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-            >
-              <View style={styles.modalHeader}>
-                <Text style={[styles.modalTitle, { color: Colors.text }]}>
-                  {editingRemId ? "Edit Bill" : "New Reminder"}
-                </Text>
-                <TouchableOpacity onPress={() => setIsModalVisible(false)}>
-                  <X color={Colors.text} size={24} />
+      {/* ── PREMIUM BILL DETAILS & TENOR FULL SCREEN MODAL ── */}
+      <Modal visible={showDetailsModal} transparent={false} animationType="slide">
+        {activeSelectedReminder ? (() => {
+          const rem = activeSelectedReminder;
+          const color = TYPE_COLOR[rem.type] || "#F472B6";
+          const isPaid = rem.lastPaidMonth === currentMonth;
+          const total = rem.totalMonths || 0;
+          const settled = rem.paidMonths || 0;
+          const remaining = Math.max(0, total - settled);
+          const progressPct = total > 0 ? Math.min(Math.round((settled / total) * 100), 100) : 0;
+          const totalAmount = rem.amount * total;
+          const paidAmount = rem.amount * settled;
+          const remainingAmount = rem.amount * remaining;
+
+          return (
+            <SafeAreaView style={styles.fullScreenReport} edges={["top", "bottom"]}>
+              {/* Header */}
+              <View style={styles.reportHeader}>
+                <TouchableOpacity
+                  onPress={() => { setShowDetailsModal(false); setSelectedReminder(null); }}
+                  style={styles.reportBackBtn}
+                >
+                  <ChevronLeft size={22} color="#475569" />
+                </TouchableOpacity>
+                <Text style={styles.reportHeaderTitle}>Bill Report</Text>
+                <TouchableOpacity
+                  onPress={() => {
+                    setShowDetailsModal(false);
+                    openModal(rem);
+                  }}
+                  style={styles.reportEditBtn}
+                >
+                  <Edit2 size={18} color="#475569" />
                 </TouchableOpacity>
               </View>
 
-              <View
-                style={{
-                  marginBottom: 20,
-                  padding: 12,
-                  backgroundColor: Colors.background,
-                  borderRadius: 15,
-                  borderStyle: "dashed",
-                  borderWidth: 1.5,
-                  borderColor: Colors.primary + "60",
-                }}
-              >
-                <View
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    gap: 6,
-                    marginBottom: 8,
-                  }}
+              {/* Segmented Tabs */}
+              <View style={styles.tabContainer}>
+                <TouchableOpacity
+                  style={[styles.tabButton, detailTab === "progress" && [styles.tabButtonActive, { backgroundColor: `${Colors.primary}15`, borderColor: Colors.primary }]]}
+                  onPress={() => setDetailTab("progress")}
                 >
-                  <Sparkles size={14} color={Colors.primary} />
-                  <Text
-                    style={{
-                      color: Colors.primary,
-                      fontSize: 11,
-                      fontWeight: "900",
-                      letterSpacing: 0.5,
-                    }}
-                  >
-                    PASTE SMS TO AUTO-FILL 🅾️
+                  <Calendar size={15} color={detailTab === "progress" ? Colors.primary : "#64748B"} />
+                  <Text style={[styles.tabButtonText, detailTab === "progress" && { color: Colors.primary }]}>
+                    Progress
                   </Text>
-                </View>
-                <TextInput
-                  placeholder="Paste bank/bill notification text here..."
-                  placeholderTextColor={Colors.textMuted}
-                  multiline
-                  numberOfLines={2}
-                  style={{ color: Colors.text, fontSize: 13, padding: 5 }}
-                  onChangeText={(text) => {
-                    if (text.length > 10) {
-                      const parsed = parseFinancialText(text);
-                      if (parsed) {
-                        setName(parsed.name);
-                        setAmount(formatInputWithCommas(parsed.amount.toString()));
-                        setDueDay(parsed.date.getDate().toString());
-                        setType(parsed.type);
-                        Haptics.notificationAsync(
-                          Haptics.NotificationFeedbackType.Success,
-                        );
-                      }
-                    }
-                  }}
-                />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.tabButton, detailTab === "history" && [styles.tabButtonActive, { backgroundColor: `${Colors.primary}15`, borderColor: Colors.primary }]]}
+                  onPress={() => setDetailTab("history")}
+                >
+                  <Clock size={15} color={detailTab === "history" ? Colors.primary : "#64748B"} />
+                  <Text style={[styles.tabButtonText, detailTab === "history" && { color: Colors.primary }]}>
+                    History
+                  </Text>
+                </TouchableOpacity>
               </View>
 
-              <TextInput
-                style={[
-                  styles.input,
-                  {
-                    backgroundColor: Colors.background,
-                    color: Colors.text,
-                    borderColor: Colors.border,
-                  },
-                ]}
-                placeholder="Bill Name"
-                placeholderTextColor={Colors.textMuted}
-                value={name}
-                onChangeText={setName}
-              />
-              <View style={{ flexDirection: "row", gap: 10, marginTop: 15 }}>
-                <TextInput
-                  style={[
-                    styles.input,
-                    {
-                      flex: 1,
-                      backgroundColor: Colors.background,
-                      color: Colors.text,
-                      borderColor: Colors.border,
-                    },
-                  ]}
-                  placeholder="Amount"
-                  placeholderTextColor={Colors.textMuted}
-                  keyboardType="numeric"
-                  value={amount}
-                  onChangeText={(text) => setAmount(formatInputWithCommas(text))}
-                />
-                <TextInput
-                  style={[
-                    styles.input,
-                    {
-                      width: 80,
-                      backgroundColor: Colors.background,
-                      color: Colors.text,
-                      borderColor: Colors.border,
-                    },
-                  ]}
-                  placeholder="Day"
-                  placeholderTextColor={Colors.textMuted}
-                  keyboardType="numeric"
-                  value={dueDay}
-                  onChangeText={setDueDay}
-                  maxLength={2}
-                />
-              </View>
-
-              <View style={{ marginTop: 15 }}>
-                <TextInput
-                  style={[
-                    styles.input,
-                    {
-                      backgroundColor: Colors.background,
-                      color: Colors.text,
-                      borderColor: Colors.border,
-                    },
-                  ]}
-                  placeholder="Total Duration (Months) - Optional"
-                  placeholderTextColor={Colors.textMuted}
-                  keyboardType="numeric"
-                  value={totalMonths}
-                  onChangeText={setTotalMonths}
-                />
-              </View>
-
-              <View style={{ marginTop: 20 }}>
-                <Text
-                  style={[styles.sectionTitle, { color: Colors.textMuted }]}
-                >
-                  Reminder Options
-                </Text>
-                <View
-                  style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}
-                >
-                  {["none", "on_day", "2_days_before", "both", "custom"].map(
-                    (opt) => (
-                      <TouchableOpacity
-                        key={opt}
-                        style={[
-                          styles.pickerBtn,
-                          {
-                            flex: 1,
-                            minWidth: "28%",
-                            backgroundColor:
-                              alertType === opt
-                                ? Colors.primary
-                                : Colors.background,
-                            borderColor:
-                              alertType === opt
-                                ? Colors.primary
-                                : Colors.border,
-                          },
-                        ]}
-                        onPress={() => setAlertType(opt as any)}
-                      >
-                        <Text
-                          style={{
-                            color: alertType === opt ? "#000" : Colors.text,
-                            fontSize: 11,
-                            fontWeight: "700",
-                          }}
-                        >
-                          {opt === "none"
-                            ? "None"
-                            : opt === "on_day"
-                              ? "Due Date"
-                              : opt === "2_days_before"
-                                ? "2 Days Prior"
-                                : opt === "both"
-                                  ? "Both"
-                                  : "Strict Date"}
-                        </Text>
-                      </TouchableOpacity>
-                    ),
-                  )}
-                </View>
-
-                {alertType === "custom" && (
-                  <View
-                    style={{ flexDirection: "row", gap: 10, marginTop: 15 }}
-                  >
-                    <TouchableOpacity
-                      style={[
-                        styles.pickerBtn,
-                        {
-                          backgroundColor: Colors.background,
-                          borderColor: Colors.border,
-                        },
-                      ]}
-                      onPress={() => setShowDate(true)}
-                    >
-                      <Calendar size={18} color={Colors.primary} />
-                      <Text
-                        style={{
-                          color: Colors.text,
-                          fontSize: 13,
-                          fontWeight: "700",
-                        }}
-                      >
-                        {date.toLocaleDateString()}
-                      </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[
-                        styles.pickerBtn,
-                        {
-                          backgroundColor: Colors.background,
-                          borderColor: Colors.border,
-                        },
-                      ]}
-                      onPress={() => setShowTime(true)}
-                    >
-                      <Clock size={18} color={Colors.primary} />
-                      <Text
-                        style={{
-                          color: Colors.text,
-                          fontSize: 13,
-                          fontWeight: "700",
-                        }}
-                      >
-                        {date.toLocaleTimeString([], {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
-              </View>
-
-              {showDate && (
-                <DateTimePicker
-                  value={date}
-                  mode="date"
-                  display="default"
-                  onChange={(e, d) => {
-                    setShowDate(false);
-                    if (d) {
-                      const next = new Date(date);
-                      next.setFullYear(d.getFullYear());
-                      next.setMonth(d.getMonth());
-                      next.setDate(d.getDate());
-                      setDate(next);
-                    }
-                  }}
-                />
-              )}
-              {showTime && (
-                <DateTimePicker
-                  value={date}
-                  mode="time"
-                  display="default"
-                  onChange={(e, d) => {
-                    setShowTime(false);
-                    if (d) {
-                      const next = new Date(date);
-                      next.setHours(d.getHours());
-                      next.setMinutes(d.getMinutes());
-                      next.setSeconds(0);
-                      setDate(next);
-                    }
-                  }}
-                />
-              )}
-
-              <TouchableOpacity
-                style={[styles.saveBtn, { backgroundColor: Colors.primary }]}
-                onPress={handleSave}
-              >
-                <Text
-                  style={{ color: "#fff", fontSize: 18, fontWeight: "bold" }}
-                >
-                  Save Goal
-                </Text>
-              </TouchableOpacity>
-
-              <FlowBannerAd />
-            </ScrollView>
-          </KeyboardAvoidingView>
-        </View>
-      </Modal>
-
-      <Modal visible={!!historyRem} animationType="fade" transparent>
-        <View style={styles.modalOverlay}>
-          <View
-            style={[
-              styles.modalContent,
-              {
-                backgroundColor: Colors.card,
-                borderColor: Colors.border,
-                height: "70%",
-              },
-            ]}
-          >
-            <View style={styles.modalHeader}>
-              <View>
-                <Text style={[styles.modalTitle, { color: Colors.text }]}>
-                  Installment Statement
-                </Text>
-                <Text style={{ color: Colors.textMuted, fontSize: 12 }}>
-                  {historyRem?.name}
-                </Text>
-              </View>
-              <TouchableOpacity onPress={() => setHistoryRem(null)}>
-                <X color={Colors.text} size={24} />
-              </TouchableOpacity>
-            </View>
-
-            {historyRem && (
-              <View style={{ flex: 1 }}>
-                <View
-                  style={{ flexDirection: "row", gap: 15, marginBottom: 25 }}
-                >
-                  <View
-                    style={{
-                      flex: 1,
-                      backgroundColor: Colors.background,
-                      padding: 15,
-                      borderRadius: 20,
-                      borderWidth: 1,
-                      borderColor: Colors.border,
-                    }}
-                  >
-                    <Text
-                      style={{
-                        color: Colors.textMuted,
-                        fontSize: 10,
-                        fontWeight: "bold",
-                      }}
-                    >
-                      TOTAL DUES
-                    </Text>
-                    <Text
-                      style={{
-                        color: Colors.text,
-                        fontSize: 18,
-                        fontWeight: "900",
-                        marginTop: 5,
-                      }}
-                    >
-                      {settings.currency}
-                      {formatWithCommas(historyRem.amount * (historyRem.totalMonths || 1))}
-                    </Text>
-                  </View>
-                  <View
-                    style={{
-                      flex: 1,
-                      backgroundColor: Colors.background,
-                      padding: 15,
-                      borderRadius: 20,
-                      borderWidth: 1,
-                      borderColor: Colors.border,
-                    }}
-                  >
-                    <Text
-                      style={{
-                        color: Colors.primary,
-                        fontSize: 10,
-                        fontWeight: "bold",
-                      }}
-                    >
-                      BALANCE LEFT
-                    </Text>
-                    <Text
-                      style={{
-                        color: Colors.primary,
-                        fontSize: 18,
-                        fontWeight: "900",
-                        marginTop: 5,
-                      }}
-                    >
-                      {settings.currency}
-                      {formatWithCommas(
-                        historyRem.amount *
-                        ((historyRem.totalMonths || 0) -
-                          (historyRem.paidMonths || 0))
-                      )}
-                    </Text>
-                  </View>
-                </View>
-
-                <Text
-                  style={[
-                    styles.sectionTitle,
-                    { color: Colors.textMuted, marginBottom: 10 },
-                  ]}
-                >
-                  Payment Logs
-                </Text>
-                <ScrollView
-                  style={{ flex: 1 }}
-                  showsVerticalScrollIndicator={false}
-                >
-                  {historyRem.paymentHistory?.length ? (
-                    historyRem.paymentHistory.map((log, idx) => (
-                      <View
-                        key={idx}
-                        style={{
-                          flexDirection: "row",
-                          justifyContent: "space-between",
-                          paddingVertical: 12,
-                          borderBottomWidth: 1,
-                          borderBottomColor: Colors.border,
-                        }}
-                      >
-                        <View>
-                          <Text
-                            style={{
-                              color: Colors.text,
-                              fontWeight: "bold",
-                              fontSize: 14,
-                            }}
-                          >
-                            Installment #{idx + 1}
-                          </Text>
-                          <Text
-                            style={{ color: Colors.textMuted, fontSize: 12 }}
-                          >
-                            {new Date(log.date).toLocaleString()}
-                          </Text>
+              {/* Content */}
+              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.reportScrollContent}>
+                {detailTab === "progress" ? (
+                  // ── Tab 1: Progress Content ──
+                  <View>
+                    {/* Header summary inside view */}
+                    <View style={styles.detailHeader}>
+                      <View style={[styles.detailIconContainer, { backgroundColor: color + "15" }]}>
+                        <Text style={styles.detailIcon}>{TYPE_EMOJI[rem.type] || "📄"}</Text>
+                      </View>
+                      <View style={{ flex: 1, marginLeft: 14 }}>
+                        <Text style={styles.detailName}>{rem.name}</Text>
+                        <View style={[styles.typeBadge, { alignSelf: "flex-start", backgroundColor: color + "18", marginTop: 4 }]}>
+                          <Text style={[styles.typeBadgeTxt, { color }]}>{rem.type.toUpperCase()}</Text>
                         </View>
-                        <Text
-                          style={{ color: Colors.primary, fontWeight: "900" }}
-                        >
-                          +{settings.currency}
-                          {formatWithCommas(log.amount)}
+                      </View>
+                    </View>
+
+                    {/* Primary Amount Card */}
+                    <View style={styles.detailAmountCard}>
+                      <Text style={styles.detailAmountLabel}>Monthly Installment</Text>
+                      <Text style={[styles.detailAmountValue, { color }]}>
+                        {currency}{formatWithCommas(rem.amount)}
+                      </Text>
+                      <View style={styles.detailCycleRow}>
+                        <Text style={styles.detailCycleText}>📅 Due on the {rem.dueDay}th of every month</Text>
+                        {isPaid ? (
+                          <View style={styles.paidBadgeContainer}>
+                            <Text style={styles.paidBadgeText}>✅ Settled This Month</Text>
+                          </View>
+                        ) : (
+                          <View style={styles.pendingBadgeContainer}>
+                            <Text style={styles.pendingBadgeText}>⏰ {getCountdown(rem.dueDay, false)}</Text>
+                          </View>
+                        )}
+                      </View>
+                    </View>
+
+                    {/* Tenor & Dues Analytics */}
+                    <Text style={styles.detailsSectionTitle}>📊 Tenor & Dues Summary</Text>
+                    
+                    {total > 0 ? (
+                      <>
+                        {/* Metric Cards Row */}
+                        <View style={styles.metricsRow}>
+                          <View style={styles.metricItemCard}>
+                            <Text style={styles.metricItemVal}>{total}</Text>
+                            <Text style={styles.metricItemLabel}>Total Dues</Text>
+                          </View>
+                          <View style={[styles.metricItemCard, { borderColor: "#10B98150" }]}>
+                            <Text style={[styles.metricItemVal, { color: "#10B981" }]}>{settled}</Text>
+                            <Text style={styles.metricItemLabel}>Settled</Text>
+                          </View>
+                          <View style={[styles.metricItemCard, { borderColor: "#F59E0B50" }]}>
+                            <Text style={[styles.metricItemVal, { color: "#F59E0B" }]}>{remaining}</Text>
+                            <Text style={styles.metricItemLabel}>Remaining</Text>
+                          </View>
+                        </View>
+
+                        {/* Total Value Analytics */}
+                        <View style={styles.valueAnalyticsCard}>
+                          <View style={styles.valueRow}>
+                            <Text style={styles.valueLabel}>Total Loan/EMI Value</Text>
+                            <Text style={styles.valueVal}>{currency}{formatWithCommas(totalAmount)}</Text>
+                          </View>
+                          <View style={styles.valueDivider} />
+                          <View style={styles.valueRow}>
+                            <Text style={styles.valueLabel}>Total Paid So Far</Text>
+                            <Text style={[styles.valueVal, { color: "#10B981" }]}>{currency}{formatWithCommas(paidAmount)}</Text>
+                          </View>
+                          <View style={styles.valueRow}>
+                            <Text style={styles.valueLabel}>Outstanding Balance</Text>
+                            <Text style={[styles.valueVal, { color: "#EF4444" }]}>{currency}{formatWithCommas(remainingAmount)}</Text>
+                          </View>
+                          {/* Progress Bar */}
+                          <View style={styles.detailBarBg}>
+                            <View style={[styles.detailBarFill, { width: `${progressPct}%`, backgroundColor: color }]} />
+                          </View>
+                          <Text style={styles.detailBarLabel}>{progressPct}% of your tenor completed</Text>
+                        </View>
+
+                        {/* Full Installments Tenor Grid/Timeline */}
+                        <Text style={styles.detailsSectionTitle}>🗓 Tenor Installment Grid ({settled}/{total} months)</Text>
+                        <View style={styles.tenorGrid}>
+                          {Array.from({ length: total }).map((_, index) => {
+                            const monthNum = index + 1;
+                            const isMonthPaid = monthNum <= settled;
+                            const isNextDue = monthNum === settled + 1;
+                            
+                            let badgeBg = "#F3F4F6";
+                            let badgeBorder = "#E5E7EB";
+                            let textCol = "#9CA3AF";
+                            let statusSymbol = "";
+
+                            if (isMonthPaid) {
+                              badgeBg = "#ECFDF5";
+                              badgeBorder = "#A7F3D0";
+                              textCol = "#059669";
+                              statusSymbol = "✓";
+                            } else if (isNextDue) {
+                              badgeBg = isPaid ? "#F3F4F6" : "#FFFBEB";
+                              badgeBorder = isPaid ? "#E5E7EB" : "#FDE68A";
+                              textCol = isPaid ? "#6B7280" : "#D97706";
+                              statusSymbol = isPaid ? "" : "⏱";
+                            }
+
+                            return (
+                              <View 
+                                key={monthNum} 
+                                style={[
+                                  styles.tenorGridItem, 
+                                  { backgroundColor: badgeBg, borderColor: badgeBorder },
+                                  isNextDue && !isPaid && styles.tenorGridItemActive
+                                ]}
+                              >
+                                <Text style={[styles.tenorGridText, { color: textCol }]}>
+                                  M{monthNum}
+                                </Text>
+                                <Text style={[styles.tenorStatusText, { color: textCol }]}>
+                                  {statusSymbol || (isMonthPaid ? "Paid" : "Due")}
+                                </Text>
+                              </View>
+                            );
+                          })}
+                        </View>
+                      </>
+                    ) : (
+                      <View style={styles.emptyTenorCard}>
+                        <Text style={styles.emptyTenorTitle}>🔄 Ongoing Monthly Bill</Text>
+                        <Text style={styles.emptyTenorDesc}>
+                          This reminder is set up as an ongoing recurring bill without a fixed tenor (like subscriptions or utilities).
+                        </Text>
+                        <View style={styles.valueRow}>
+                          <Text style={styles.valueLabel}>Times Settled:</Text>
+                          <Text style={[styles.valueVal, { color: "#10B981" }]}>{settled} times</Text>
+                        </View>
+                      </View>
+                    )}
+                  </View>
+                ) : (
+                  // ── Tab 2: History Content ──
+                  <View>
+                    {/* Header summary inside view */}
+                    <View style={styles.detailHeader}>
+                      <View style={[styles.detailIconContainer, { backgroundColor: color + "15" }]}>
+                        <Text style={styles.detailIcon}>{TYPE_EMOJI[rem.type] || "📄"}</Text>
+                      </View>
+                      <View style={{ flex: 1, marginLeft: 14 }}>
+                        <Text style={styles.detailName}>{rem.name}</Text>
+                        <View style={[styles.typeBadge, { alignSelf: "flex-start", backgroundColor: color + "18", marginTop: 4 }]}>
+                          <Text style={[styles.typeBadgeTxt, { color }]}>{rem.type.toUpperCase()}</Text>
+                        </View>
+                      </View>
+                    </View>
+
+                    {/* Info summary */}
+                    <View style={styles.valueAnalyticsCard}>
+                      <Text style={styles.detailsSectionTitle}>🔔 Alert Configuration</Text>
+                      <View style={styles.valueRow}>
+                        <Text style={styles.valueLabel}>Reminder Type:</Text>
+                        <View style={[styles.typeBadge, { backgroundColor: color + "18" }]}>
+                          <Text style={[styles.typeBadgeTxt, { color }]}>{rem.type.toUpperCase()}</Text>
+                        </View>
+                      </View>
+                      <View style={styles.valueDivider} />
+                      <View style={styles.valueRow}>
+                        <Text style={styles.valueLabel}>Alert Setting:</Text>
+                        <Text style={styles.valueVal}>
+                          {ALERT_OPTIONS.find(o => o.id === rem.alertType)?.label || "On Due Day"}
                         </Text>
                       </View>
-                    ))
-                  ) : (
-                    <Text
-                      style={{
-                        color: Colors.textMuted,
-                        textAlign: "center",
-                        marginTop: 20,
-                      }}
-                    >
-                      No payments recorded yet.
-                    </Text>
-                  )}
-                </ScrollView>
+                      {rem.alertType === "custom" && rem.customDate && (
+                        <View style={[styles.valueRow, { marginTop: 4 }]}>
+                          <Text style={styles.valueLabel}>Scheduled Time:</Text>
+                          <Text style={styles.valueVal}>
+                            {new Date(rem.customDate).toLocaleString(undefined, { 
+                              month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' 
+                            })}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+
+                    {/* Payment History Log */}
+                    <Text style={styles.detailsSectionTitle}>📜 Payment History Log</Text>
+                    {rem.paymentHistory && rem.paymentHistory.length > 0 ? (
+                      <View style={styles.historyCard}>
+                        {rem.paymentHistory.map((h, i) => (
+                          <View key={i} style={styles.historyItem}>
+                            <View style={styles.historyLeft}>
+                              <Text style={styles.historyDate}>
+                                {new Date(h.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                              </Text>
+                              <Text style={styles.historyTime}>
+                                {new Date(h.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </Text>
+                            </View>
+                            <Text style={styles.historyAmount}>{currency}{formatWithCommas(h.amount)}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    ) : (
+                      <View style={styles.emptyTenorCard}>
+                        <Text style={styles.emptyTenorTitle}>No payment history yet</Text>
+                        <Text style={styles.emptyTenorDesc}>
+                          Payments will appear here chronologically once they are marked as paid.
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                )}
+              </ScrollView>
+
+              {/* Bottom Actions */}
+              <View style={styles.reportActionsContainer}>
+                <TouchableOpacity
+                  style={[styles.reportActionBtn, styles.reportDeleteBtn]}
+                  onPress={() => handleDeleteReminder(rem.id)}
+                >
+                  <Trash2 size={16} color="#EF4444" />
+                  <Text style={styles.reportDeleteBtnTxt}>Delete</Text>
+                </TouchableOpacity>
+
+                {!isPaid && (
+                  <TouchableOpacity
+                    style={[styles.reportActionBtn, styles.reportPayBtn, { backgroundColor: color }]}
+                    onPress={() => handleMarkPaidInDetails(rem.id)}
+                  >
+                    <Check size={16} color="#FFF" />
+                    <Text style={styles.reportPayBtnTxt}>Mark Paid</Text>
+                  </TouchableOpacity>
+                )}
               </View>
-            )}
-          </View>
-        </View>
+            </SafeAreaView>
+          );
+        })() : null}
       </Modal>
 
-      {showPaymentDatePicker && (
-        <DateTimePicker
-          value={paymentDate}
-          mode="date"
-          display="default"
-          onChange={(e, d) => {
-            setShowPaymentDatePicker(false);
-            if (d && payingRemId) {
-              Alert.alert(
-                "Track Expense?",
-                "Do you want to add this payment to your expense tracker?",
-                [
-                  {
-                    text: "No, just mark paid",
-                    onPress: () => {
-                      markReminderPaid(payingRemId, false, d.toISOString());
-                      setPayingRemId(null);
-                    },
-                  },
-                  {
-                    text: "Yes, track it",
-                    onPress: () => {
-                      markReminderPaid(payingRemId, true, d.toISOString());
-                      setPayingRemId(null);
-                    },
-                  },
-                ],
-              );
-            } else {
-              setPayingRemId(null);
-            }
-          }}
-        />
-      )}
+      {/* ── ADD / EDIT MODAL ── */}
+      <Modal visible={showModal} transparent={false} animationType="slide">
+        <SafeAreaView style={styles.fullScreenContainer} edges={["top", "bottom"]}>
+          <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
+            <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.fullScreenContent} showsVerticalScrollIndicator={false}>
+
+              <View style={styles.sheetTitleRow}>
+                <Text style={styles.sheetTitle}>{editingId ? "✏️ Edit Bill" : "🔔 New Bill Reminder"}</Text>
+                <TouchableOpacity onPress={() => setShowModal(false)} style={styles.sheetClose}>
+                  <Text style={styles.sheetCloseTxt}>✕</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Bill Name */}
+              <Text style={styles.formLabel}>📝 Bill Name</Text>
+              <TextInput
+                style={styles.formInput}
+                placeholder="e.g. Home Loan, Netflix, HDFC EMI"
+                placeholderTextColor="#9CA3AF"
+                value={name}
+                onChangeText={setName}
+                autoFocus
+              />
+
+              {/* Amount */}
+              <Text style={styles.formLabel}>💰 Amount</Text>
+              <TextInput
+                style={styles.formInput}
+                placeholder={`${currency}0.00`}
+                placeholderTextColor="#9CA3AF"
+                keyboardType="decimal-pad"
+                value={amount}
+                onChangeText={t => setAmount(formatInputWithCommas(t))}
+              />
+
+              {/* Bill Type */}
+              <Text style={styles.formLabel}>📂 Type</Text>
+              <View style={styles.typeRow}>
+                {BILL_TYPES.map(t => (
+                  <TouchableOpacity
+                    key={t.id}
+                    style={[styles.typeChip, type === t.id && { backgroundColor: t.color + "18", borderColor: t.color, borderWidth: 1.5 }]}
+                    onPress={() => setType(t.id as any)}
+                  >
+                    <Text style={styles.typeEmoji}>{t.emoji}</Text>
+                    <Text style={[styles.typeText, type === t.id && { color: t.color }]}>{t.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* Due Day */}
+              <Text style={styles.formLabel}>📅 Due Day of Month (1–31)</Text>
+              <TextInput
+                style={styles.formInput}
+                placeholder="e.g. 5"
+                placeholderTextColor="#9CA3AF"
+                keyboardType="number-pad"
+                value={dueDay}
+                onChangeText={setDueDay}
+              />
+
+              {/* Alerts */}
+              <Text style={styles.formLabel}>⏰ Set Reminder Alert</Text>
+              <View style={{ flexDirection: "row", gap: 8, marginBottom: 16 }}>
+                <TouchableOpacity
+                  style={[styles.alertChip, alertType === "on_day" && { backgroundColor: `${Colors.primary}15`, borderColor: Colors.primary }]}
+                  onPress={() => setAlertType("on_day")}
+                >
+                  <Text style={[styles.alertText, alertType === "on_day" && { color: Colors.primary }]}>
+                    On Due Day (9 AM)
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.alertChip, alertType === "2_days_before" && { backgroundColor: `${Colors.primary}15`, borderColor: Colors.primary }]}
+                  onPress={() => setAlertType("2_days_before")}
+                >
+                  <Text style={[styles.alertText, alertType === "2_days_before" && { color: Colors.primary }]}>
+                    2 Days Before (9 AM)
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.alertChip, alertType === "both" && { backgroundColor: `${Colors.primary}15`, borderColor: Colors.primary }]}
+                  onPress={() => setAlertType("both")}
+                >
+                  <Text style={[styles.alertText, alertType === "both" && { color: Colors.primary }]}>
+                    Both Alerts
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Tenor / Installments Setup */}
+              {(type === "emi" || type === "loan") && (
+                <>
+                  <View style={styles.divider} />
+                  <View style={{ marginBottom: 12 }}>
+                    <Text style={{ fontSize: 14, fontWeight: "800", color: "#1E293B" }}>🗓️ Tenor / Installments</Text>
+                    <Text style={{ fontSize: 11, color: "#64748B", fontWeight: "600", marginTop: 2 }}>For loans, insurance, EMIs with fixed end dates</Text>
+                  </View>
+
+                  <Text style={styles.formLabel}>🔢 Total Installments (Months)</Text>
+                  <TextInput
+                    style={styles.formInput}
+                    placeholder="e.g. 12, 24, 36"
+                    placeholderTextColor="#9CA3AF"
+                    keyboardType="number-pad"
+                    value={totalMonths}
+                    onChangeText={setTotalMonths}
+                  />
+
+                  <Text style={styles.formLabel}>✅ Already Settled (Months)</Text>
+                  <TextInput
+                    style={styles.formInput}
+                    placeholder="e.g. 0, 3, 5"
+                    placeholderTextColor="#9CA3AF"
+                    keyboardType="number-pad"
+                    value={paidMonthsInput}
+                    onChangeText={setPaidMonthsInput}
+                  />
+
+                  <Text style={styles.formLabel}>📅 First Installment Due Date</Text>
+                  <View style={{ flexDirection: "row", gap: 10, marginBottom: 16 }}>
+                    <TouchableOpacity style={styles.datePill} onPress={() => setShowDate(true)}>
+                      <Text style={styles.datePillTxt}>📅 {date.toLocaleDateString()}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.datePill} onPress={() => setShowTime(true)}>
+                      <Text style={styles.datePillTxt}>🕐 {date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {showDate && (
+                    <DateTimePicker value={date} mode="date"
+                      display={Platform.OS === "ios" ? "inline" : "default"}
+                      onChange={(_, d) => { setShowDate(false); if (d) setDate(d); }} />
+                  )}
+                  {showTime && (
+                    <DateTimePicker value={date} mode="time"
+                      display={Platform.OS === "ios" ? "inline" : "default"}
+                      onChange={(_, d) => { setShowTime(false); if (d) setDate(d); }} />
+                  )}
+                </>
+              )}
+
+              {/* Save */}
+              <TouchableOpacity
+                style={[styles.saveBtn, { backgroundColor: Colors.primary, shadowColor: Colors.primary }, (!name || !amount || !dueDay || isSubmitting) && { opacity: 0.5 }]}
+                onPress={handleSave}
+                disabled={!name || !amount || !dueDay || isSubmitting}
+              >
+                <Text style={styles.saveBtnTxt}>
+                  {isSubmitting ? "Saving…" : editingId ? "Update Bill" : "Add Bill Reminder"}
+                </Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </KeyboardAvoidingView>
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }
 
+// ── Bill Card ───────────────────────────────────────────────────────────────
+function BillCard({ rem, currency, isPaid, countdown, onPress, onMarkPaid, onDelete }: {
+  rem: Reminder; currency: string; isPaid: boolean;
+  countdown: string; onPress: () => void; onMarkPaid: () => void;
+  onDelete: () => void;
+}) {
+  const color = TYPE_COLOR[rem.type] || "#F472B6";
+  const isOverdue = !isPaid && (countdown === "Due today" || countdown.includes("Overdue"));
+  const progressPct = rem.totalMonths && rem.paidMonths
+    ? Math.min(Math.round((rem.paidMonths / rem.totalMonths) * 100), 100) : 0;
+
+  return (
+    <TouchableOpacity style={[styles.card, isPaid && styles.cardPaid, isOverdue && styles.cardOverdue]} onPress={onPress} activeOpacity={0.8}>
+      {/* Left color bar */}
+      <View style={[styles.cardBar, { backgroundColor: isPaid ? "#10B981" : color }]} />
+
+      {/* Main container wrapping top info and bottom actions */}
+      <View style={styles.cardMain}>
+        {/* Top Info Row */}
+        <View style={styles.cardInfoRow}>
+          {/* Emoji icon */}
+          <View style={[styles.cardIcon, { backgroundColor: isPaid ? "#F0FDF4" : color + "15" }]}>
+            <Text style={styles.cardIconText}>{TYPE_EMOJI[rem.type] || "📄"}</Text>
+          </View>
+
+          {/* Content */}
+          <View style={styles.cardContent}>
+            <View style={styles.cardTopRow}>
+              <Text style={[styles.cardName, isPaid && styles.cardNamePaid]} numberOfLines={1}>{rem.name}</Text>
+              <View style={[styles.typeBadge, { backgroundColor: color + "18" }]}>
+                <Text style={[styles.typeBadgeTxt, { color }]}>{rem.type.toUpperCase()}</Text>
+              </View>
+            </View>
+            <Text style={[styles.cardAmount, { color: isPaid ? "#10B981" : color }]}>
+              {currency}{formatWithCommas(rem.amount)}
+            </Text>
+            <View style={styles.cardMetaRow}>
+              <Text style={styles.cardDueDay}>📅 {rem.dueDay}th every month</Text>
+              {countdown ? (
+                <Text style={[
+                  styles.cardCountdown,
+                  isPaid ? { color: "#10B981" } : isOverdue ? { color: "#EF4444" } : { color: "#F59E0B" }
+                ]}>
+                  ⏰ {isPaid ? `Next: ${countdown}` : countdown}
+                </Text>
+              ) : null}
+            </View>
+            {/* EMI progress bar */}
+            {rem.totalMonths && rem.totalMonths > 0 && (
+              <View style={styles.emiRow}>
+                <View style={styles.emiBarBg}>
+                  <View style={[styles.emiBarFill, { width: `${progressPct}%`, backgroundColor: isPaid ? "#10B981" : color }]} />
+                </View>
+                <Text style={styles.emiText}>{rem.paidMonths || 0}/{rem.totalMonths} mo</Text>
+              </View>
+            )}
+          </View>
+        </View>
+
+        {/* Bottom Actions Row */}
+        <View style={styles.cardActionsRow}>
+          <TouchableOpacity
+            style={[styles.cardActionBtn, { borderColor: "#E2E8F0" }]}
+            onPress={(e) => { e.stopPropagation(); onPress(); }}
+          >
+            <Eye size={13} color="#6366F1" />
+            <Text style={[styles.cardActionBtnTxt, { color: "#4F46E5" }]}>Progress</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.cardActionBtn, { borderColor: "#FEE2E2", backgroundColor: "#FEF2F2" }]}
+            onPress={(e) => { e.stopPropagation(); onDelete(); }}
+          >
+            <Trash2 size={13} color="#EF4444" />
+            <Text style={[styles.cardActionBtnTxt, { color: "#DC2626" }]}>Delete</Text>
+          </TouchableOpacity>
+
+          {!isPaid && (
+            <TouchableOpacity
+              style={[styles.cardActionBtn, { borderColor: color, backgroundColor: color }]}
+              onPress={(e) => { e.stopPropagation(); onMarkPaid(); }}
+            >
+              <Check size={13} color="#FFF" />
+              <Text style={[styles.cardActionBtnTxt, { color: "#FFF" }]}>Pay</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+}
+
 const styles = StyleSheet.create({
-  container: { flex: 1 },
+  container: { flex: 1, backgroundColor: "#F8FAFC" },
+  fullScreenContainer: { flex: 1, backgroundColor: "#FFFFFF" },
+  fullScreenContent: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 34 },
+
+  // Header
   header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: 24,
-    paddingBottom: 10,
-    marginTop: 20,
+    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+    paddingHorizontal: 20, paddingTop: 12, paddingBottom: 10,
   },
-  title: { fontSize: 32, fontWeight: "900" },
+  headerTitle: { fontSize: 26, fontWeight: "900", color: "#171717", letterSpacing: -0.5 },
+  headerSub: { fontSize: 13, color: "#9CA3AF", marginTop: 2 },
   addBtn: {
-    width: 48,
-    height: 48,
-    borderRadius: 16,
-    justifyContent: "center",
-    alignItems: "center",
-    shadowColor: "#16a34a",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
+    width: 42, height: 42, borderRadius: 21,
+    alignItems: "center", justifyContent: "center",
   },
-  content: { padding: 20, paddingBottom: 180 },
+  addBtnText: { color: "#FFF", fontSize: 22, lineHeight: 26 },
+
+  scroll: { paddingHorizontal: 20 },
+
+  // Hero card
   heroCard: {
-    borderRadius: 24,
-    padding: 24,
-    marginBottom: 20,
+    backgroundColor: "#FFF", borderRadius: 24, padding: 18, marginBottom: 14,
+    shadowColor: "#6366F1", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 14, elevation: 4,
     overflow: "hidden",
-    position: "relative",
-    borderWidth: 2.5,
-    borderColor: "#171717",
-    shadowColor: "#171717",
-    shadowOffset: { width: 4, height: 4 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 0,
   },
-  rider: {
-    position: "absolute",
-    top: 5,
-    right: 0,
-    width: 100,
-    height: 100,
-    transform: [{ scaleX: -1 }],
+  heroCardInner: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  heroLeft: { flex: 1, paddingRight: 8 },
+  heroTitle: { fontSize: 14, fontWeight: "800", color: "#F472B6", marginBottom: 4 },
+  heroName: { fontSize: 20, fontWeight: "900", color: "#171717", marginBottom: 12, letterSpacing: -0.5 },
+  heroStatsRow: { flexDirection: "row", alignItems: "center", marginBottom: 14 },
+  heroStat: { alignItems: "flex-start" },
+  heroStatVal: { fontSize: 18, fontWeight: "900", color: "#F472B6" },
+  heroStatLabel: { fontSize: 11, color: "#9CA3AF", fontWeight: "600" },
+  heroStatDivider: { width: 1, height: 30, backgroundColor: "#F3F4F6", marginHorizontal: 16 },
+  heroBarBg: { height: 8, backgroundColor: "#F3F4F6", borderRadius: 4, overflow: "hidden", marginBottom: 6 },
+  heroBarFill: { height: 8, backgroundColor: "#10B981", borderRadius: 4 },
+  heroBarLabel: { fontSize: 12, color: "#9CA3AF" },
+  heroLottie: { width: 90, height: 90 },
+
+  // Filters
+  filterScroll: { marginBottom: 14, marginHorizontal: -20 },
+  filterContent: { paddingHorizontal: 20, gap: 8 },
+  filterChip: {
+    flexDirection: "row", alignItems: "center", gap: 5,
+    paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20,
+    backgroundColor: "#FFF",
+    shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 1,
   },
-  heroHeader: {
+  filterChipActive: {},
+  filterEmoji: { fontSize: 15 },
+  filterText: { fontSize: 13, fontWeight: "700", color: "#6B7280" },
+  filterTextActive: { color: "#FFF" },
+
+  // Section labels
+  sectionLabel: { fontSize: 13, fontWeight: "700", color: "#6B7280", marginBottom: 8 },
+
+  // Bill card
+  card: {
+    backgroundColor: "#FFF", borderRadius: 18, marginBottom: 10,
+    flexDirection: "row", alignItems: "center", overflow: "hidden",
+    shadowColor: "#000", shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 2,
+  },
+  cardPaid: { opacity: 0.7 },
+  cardOverdue: { borderWidth: 1.5, borderColor: "#FEE2E2" },
+  cardBar: { width: 4, alignSelf: "stretch" },
+  cardMain: { flex: 1, flexDirection: "column" },
+  cardInfoRow: { flexDirection: "row", alignItems: "center" },
+  cardIcon: {
+    width: 44, height: 44, borderRadius: 22,
+    alignItems: "center", justifyContent: "center", margin: 12,
+  },
+  cardIconText: { fontSize: 22 },
+  cardContent: { flex: 1, paddingVertical: 14, paddingRight: 8 },
+  cardTopRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 4 },
+  cardName: { flex: 1, fontSize: 15, fontWeight: "800", color: "#171717" },
+  cardNamePaid: { textDecorationLine: "line-through", color: "#9CA3AF" },
+  typeBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
+  typeBadgeTxt: { fontSize: 10, fontWeight: "800", letterSpacing: 0.5 },
+  cardAmount: { fontSize: 18, fontWeight: "900", marginBottom: 6, letterSpacing: -0.5 },
+  cardMetaRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  cardDueDay: { fontSize: 11, color: "#9CA3AF", fontWeight: "600" },
+  cardCountdown: { fontSize: 11, color: "#F59E0B", fontWeight: "700" },
+  cardPaidBadge: { fontSize: 11, color: "#10B981", fontWeight: "700" },
+  emiRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 8 },
+  emiBarBg: { flex: 1, height: 5, backgroundColor: "#F3F4F6", borderRadius: 3, overflow: "hidden" },
+  emiBarFill: { height: 5, borderRadius: 3 },
+  emiText: { fontSize: 11, color: "#9CA3AF", fontWeight: "600" },
+  markBtn: {
+    borderWidth: 1.5, borderRadius: 12,
+    paddingHorizontal: 12, paddingVertical: 8, marginRight: 12,
+  },
+  markBtnTxt: { fontSize: 12, fontWeight: "800" },
+
+  cardActionsRow: {
     flexDirection: "row",
-    alignItems: "center",
     gap: 8,
-    marginBottom: 12,
-    opacity: 0.8,
+    paddingHorizontal: 12,
+    paddingBottom: 12,
+    paddingTop: 4,
   },
-  heroLabel: {
-    fontSize: 10,
-    fontWeight: "900",
-    color: "#000",
-    letterSpacing: 1.5,
-  },
-  heroName: {
-    fontSize: 28,
-    fontWeight: "900",
-    color: "#000",
-    marginBottom: 15,
-    letterSpacing: -1,
-  },
-  heroTimeContainer: {
-    backgroundColor: "rgba(0,0,0,0.1)",
-    padding: 20,
-    borderRadius: 24,
-    alignItems: "center",
-    marginBottom: 15,
-  },
-  heroTime: { fontSize: 36, fontWeight: "900", color: "#000" },
-  heroFooter: {
-    borderTopWidth: 1,
-    borderTopColor: "rgba(0,0,0,0.1)",
-    paddingTop: 15,
-  },
-  heroMeta: { fontSize: 12, fontWeight: "bold", color: "#000", opacity: 0.7 },
-  heroOthersContainer: {
-    backgroundColor: "rgba(0,0,0,0.06)",
-    padding: 14,
-    borderRadius: 18,
-    marginBottom: 15,
-    borderWidth: 1.5,
-    borderColor: "rgba(0,0,0,0.15)",
-  },
-  heroOthersTitle: {
-    fontSize: 9,
-    fontWeight: "900",
-    color: "#000",
-    opacity: 0.6,
-    letterSpacing: 1,
-    marginBottom: 8,
-  },
-  heroOtherRow: {
+  cardActionBtn: {
+    flex: 1,
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    paddingVertical: 4,
+    justifyContent: "center",
+    gap: 5,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    backgroundColor: "#FFF",
   },
-  heroOtherName: {
+  cardActionBtnTxt: {
     fontSize: 12,
     fontWeight: "800",
-    color: "#000",
-    flex: 1,
-    marginRight: 10,
   },
-  heroOtherMeta: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: "#000",
-    opacity: 0.8,
+
+  // Empty
+  empty: { alignItems: "center", paddingTop: 20 },
+  emptyLottie: { width: 180, height: 180 },
+  emptyTitle: { fontSize: 20, fontWeight: "800", color: "#171717", marginBottom: 6 },
+  emptySubtitle: { fontSize: 13, color: "#9CA3AF", textAlign: "center", marginBottom: 24, paddingHorizontal: 30 },
+  emptyBtn: {
+    paddingHorizontal: 28, paddingVertical: 14, borderRadius: 20,
+    shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 4,
   },
-  sectionTitle: {
-    fontSize: 11,
-    fontWeight: "bold",
-    textTransform: "uppercase",
-    letterSpacing: 1.5,
-    marginBottom: 12,
-    marginLeft: 4,
+  emptyBtnText: { color: "#FFF", fontWeight: "800", fontSize: 15 },
+
+  // FAB
+  fab: {
+    position: "absolute", right: 24, width: 58, height: 58, borderRadius: 29,
+    alignItems: "center", justifyContent: "center",
+    shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.4, shadowRadius: 14, elevation: 10,
   },
-  card: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 20,
-    marginBottom: 12,
-    borderRadius: 20,
-    borderWidth: 2.5,
-    borderColor: "#171717",
-    shadowColor: "#171717",
-    shadowOffset: { width: 4, height: 4 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 0,
+  fabText: { fontSize: 28, color: "#FFF", lineHeight: 34 },
+
+  // Modal
+  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.55)", justifyContent: "flex-end" },
+  sheet: {
+    backgroundColor: "#FFF", borderTopLeftRadius: 32, borderTopRightRadius: 32,
+    maxHeight: "92%", paddingBottom: Platform.OS === "ios" ? 40 : 24,
   },
-  cardInfo: { flex: 1, marginLeft: 16 },
-  countdownRow: { flexDirection: "row", alignItems: "center", marginTop: 4 },
-  countdownBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
-  countdownText: { fontSize: 10, fontWeight: "900", letterSpacing: 0.5 },
-  cardName: { fontSize: 17, fontWeight: "700" },
-  cardAmount: { fontSize: 17, fontWeight: "900" },
-  emptyCard: {
-    padding: 40,
-    justifyContent: "center",
-    alignItems: "center",
-    borderRadius: 28,
-    borderWidth: 2.5,
-    borderColor: "#171717",
+  sheetHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: "#E5E7EB", alignSelf: "center", marginTop: 12, marginBottom: 4 },
+  sheetContent: { paddingHorizontal: 24, paddingTop: 8, paddingBottom: 16 },
+  sheetTitleRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 18 },
+  sheetTitle: { fontSize: 18, fontWeight: "800", color: "#171717" },
+  sheetClose: { width: 32, height: 32, borderRadius: 16, backgroundColor: "#F3F4F6", alignItems: "center", justifyContent: "center" },
+  sheetCloseTxt: { fontSize: 14, color: "#6B7280", fontWeight: "700" },
+
+  formLabel: { fontSize: 13, fontWeight: "700", color: "#374151", marginBottom: 8 },
+  formInput: {
+    backgroundColor: "#F9FAFB", borderRadius: 14, padding: 14,
+    fontSize: 15, color: "#171717", fontWeight: "600", marginBottom: 16,
+    borderWidth: 1, borderColor: "#E5E7EB",
   },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.8)",
-    justifyContent: "flex-end",
+
+  typeRow: { flexDirection: "row", gap: 8, marginBottom: 16 },
+  typeChip: {
+    flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
+    paddingVertical: 12, borderRadius: 14, backgroundColor: "#F9FAFB", borderWidth: 1.5, borderColor: "#F3F4F6",
   },
-  modalContent: {
-    borderTopLeftRadius: 36,
-    borderTopRightRadius: 36,
-    padding: 24,
-    borderWidth: 2.5,
-    borderColor: "#171717",
+  typeEmoji: { fontSize: 18 },
+  typeText: { fontSize: 13, fontWeight: "700", color: "#6B7280" },
+
+  alertChip: {
+    paddingHorizontal: 14, paddingVertical: 10, borderRadius: 14,
+    backgroundColor: "#F9FAFB", borderWidth: 1.5, borderColor: "#F3F4F6",
   },
-  modalHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 25,
+  alertChipActive: {},
+  alertText: { fontSize: 12, fontWeight: "700", color: "#6B7280" },
+  alertTextActive: { color: "#6B7280" },
+
+  dateRow: { flexDirection: "row", gap: 10, marginBottom: 16 },
+  datePill: {
+    flex: 1, backgroundColor: "#F9FAFB", borderRadius: 14, paddingVertical: 12,
+    alignItems: "center", borderWidth: 1.5, borderColor: "#F3F4F6",
   },
-  modalTitle: { fontSize: 22, fontWeight: "bold" },
-  input: { padding: 20, borderRadius: 20, borderWidth: 2.5, borderColor: "#171717", fontSize: 16 },
-  pickerBtn: {
-    flex: 1,
-    height: 56,
-    borderRadius: 18,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 10,
-    borderWidth: 2.5,
-    borderColor: "#171717",
-  },
+  datePillTxt: { fontSize: 13, fontWeight: "700", color: "#374151" },
+  divider: { height: 1, backgroundColor: "#F3F4F6", marginVertical: 16 },
+
   saveBtn: {
-    padding: 18,
-    borderRadius: 16,
-    alignItems: "center",
-    marginTop: 10,
-    borderWidth: 2.5,
-    borderColor: "#171717",
-    shadowColor: "#171717",
-    shadowOffset: { width: 4, height: 4 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 0,
+    borderRadius: 20, paddingVertical: 17, alignItems: "center",
+    shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 5,
+    marginTop: 8,
   },
-  litHeaderRow: {
+  saveBtnTxt: { color: "#FFF", fontSize: 16, fontWeight: "800" },
+
+  // Full Screen Report Styles
+  fullScreenReport: { flex: 1, backgroundColor: "#F8FAFC" },
+  reportHeader: {
     flexDirection: "row",
+    alignItems: "center",
     justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 10,
-    marginTop: 5,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    backgroundColor: "#FFF",
+    borderBottomWidth: 1,
+    borderColor: "#E2E8F0",
   },
-  tabBtn: {
-    flex: 1,
+  reportBackBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#F1F5F9",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  reportEditBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#F1F5F9",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  reportHeaderTitle: {
+    fontSize: 18,
+    fontWeight: "900",
+    color: "#1E293B",
+    letterSpacing: -0.3,
+  },
+  tabContainer: {
+    flexDirection: "row",
+    paddingHorizontal: 20,
     paddingVertical: 12,
+    backgroundColor: "#FFF",
+    borderBottomWidth: 1,
+    borderColor: "#E2E8F0",
+    gap: 10,
+  },
+  tabButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 10,
     borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 2.5,
-    borderColor: "transparent",
+    backgroundColor: "#F8FAFC",
+    borderWidth: 1.5,
+    borderColor: "#F1F5F9",
   },
-  litAddBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 2.5,
-    borderColor: "#171717",
+  tabButtonActive: {},
+  tabButtonText: { fontSize: 13, fontWeight: "800", color: "#64748B" },
+  tabButtonTextActive: {},
+  reportScrollContent: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 100,
   },
-  selectionCircle: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    borderWidth: 2.5,
-    borderColor: "#171717",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  bottomActionBar: {
+  reportActionsContainer: {
     position: "absolute",
     bottom: 0,
     left: 0,
     right: 0,
-    height: 100,
     flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 15,
+    gap: 12,
     paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: "#FFF",
     borderTopWidth: 1,
-    paddingBottom: 30,
-    elevation: 30,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: -10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 15,
+    borderColor: "#E2E8F0",
   },
-  batchBtn: {
+  reportActionBtn: {
     flex: 1,
-    height: 54,
-    borderRadius: 18,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    borderWidth: 2.5,
-    borderColor: "#171717",
+    paddingVertical: 14,
+    borderRadius: 16,
+    borderWidth: 1,
   },
-  batchBtnText: {
-    fontSize: 12,
-    fontWeight: "900",
-    letterSpacing: 1,
-    color: "#000",
+  reportDeleteBtn: {
+    backgroundColor: "#FEF2F2",
+    borderColor: "#FEE2E2",
   },
-  adPlaceholder: {
-    height: 60,
-    width: "100%",
-    borderRadius: 12,
-    borderWidth: 2.5,
-    borderColor: "#171717",
-    borderStyle: "dashed",
-    justifyContent: "center",
-    alignItems: "center",
-    marginTop: 20,
-    marginBottom: 5,
-    opacity: 0.6,
+  reportDeleteBtnTxt: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#EF4444",
   },
-  adLabel: {
-    fontSize: 10,
-    fontWeight: "900",
-    letterSpacing: 1,
+  reportPayBtn: {
+    borderColor: "transparent",
   },
+  reportPayBtnTxt: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#FFF",
+  },
+
+  // Redesigned Detail Screen Specific Styles
+  detailHeader: { flexDirection: "row", alignItems: "center", marginBottom: 18 },
+  detailIconContainer: { width: 50, height: 50, borderRadius: 25, alignItems: "center", justifyContent: "center" },
+  detailIcon: { fontSize: 24 },
+  detailName: { fontSize: 22, fontWeight: "900", color: "#111827", letterSpacing: -0.5 },
+  detailAmountCard: { backgroundColor: "#F8FAFC", borderRadius: 20, padding: 18, marginBottom: 20, borderWidth: 1, borderColor: "#E2E8F0" },
+  detailAmountLabel: { fontSize: 12, color: "#64748B", fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5 },
+  detailAmountValue: { fontSize: 32, fontWeight: "900", marginVertical: 6, letterSpacing: -1 },
+  detailCycleRow: { marginTop: 4, gap: 6 },
+  detailCycleText: { fontSize: 13, color: "#475569", fontWeight: "600" },
+  paidBadgeContainer: { backgroundColor: "#ECFDF5", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, alignSelf: "flex-start", marginTop: 4 },
+  paidBadgeText: { color: "#059669", fontSize: 11, fontWeight: "800" },
+  pendingBadgeContainer: { backgroundColor: "#FFFBEB", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, alignSelf: "flex-start", marginTop: 4 },
+  pendingBadgeText: { color: "#D97706", fontSize: 11, fontWeight: "800" },
+  detailsSectionTitle: { fontSize: 15, fontWeight: "800", color: "#1E293B", marginTop: 12, marginBottom: 10, letterSpacing: -0.2 },
+  emptyTenorCard: { backgroundColor: "#F8FAFC", borderRadius: 20, padding: 16, marginBottom: 16, borderStyle: "dashed", borderWidth: 1.5, borderColor: "#CBD5E1" },
+  emptyTenorTitle: { fontSize: 14, fontWeight: "800", color: "#475569", marginBottom: 4 },
+  emptyTenorDesc: { fontSize: 12, color: "#64748B", lineHeight: 18, marginBottom: 12 },
+  metricsRow: { flexDirection: "row", gap: 10, marginBottom: 16 },
+  metricItemCard: { flex: 1, backgroundColor: "#FFF", borderRadius: 16, padding: 12, alignItems: "center", borderWidth: 1, borderColor: "#E2E8F0" },
+  metricItemVal: { fontSize: 20, fontWeight: "900", color: "#1E293B" },
+  metricItemLabel: { fontSize: 11, color: "#64748B", fontWeight: "600", marginTop: 2 },
+  valueAnalyticsCard: { backgroundColor: "#FFF", borderRadius: 20, padding: 16, marginBottom: 20, borderWidth: 1, borderColor: "#E2E8F0" },
+  valueRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginVertical: 4 },
+  valueLabel: { fontSize: 13, color: "#64748B", fontWeight: "600" },
+  valueVal: { fontSize: 14, color: "#1E293B", fontWeight: "800" },
+  valueDivider: { height: 1, backgroundColor: "#F1F5F9", marginVertical: 8 },
+  detailBarBg: { height: 8, backgroundColor: "#F1F5F9", borderRadius: 4, overflow: "hidden", marginTop: 14, marginBottom: 6 },
+  detailBarFill: { height: 8, borderRadius: 4 },
+  detailBarLabel: { fontSize: 11, color: "#64748B", fontWeight: "600" },
+  tenorGrid: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginBottom: 20 },
+  tenorGridItem: { width: (width - 48 - 30) / 5, height: 48, borderRadius: 12, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  tenorGridItemActive: { borderWidth: 1.5, shadowColor: "#F59E0B", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 1 },
+  tenorGridText: { fontSize: 12, fontWeight: "800" },
+  tenorStatusText: { fontSize: 8, fontWeight: "700", marginTop: 1 },
+  historyCard: { backgroundColor: "#FFF", borderRadius: 18, padding: 12, marginBottom: 20, borderWidth: 1, borderColor: "#E2E8F0" },
+  historyItem: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: "#F1F5F9" },
+  historyLeft: { gap: 2 },
+  historyDate: { fontSize: 13, color: "#1E293B", fontWeight: "700" },
+  historyTime: { fontSize: 10, color: "#94A3B8", fontWeight: "600" },
+  historyAmount: { fontSize: 14, color: "#10B981", fontWeight: "800" },
+  detailActionsRow: { flexDirection: "row", gap: 10, marginBottom: 12 },
+  detailActionBtn: { flex: 1, paddingVertical: 14, borderRadius: 16, alignItems: "center", justifyContent: "center", borderWidth: 1 },
+  editActionBtn: { backgroundColor: "#FFF", borderColor: "#CBD5E1" },
+  editActionTxt: { fontSize: 14, fontWeight: "700", color: "#475569" },
+  deleteActionBtn: { backgroundColor: "#FEF2F2", borderColor: "#FEE2E2" },
+  deleteActionTxt: { fontSize: 14, fontWeight: "700", color: "#EF4444" },
+  detailPayBtn: { paddingVertical: 16, borderRadius: 18, alignItems: "center", justifyContent: "center" },
+  detailPayBtnTxt: { color: "#FFF", fontSize: 15, fontWeight: "800" },
 });
+

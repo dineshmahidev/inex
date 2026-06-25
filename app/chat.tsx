@@ -122,7 +122,7 @@ function TypingDots() {
           key={i}
           style={{
             width: 7, height: 7, borderRadius: 3.5,
-            backgroundColor: '#16a34a', opacity: 0.5,
+            backgroundColor: '#ff2d78', opacity: 0.5,
             transform: [{ translateY: anim }],
           }}
         />
@@ -282,14 +282,14 @@ export default function ChatScreen() {
           </TouchableOpacity>
           <View style={styles.headerContent}>
             <View style={styles.aiBadge}>
-              <Brain size={20} color="#16a34a" />
+              <Brain size={20} color="#ff2d78" />
             </View>
             <View>
               <Text style={styles.headerTitle}>AI Strategy</Text>
               <Text style={styles.headerSubtitle}>Powered by Tracksy</Text>
             </View>
           </View>
-          <View style={[styles.langBadge, { backgroundColor: '#16a34a' }]}>
+          <View style={[styles.langBadge, { backgroundColor: '#ff2d78' }]}>
             <Text style={styles.langBadgeText}>{lang === 'en' ? 'EN' : 'த'.toUpperCase()}</Text>
           </View>
         </View>
@@ -299,7 +299,7 @@ export default function ChatScreen() {
                 <View key={m.id} style={[styles.msgWrapper, m.sender === 'user' ? styles.userWrapper : styles.aiWrapper]}>
                     {m.sender === 'ai' && (
                         <View style={styles.aiAvatar}>
-                          <Sparkles size={12} color="#16a34a" />
+                          <Sparkles size={12} color="#ff2d78" />
                         </View>
                     )}
                     <View style={{ flex: 1 }}>
@@ -318,7 +318,7 @@ export default function ChatScreen() {
                         {(m.type === 'options' || m.type === 'lang') && m.options && (
                             <View style={styles.optionsGrid}>
                                 {m.options.map((opt, i) => {
-                                  const colors = ['#16a34a', '#8b5cf6', '#eab308', '#ef4444'];
+                                  const colors = ['#ff2d78', '#8b5cf6', '#eab308', '#ef4444'];
                                   const color = colors[i % colors.length];
                                   return (
                                     <TouchableOpacity
@@ -337,7 +337,7 @@ export default function ChatScreen() {
                         {m.type === 'result' && m.options && (
                             <View style={styles.resultCard}>
                               <View style={styles.resultHeader}>
-                                <Sparkles size={14} color="#16a34a" />
+                                <Sparkles size={14} color="#ff2d78" />
                                 <Text style={styles.resultHead}>STRATEGIC ROADMAP</Text>
                               </View>
                               <View style={styles.resultDivider} />
@@ -348,11 +348,11 @@ export default function ChatScreen() {
                                 const value = parts[1];
                                 return (
                                   <View key={idx} style={styles.tierRow}>
-                                    <View style={[styles.tierIcon, { backgroundColor: idx === 0 ? '#16a34a' : idx === 1 ? '#8b5cf6' : idx === 2 ? '#eab308' : '#ef4444' }]}>
+                                    <View style={[styles.tierIcon, { backgroundColor: idx === 0 ? '#ff2d78' : idx === 1 ? '#8b5cf6' : idx === 2 ? '#eab308' : '#ef4444' }]}>
                                       <Icon size={12} color="#FFFFFF" />
                                     </View>
                                     <Text style={styles.tierLabel}>{label}</Text>
-                                    <Text style={[styles.tierValue, { color: idx === 0 ? '#16a34a' : idx === 1 ? '#8b5cf6' : idx === 2 ? '#eab308' : '#ef4444' }]}>{value}</Text>
+                                    <Text style={[styles.tierValue, { color: idx === 0 ? '#ff2d78' : idx === 1 ? '#8b5cf6' : idx === 2 ? '#eab308' : '#ef4444' }]}>{value}</Text>
                                   </View>
                                 );
                               })}
@@ -422,7 +422,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#16a34a15',
+    backgroundColor: '#ff2d7815',
   },
   headerTitle: {
     fontSize: 17,
@@ -471,7 +471,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#16a34a15',
+    backgroundColor: '#ff2d7815',
     marginTop: 6,
   },
   bubble: {
@@ -481,9 +481,9 @@ const styles = StyleSheet.create({
     maxWidth: '82%',
   },
   userBubble: {
-    backgroundColor: '#16a34a',
+    backgroundColor: '#ff2d78',
     borderBottomRightRadius: 4,
-    shadowColor: '#16a34a',
+    shadowColor: '#ff2d78',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
     shadowRadius: 8,
@@ -550,7 +550,7 @@ const styles = StyleSheet.create({
   resultHead: {
     fontSize: 9,
     fontWeight: '900',
-    color: '#16a34a',
+    color: '#ff2d78',
     letterSpacing: 2,
   },
   resultDivider: {
@@ -618,8 +618,8 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#16a34a',
-    shadowColor: '#16a34a',
+    backgroundColor: '#ff2d78',
+    shadowColor: '#ff2d78',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
