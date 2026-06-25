@@ -31,12 +31,12 @@
         "resizeMode": "contain",
         "backgroundColor": "#ffffff"
       },
-"adaptiveIcon": {
-          "backgroundColor": "#fcd002",
-          "foregroundImage": "./assets/tracksy_logo.png",
-          "backgroundImage": "./assets/tracksy_logo.png",
-          "monochromeImage": "./assets/tracksy_logo.png"
-        },
+      "adaptiveIcon": {
+        "backgroundColor": "#fcd002",
+        "foregroundImage": "./assets/tracksy_logo.png",
+        "backgroundImage": "./assets/tracksy_logo.png",
+        "monochromeImage": "./assets/tracksy_logo.png"
+      },
       "config": {
         "googleMobileAdsAppId": "ca-app-pub-2141805169615611~2090173992"
       },
@@ -80,7 +80,10 @@
             "./assets/mixkit_bell_notification_933.wav"
           ]
         }
-      ]
+      ],
+      "expo-asset",
+      "expo-font",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,
