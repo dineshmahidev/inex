@@ -468,13 +468,7 @@ export default function HabitsScreen() {
                     </Text>
                   </View>
 
-                  {/* Share button */}
-                  <TouchableOpacity
-                    onPress={() => { setSharingHabit(habit); setShareUserName(settings.userName || "Challenger"); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); }}
-                    style={[styles.shareBtn, { backgroundColor: Colors.primary, borderColor: "#171717" }]}>
-                    <Share2 size={16} color="#000" strokeWidth={3} />
-                    <Text style={styles.shareBtnText}>SHARE PROGRESS</Text>
-                  </TouchableOpacity>
+
                 </View>
               );
             })
@@ -567,64 +561,7 @@ export default function HabitsScreen() {
       </Modal>
 
       {/* ── Share Modal ── */}
-      <Modal visible={!!sharingHabit} animationType="slide" transparent statusBarTranslucent>
-        <View style={[styles.overlay, { backgroundColor: "rgba(0,0,0,0.88)" }]}>
-          <SafeAreaView style={{ flex: 1, justifyContent: "center", alignItems: "center", width: "100%" }}>
-            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", width: "90%", marginBottom: 15 }}>
-              <Text style={{ color: "#fff", fontSize: 18, fontWeight: "900" }}>SHARE PROGRESS</Text>
-              <TouchableOpacity onPress={() => setSharingHabit(null)} style={styles.closeBtn}><X size={16} color="#fff" strokeWidth={3.5} /></TouchableOpacity>
-            </View>
 
-            <View ref={shareCardRef} collapsable={false}
-              style={{ width: Dimensions.get("window").width * 0.82, aspectRatio: 9 / 16, maxHeight: Dimensions.get("window").height * 0.62, backgroundColor: "#facc15", borderWidth: 3, borderColor: "#171717", borderRadius: 24, padding: 20, justifyContent: "space-between", shadowColor: "#000", shadowOffset: { width: 5, height: 5 }, shadowOpacity: 1, shadowRadius: 0, overflow: "hidden" }}>
-              <View style={{ flexDirection: "row", justifyContent: "space-between", borderBottomWidth: 3, borderColor: "#171717", paddingBottom: 10 }}>
-                <Text style={{ color: "#171717", fontWeight: "900", fontSize: 14 }}>TRACKSY HABITS</Text>
-                <Text style={{ color: "#171717", fontWeight: "900", fontSize: 11 }}>@{shareUserName.toUpperCase()}</Text>
-              </View>
-              <View style={{ backgroundColor: "#fff", borderWidth: 3, borderColor: "#171717", borderRadius: 16, padding: 14, marginTop: 10 }}>
-                <Text style={{ fontSize: 24 }}>{sharingHabit?.icon || "🔥"}</Text>
-                <Text style={{ color: "#171717", fontSize: 16, fontWeight: "900" }} numberOfLines={1}>{sharingHabit?.name.toUpperCase()}</Text>
-              </View>
-              <View style={{ flexDirection: "row", gap: 10, marginTop: 10 }}>
-                <View style={{ flex: 1, backgroundColor: "#171717", borderRadius: 14, padding: 12, alignItems: "center" }}>
-                  <Text style={{ color: "#facc15", fontSize: 22, fontWeight: "900" }}>🔥 {getHabitStreak(sharingHabit?.logs || [])}</Text>
-                  <Text style={{ color: "#a3a3a3", fontSize: 8, fontWeight: "900", letterSpacing: 1 }}>DAY STREAK</Text>
-                </View>
-                <View style={{ flex: 1, backgroundColor: "#171717", borderRadius: 14, padding: 12, alignItems: "center" }}>
-                  <Text style={{ color: "#facc15", fontSize: 22, fontWeight: "900" }}>{sharingHabit?.logs?.length || 0}</Text>
-                  <Text style={{ color: "#a3a3a3", fontSize: 8, fontWeight: "900", letterSpacing: 1 }}>COMPLETED</Text>
-                </View>
-              </View>
-              <View style={{ backgroundColor: "#fff", borderWidth: 3, borderColor: "#171717", borderRadius: 14, padding: 12, flex: 1, marginTop: 10, justifyContent: "center" }}>
-                <Text style={{ color: "#171717", fontSize: 9, fontWeight: "900", letterSpacing: 1, textAlign: "center", marginBottom: 8 }}>MONTHLY RADAR</Text>
-                <View style={{ flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: 3 }}>
-                  {sharingHabit && Array.from({ length: Math.min(new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate(), 31) }).map((_, i) => {
-                    const day = i + 1;
-                    const ds = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-                    return (
-                      <View key={day} style={{ width: 20, height: 20, borderRadius: 4, backgroundColor: sharingHabit.logs.includes(ds) ? sharingHabit.color : "#e5e7eb", borderWidth: 1.5, borderColor: "#171717", justifyContent: "center", alignItems: "center" }}>
-                        <Text style={{ color: "#fff", fontSize: 6, fontWeight: "900" }}>{sharingHabit.logs.includes(ds) ? "✓" : day}</Text>
-                      </View>
-                    );
-                  })}
-                </View>
-              </View>
-              <View style={{ borderTopWidth: 3, borderStyle: "dashed", borderColor: "#171717", paddingTop: 8, marginTop: 10, alignItems: "center" }}>
-                <Text style={{ color: "#171717", fontSize: 10, fontWeight: "900", letterSpacing: 1.5 }}>BUILD SYSTEMS, NOT GOALS</Text>
-              </View>
-            </View>
-
-            <View style={{ width: "82%", marginTop: 12, backgroundColor: "#fff", borderWidth: 2.5, borderColor: "#171717", borderRadius: 14, paddingHorizontal: 12, height: 44, flexDirection: "row", alignItems: "center" }}>
-              <Text style={{ color: "#a3a3a3", fontSize: 11, fontWeight: "900", marginRight: 6 }}>NAME:</Text>
-              <TextInput style={{ flex: 1, color: "#171717", fontWeight: "900", fontSize: 12 }} value={shareUserName} onChangeText={setShareUserName} maxLength={18} placeholder="Your Name" placeholderTextColor="#a3a3a3" />
-            </View>
-            <TouchableOpacity onPress={exportShareCard} style={{ marginTop: 12, width: "82%", height: 48, backgroundColor: "#34d399", borderWidth: 2.5, borderColor: "#171717", borderRadius: 14, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 }}>
-              <Download size={18} color="#000" strokeWidth={3} />
-              <Text style={{ color: "#000", fontSize: 13, fontWeight: "900" }}>EXPORT PICTURE</Text>
-            </TouchableOpacity>
-          </SafeAreaView>
-        </View>
-      </Modal>
     </SafeAreaView>
   );
 }
