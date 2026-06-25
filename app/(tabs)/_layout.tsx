@@ -235,7 +235,7 @@ function CustomTabBar({
 
 // ─── Layout Root ──────────────────────────────────────────────────────────────
 export default function TabLayout() {
-  const { Colors, settings, updateSettings } = useDatabase();
+  const { Colors, settings } = useDatabase();
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
