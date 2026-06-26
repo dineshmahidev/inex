@@ -24,6 +24,7 @@ import Svg, { Circle } from "react-native-svg";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import * as Sharing from "expo-sharing";
+import * as FileSystem from "expo-file-system/legacy";
 import ViewShot from "react-native-view-shot";
 import LottieView from "lottie-react-native";
 import MrCookieDrinkLottie from "@/assets/Mr. Cookie_ Drink.json";
@@ -263,13 +264,16 @@ export default function TracksyHomeScreen() {
     try {
       if (viewShotRef.current) {
         const uri = await viewShotRef.current.capture();
+        const fileName = `Tracksy_Habit_Complete_${Date.now()}.png`;
+        const destUri = FileSystem.documentDirectory + fileName;
+        await FileSystem.moveAsync({ from: uri, to: destUri });
         const inviteText = `I just completed my habit on Tracksy! 🔥\nJoin me and track your goals: https://play.google.com/store/apps/details?id=com.dineshmahidev.tracksy`;
         
         if (Platform.OS === "ios") {
-          await Share.share({ message: inviteText, url: uri });
+          await Share.share({ message: inviteText, url: destUri });
         } else {
           if (await Sharing.isAvailableAsync()) {
-            await Sharing.shareAsync(uri, { dialogTitle: "Share your habit" });
+            await Sharing.shareAsync(destUri, { dialogTitle: "Share your habit" });
           }
         }
       }
