@@ -18,6 +18,7 @@ import * as Sharing from "expo-sharing";
 import { LinearGradient } from "expo-linear-gradient";
 import { FontAwesome } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import * as FileSystem from "expo-file-system/legacy";
 
 const { width } = Dimensions.get("window");
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -267,7 +268,10 @@ export default function ProgressScreen() {
 
   // Share today's checklist as Text
   const shareProgressAsText = async () => {
-    let shareText = `🌟 *My Tracksy Daily Habit Check-in* 🌟\n📅 Date: ${today.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}\n\n`;
+    const emoji = todayStats.rate >= 80 ? "🚀" : todayStats.rate >= 50 ? "💪" : "🔥";
+    const dateStr = today.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+    let shareText = `${emoji} *Today's Habit Report* ${emoji}\n📅 ${dateStr}\n\n`;
 
     habits.forEach((h) => {
       const logs = h.logs || [];
@@ -275,21 +279,22 @@ export default function ProgressScreen() {
       const goal = h.goal || 1;
       const isDone = todayCount >= goal;
       if (isDone) {
-        shareText += `✅ *${h.icon || "✨"} ${h.name}* — ${todayCount}/${goal} Done!\n`;
+        shareText += `✅ ${h.icon || "✨"} ${h.name} — done\n`;
       } else if (todayCount > 0) {
-        shareText += `⏳ *${h.icon || "✨"} ${h.name}* — ${todayCount}/${goal} In Progress\n`;
+        shareText += `⏳ ${h.icon || "✨"} ${h.name} — ${todayCount}/${goal}\n`;
       } else {
-        shareText += `❌ *${h.icon || "✨"} ${h.name}* — ${todayCount}/${goal} Missed\n`;
+        shareText += `❌ ${h.icon || "✨"} ${h.name} — missed\n`;
       }
     });
 
-    shareText += `\n🔥 *Today's Score: ${todayStats.rate}%* (${todayStats.completed}/${todayStats.total} habits completed)\n`;
-    shareText += `\n📥 Download Tracksy: ${PLAY_STORE_URL}`;
+    shareText += `\n📊 Score: ${todayStats.rate}% (${todayStats.completed}/${todayStats.total})\n\n`;
+    shareText += `📲 Track your habits daily with Tracksy!\n📥 ${PLAY_STORE_URL}\n\n`;
+    shareText += `#habitTracker #dailyProgress #tracksy #discipline`;
 
     try {
       await Share.share({
         message: shareText,
-        title: "Tracksy Daily Habit Progress",
+        title: "My Daily Habit Progress",
       });
     } catch (error) {
       console.error("Error sharing text progress:", error);
@@ -308,10 +313,14 @@ export default function ProgressScreen() {
         format: "png",
         quality: 0.95,
       });
-      
+
+      const fileName = `Tracksy_Progress_${todayStr}.png`;
+      const destUri = FileSystem.documentDirectory + fileName;
+      await FileSystem.moveAsync({ from: uri, to: destUri });
+
       const isAvailable = await Sharing.isAvailableAsync();
       if (isAvailable) {
-        await Sharing.shareAsync(uri, {
+        await Sharing.shareAsync(destUri, {
           dialogTitle: "Share my Tracksy progress today!",
           mimeType: "image/png",
         });
@@ -563,7 +572,19 @@ export default function ProgressScreen() {
               ))}
             </View>
 
-
+            {/* Today's Progress + Share */}
+            <View style={styles.todayShareRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.todayShareTitle}>Today's Progress</Text>
+                <Text style={styles.todayShareScore}>
+                  {todayStats.completed}/{todayStats.total} habits · <Text style={{ color: Colors.primary }}>{todayStats.rate}%</Text>
+                </Text>
+              </View>
+              <TouchableOpacity style={[styles.shareBtn, { borderColor: Colors.primary }]} onPress={handleSharePress} activeOpacity={0.7}>
+                <FontAwesome name="share" size={16} color={Colors.primary} />
+                <Text style={[styles.shareBtnText, { color: Colors.primary }]}>Share</Text>
+              </TouchableOpacity>
+            </View>
 
             {/* Habit Performance */}
             <Text style={styles.sectionTitle}>Habit Performance</Text>
@@ -616,127 +637,78 @@ export default function ProgressScreen() {
         <View style={{ height: 100 }} />
       </ScrollView>
 
-      {/* Premium Share Cards (Rendered in White Theme, always mounted, hidden off-screen) */}
+      {/* Shareable 9:16 Progress Card */}
       <View style={styles.hiddenShareContainer} pointerEvents="none">
-        <View ref={shareViewRef} style={styles.shareCardImage}>
+        <View ref={shareViewRef} style={styles.shareCardWrap}>
           <LinearGradient
             colors={["#FFFFFF", "#F8FAFC"]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={styles.shareGradient}
+            style={styles.shareDailyGradient}
           >
-            {/* Top Share Card Branding */}
-            <View style={styles.shareBrandingRow}>
+            {/* Top Section: Branding + User */}
+            <View style={styles.shareTopSection}>
+              <View style={styles.shareBrandRow}>
+                <Image
+                  source={require("../../assets/splash_logo.png")}
+                  style={styles.shareLogoImg}
+                  resizeMode="contain"
+                />
+                <Text style={styles.shareBrandName}>Tracksy</Text>
+              </View>
+              {/* Profile Row */}
+              <View style={styles.shareProfileRow}>
+                {isImageUri(userImage) ? (
+                  <Image source={{ uri: userImage || undefined }} style={styles.shareProfilePic} />
+                ) : (
+                  <View style={styles.shareProfilePicPlaceholder}>
+                    <Text style={styles.shareProfilePicEmoji}>{userImage || "🐉"}</Text>
+                  </View>
+                )}
+                <Text style={styles.shareProfileName}>{userName}</Text>
+              </View>
+            </View>
+
+            {/* Progress Circle */}
+            <View style={styles.shareProgressSection}>
               <LinearGradient
-                colors={Colors.gradient || ["#F472B6", "#EC4899"]}
-                style={[styles.shareLogoCircle, { shadowColor: Colors.primary }]}
+                colors={[`${Colors.primary}15`, `${Colors.primary}08`]}
+                style={[styles.shareProgressCircle, { borderColor: Colors.primary }]}
               >
-                <Text style={styles.shareLogoTick}>✓</Text>
+                <Text style={[styles.shareProgressValue, { color: Colors.primary }]}>{todayStats.rate}%</Text>
+                <Text style={styles.shareProgressLabel}>{todayStats.completed}/{todayStats.total} done</Text>
               </LinearGradient>
-              <View style={styles.shareBrandingMeta}>
-                <Text style={[styles.shareAppName, { color: "#1E293B" }]}>Tracksy</Text>
-                <Text style={styles.shareAppSubtitle}>Habit Tracker</Text>
-              </View>
+              <Text style={styles.shareDate}>{today.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}</Text>
             </View>
 
-            {/* Share Card User Profile Row */}
-            <View style={styles.shareUserRow}>
-              {isImageUri(userImage) ? (
-                <Image source={{ uri: userImage || undefined }} style={styles.shareUserAvatar} />
-              ) : (
-                <View style={[styles.shareUserAvatarPlaceholder, { backgroundColor: "#F1F5F9" }]}>
-                  <Text style={{ fontSize: 18 }}>{userImage || "🐉"}</Text>
-                </View>
+            {/* Habits List (up to 8) */}
+            <ScrollView style={styles.shareHabitsScroll} showsVerticalScrollIndicator={false}>
+              {habits.slice(0, 8).map((h, idx) => {
+                const logs = h.logs || [];
+                const todayCount = logs.filter((l) => l === todayStr).length;
+                const goal = h.goal || 1;
+                const isDone = todayCount >= goal;
+                return (
+                  <View key={h.id} style={[styles.shareHabitRow, idx % 2 === 0 ? { backgroundColor: "#F8FAFC" } : { backgroundColor: "#FFFFFF" }]}>
+                    <Text style={styles.shareHabitIcon}>{h.icon || "✨"}</Text>
+                    <Text style={styles.shareHabitName} numberOfLines={1}>{h.name}</Text>
+                    <View style={[styles.shareHabitStatus, { backgroundColor: isDone ? (h.color || Colors.primary) : "#CBD5E1" }]}>
+                      <Text style={styles.shareHabitStatusText}>
+                        {isDone ? "✓" : todayCount > 0 ? "⏳" : "✕"}
+                      </Text>
+                    </View>
+                  </View>
+                );
+              })}
+              {habits.length === 0 && (
+                <Text style={styles.shareEmptyText}>No habits tracked today</Text>
               )}
-              <View style={styles.shareUserMeta}>
-                <Text style={styles.shareUserNameText}>{userName}'s Daily Track</Text>
-                <Text style={styles.shareUserSubtitle}>Today's Achievements</Text>
-              </View>
-            </View>
+            </ScrollView>
 
-            {/* App UI Phone Mockup Card (White Theme) */}
-            <View style={[styles.phoneMockup, { backgroundColor: "#FFFFFF", borderColor: "#E2E8F0" }]}>
-              {/* Phone Status Bar Notch */}
-              <View style={styles.phoneStatusRow}>
-                <Text style={[styles.phoneTimeText, { color: "#64748B" }]}>09:41</Text>
-                <View style={[styles.phoneNotch, { backgroundColor: "#E2E8F0" }]} />
-                <View style={styles.phoneIconsRow}>
-                  <Text style={[styles.phoneIconSmall, { color: "#64748B" }]}>📶</Text>
-                  <Text style={[styles.phoneIconSmall, { color: "#64748B" }]}>🔋</Text>
-                </View>
-              </View>
-
-              {/* Phone UI Contents */}
-              <View style={styles.phoneBody}>
-                <Text style={[styles.phoneHeaderDate, { color: Colors.primary }]}>
-                  {today.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}
-                </Text>
-                <Text style={[styles.phoneTitleText, { color: "#1E293B" }]}>Daily Checklist</Text>
-
-                {/* Glowing Progress Circle */}
-                <View style={styles.phoneProgressContainer}>
-                  <LinearGradient
-                    colors={[`${Colors.primary}12`, `${Colors.primary}08`]}
-                    style={[styles.phoneProgressCircle, { borderColor: Colors.primary }]}
-                  >
-                    <Text style={[styles.phoneProgressVal, { color: Colors.primary }]}>{todayStats.rate}%</Text>
-                    <Text style={[styles.phoneProgressLbl, { color: "#64748B" }]}>Completed</Text>
-                  </LinearGradient>
-                </View>
-
-                {/* Habits List in Phone UI */}
-                <View style={styles.phoneHabitsList}>
-                  {habits.slice(0, 3).map((h) => {
-                    const logs = h.logs || [];
-                    const todayCount = logs.filter((l) => l === todayStr).length;
-                    const goal = h.goal || 1;
-                    const isDone = todayCount >= goal;
-                    return (
-                      <View key={h.id} style={[styles.phoneHabitRow, { backgroundColor: "#F8FAFC", borderColor: "#F1F5F9", flexDirection: "row", alignItems: "center" }]}>
-                        <Text style={styles.phoneHabitEmoji}>{h.icon || "✨"}</Text>
-                        <View style={{ flex: 1, marginLeft: 8 }}>
-                          <Text style={[styles.phoneHabitName, { color: "#1E293B", marginBottom: 2 }, isDone && styles.phoneHabitNameDone]} numberOfLines={1}>
-                            {h.name}
-                          </Text>
-                          {/* Small progress bar */}
-                          <View style={{ height: 4, backgroundColor: "#E2E8F0", borderRadius: 2, overflow: "hidden", width: "80%" }}>
-                            <View style={{ height: "100%", width: `${Math.min((todayCount / goal) * 100, 100)}%`, backgroundColor: h.color || Colors.primary }} />
-                          </View>
-                        </View>
-                        <View style={{ alignItems: "flex-end", marginRight: 8 }}>
-                          <Text style={{ fontSize: 10, fontWeight: "700", color: isDone ? (h.color || Colors.primary) : "#64748B" }}>
-                            {todayCount}/{goal}
-                          </Text>
-                        </View>
-                        <View style={[styles.phoneStatusBox, isDone ? { backgroundColor: h.color || Colors.primary } : { backgroundColor: "#CBD5E1" }]}>
-                          <Text style={styles.phoneStatusCheck}>{isDone ? "✓" : todayCount > 0 ? "⏳" : "✕"}</Text>
-                        </View>
-                      </View>
-                    );
-                  })}
-                  {habits.length === 0 && (
-                    <Text style={[styles.phoneEmptyText, { color: "#64748B" }]}>No habits tracked today</Text>
-                  )}
-                </View>
-              </View>
-            </View>
-
-            {/* Play Store & Download Badge */}
-            <View style={styles.shareFooterBlock}>
-              <View style={[styles.playStoreBadge, { borderColor: "#E2E8F0" }]}>
-                {/* Stylized Google Play Colored Triangle Icon */}
-                <View style={styles.playLogoContainer}>
-                  <View style={styles.playTriangleTop} />
-                  <View style={styles.playTriangleRight} />
-                  <View style={styles.playTriangleBottom} />
-                  <View style={styles.playTriangleLeft} />
-                </View>
-                <View style={styles.playBadgeTextColumn}>
-                  <Text style={styles.playBadgeSmallTxt}>GET IT ON</Text>
-                  <Text style={styles.playBadgeLargeTxt}>Google Play</Text>
-                </View>
-              </View>
-              <Text style={[styles.playStoreLinkText, { color: "#64748B" }]}>{PLAY_STORE_URL}</Text>
+            {/* Bottom: App promo */}
+            <View style={styles.shareBottomSection}>
+              <Text style={styles.shareAppPromo}>📲 Track your habits daily with Tracksy</Text>
+              <Text style={styles.shareAppLink}>{PLAY_STORE_URL}</Text>
             </View>
           </LinearGradient>
         </View>
@@ -953,6 +925,33 @@ const styles = StyleSheet.create({
   dayDotDone: { backgroundColor: "#F472B6" },
   dayCheck: { fontSize: 14, color: "#FFF", fontWeight: "800" },
 
+  todayShareRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    padding: 14,
+    marginBottom: 16,
+    shadowColor: "#0F172A",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 12,
+    elevation: 2,
+  },
+  todayShareTitle: { fontSize: 13, fontWeight: "700", color: "#64748B", marginBottom: 2 },
+  todayShareScore: { fontSize: 15, fontWeight: "800", color: "#1E293B" },
+  shareBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 14,
+    borderWidth: 2,
+  },
+  shareBtnText: { fontSize: 13, fontWeight: "800" },
+
   shareCardCTA: {
     backgroundColor: "#FFF0F6",
     borderRadius: 24,
@@ -1084,10 +1083,11 @@ const styles = StyleSheet.create({
   statLbl: { fontSize: 10, color: "#64748B", fontWeight: "700", marginTop: 2 },
   statDivider: { width: 1, height: 28, backgroundColor: "#F1F5F9" },
 
-  // Premium Hidden Shareable Card Styles
+  // Premium Hidden Shareable Card Styles (kept for monthly card)
   hiddenShareContainer: { position: "absolute", left: -9999, top: -9999, opacity: 0 },
   shareCardImage: { width: 380, height: 660, borderRadius: 32, overflow: "hidden", borderWidth: 1, borderColor: "#E2E8F0" },
   shareGradient: { flex: 1, padding: 24, justifyContent: "space-between", alignItems: "center" },
+  shareDailyGradient: { flex: 1, padding: 20, justifyContent: "space-between" },
   
   // Branding
   shareBrandingRow: { flexDirection: "row", alignItems: "center", gap: 10, width: "100%", paddingHorizontal: 4 },
@@ -1142,6 +1142,35 @@ const styles = StyleSheet.create({
   playBadgeSmallTxt: { fontSize: 6, color: "#FFF", fontWeight: "600", letterSpacing: 0.5 },
   playBadgeLargeTxt: { fontSize: 12, color: "#FFF", fontWeight: "900", marginTop: -1 },
   playStoreLinkText: { fontSize: 9, color: "#94A3B8", fontWeight: "600", marginTop: 4, textAlign: "center" },
+
+  // Daily Share Card (9:16) - New Design
+  shareCardWrap: { width: 360, height: 640, borderRadius: 32, overflow: "hidden", borderWidth: 1, borderColor: "#E2E8F0" },
+  shareTopSection: { alignItems: "center", paddingTop: 8 },
+  shareBrandRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  shareLogoImg: { width: 32, height: 32 },
+  shareProfileRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 6 },
+  shareProfilePic: { width: 22, height: 22, borderRadius: 11 },
+  shareProfilePicPlaceholder: { width: 22, height: 22, borderRadius: 11, backgroundColor: "#F1F5F9", alignItems: "center", justifyContent: "center" },
+  shareProfilePicEmoji: { fontSize: 11 },
+  shareProfileName: { fontSize: 11, color: "#64748B", fontWeight: "600" },
+  shareLogoText: { fontSize: 16, color: "#FFF", fontWeight: "900" },
+  shareBrandName: { fontSize: 20, fontWeight: "900", color: "#1E293B", letterSpacing: -0.5 },
+  shareBrandTagline: { fontSize: 10, color: "#94A3B8", fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5, marginTop: 2 },
+  shareProgressSection: { alignItems: "center", marginVertical: 8 },
+  shareProgressCircle: { width: 100, height: 100, borderRadius: 50, alignItems: "center", justifyContent: "center", borderWidth: 4 },
+  shareProgressValue: { fontSize: 28, fontWeight: "900" },
+  shareProgressLabel: { fontSize: 9, color: "#94A3B8", fontWeight: "700", marginTop: 1 },
+  shareDate: { fontSize: 12, color: "#64748B", fontWeight: "600", marginTop: 6 },
+  shareHabitsScroll: { flex: 1, paddingHorizontal: 4, marginTop: 4 },
+  shareHabitRow: { flexDirection: "row", alignItems: "center", paddingHorizontal: 12, paddingVertical: 10, borderRadius: 14, marginBottom: 6 },
+  shareHabitIcon: { fontSize: 16, marginRight: 10 },
+  shareHabitName: { flex: 1, fontSize: 13, fontWeight: "700", color: "#1E293B" },
+  shareHabitStatus: { width: 22, height: 22, borderRadius: 11, alignItems: "center", justifyContent: "center" },
+  shareHabitStatusText: { fontSize: 11, color: "#FFF", fontWeight: "800" },
+  shareEmptyText: { fontSize: 12, color: "#94A3B8", textAlign: "center", marginTop: 20 },
+  shareBottomSection: { alignItems: "center", paddingBottom: 4, gap: 2 },
+  shareAppPromo: { fontSize: 11, color: "#64748B", fontWeight: "600" },
+  shareAppLink: { fontSize: 8, color: "#94A3B8", fontWeight: "500", textAlign: "center" },
 
   // Monthly Progress Sharing styles
   shareMonthBtn: {
