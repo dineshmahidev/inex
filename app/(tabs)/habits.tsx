@@ -347,6 +347,7 @@ export default function HabitsScreen() {
                       <View style={{ flex: 1 }}>
                         <Text style={styles.overviewName}>{habit.name.toUpperCase()}</Text>
                         <Text style={styles.overviewCount}>{completedCount} / {challengeDays} DAYS</Text>
+                        {habit.reminderTime ? <Text style={styles.overviewReminder}>🔔 {habit.reminderTime}</Text> : null}
                       </View>
                       <View style={[styles.streakPill, { backgroundColor: "#00000020" }]}>
                         <Text style={styles.streakPillText}>🔥 {getHabitStreak(habit.logs)}</Text>
@@ -590,6 +591,7 @@ const styles = StyleSheet.create({
   iconBox: { width: 44, height: 44, backgroundColor: "#fff", borderWidth: 2, borderColor: "#000", borderRadius: 10, alignItems: "center", justifyContent: "center" },
   overviewName: { color: "#000", fontWeight: "900", fontSize: 15, letterSpacing: 0.3 },
   overviewCount: { color: "#00000080", fontSize: 11, fontWeight: "800", marginTop: 2 },
+  overviewReminder: { color: "#00000099", fontSize: 10, fontWeight: "700", marginTop: 2 },
   streakPill: { borderRadius: 12, paddingHorizontal: 10, paddingVertical: 4 },
   streakPillText: { color: "#000", fontWeight: "900", fontSize: 13 },
   cardBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, height: 36, borderRadius: 12, borderWidth: 2, borderColor: "#00000030" },

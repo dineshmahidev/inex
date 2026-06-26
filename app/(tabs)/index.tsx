@@ -1,7 +1,7 @@
 import { useDatabase } from "@/hooks/useDatabase";
 import { useIsFocused, useFocusEffect } from "@react-navigation/native";
 import { useRouter } from "expo-router";
-import { Bell, Sparkles, Plus, Check } from "lucide-react-native";
+import { Bell, Sparkles, Plus, Check, Share2 } from "lucide-react-native";
 import React, { useEffect, useMemo, useState, useRef, useCallback } from "react";
 import {
   DeviceEventEmitter,
@@ -16,10 +16,15 @@ import {
   Animated,
   Modal,
   FlatList,
+  Platform,
+  Alert,
+  Share,
 } from "react-native";
 import Svg, { Circle } from "react-native-svg";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
+import * as Sharing from "expo-sharing";
+import ViewShot from "react-native-view-shot";
 import LottieView from "lottie-react-native";
 import MrCookieDrinkLottie from "@/assets/Mr. Cookie_ Drink.json";
 import RunningPigeonLottie from "@/assets/running pigeon.json";
@@ -167,7 +172,7 @@ const getModifiedRunningPigeonLottie = (habitColorHex: string) => {
   return cloned;
 };
 
-const getHabitLottieTheme = (habit: any): "meditation" | "drink" | "running" | "sleeping" | "tooth" | "default" => {
+const getHabitLottieTheme = (habit: any): "meditation" | "drink" | "running" | "sleeping" | "tooth" | "capsule" | "exercise" | "kids" | "study" | "default" => {
   if (!habit) return "default";
   const name = (habit.name || "").toLowerCase();
   const icon = habit.icon || "";
@@ -178,7 +183,10 @@ const getHabitLottieTheme = (habit: any): "meditation" | "drink" | "running" | "
   const drinkKeywords = ["drink", "water", "hydrate", "glass", "beverage", "liquid", "hydrat", "h2o"];
   const drinkEmojis = ["🥛", "🥤", "🫗", "💧", "🍹", "☕", "🍵", "🍺", "🥂", "🍷", "🍸", "🍾"];
 
-  const runningKeywords = ["run", "running", "jog", "jogging", "sprint", "cardio", "pace", "walk", "walking", "step", "steps", "exercise", "workout", "gym", "fitness", "athletics"];
+  const exerciseKeywords = ["exercise", "workout", "gym", "fitness", "athletics", "train", "lift", "pull up", "push up"];
+  const exerciseEmojis = ["💪", "🏋️", "🤸", "🧗"];
+
+  const runningKeywords = ["run", "running", "jog", "jogging", "sprint", "cardio", "pace", "walk", "walking", "step", "steps"];
   const runningEmojis = ["🏃", "🏃‍♂️", "🏃‍♀️", "👟", "🧦", "🚶", "🚶‍♂️", "🚶‍♀️", "🥇", "🥈", "🥉", "🏅", "🏆", "🎽"];
 
   const sleepingKeywords = ["sleep", "sleeping", "bed", "nap", "rest", "night", "dream", "snore", "slumber", "bedtime", "relax", "pillow", "blanket"];
@@ -187,20 +195,41 @@ const getHabitLottieTheme = (habit: any): "meditation" | "drink" | "running" | "
   const toothKeywords = ["tooth", "teeth", "brush", "brushing", "dental", "dentist", "floss", "flossing", "mouthwash", "hygiene"];
   const toothEmojis = ["🪥", "🦷", "👄", "🦷", "✨"];
   
+  const capsuleKeywords = ["medicine", "pill", "tablet", "capsule", "supplement", "vitamin", "medication", "drug", "prescription"];
+  const capsuleEmojis = ["💊", "💉", "🩸", "⚕️"];
+  
+  const kidsKeywords = ["kid", "child", "baby", "parenting", "play", "school", "son", "daughter"];
+  const kidsEmojis = ["👶", "🧒", "👦", "👧", "🍼", "🧸", "🚸", "🎮", "🪁"];
+
+  const studyKeywords = ["study", "studying", "read", "reading", "learn", "learning", "book", "homework", "exam", "school", "college"];
+  const studyEmojis = ["📚", "📖", "📝", "✏️", "🎒", "🎓", "🤓", "✍️", "💻"];
+  
   const isMeditation = meditationKeywords.some(kw => name.includes(kw)) || meditationEmojis.some(em => icon.includes(em));
   if (isMeditation) return "meditation";
   
   const isDrink = drinkKeywords.some(kw => name.includes(kw)) || drinkEmojis.some(em => icon.includes(em));
   if (isDrink) return "drink";
 
+  const isExercise = exerciseKeywords.some(kw => name.includes(kw)) || exerciseEmojis.some(em => icon.includes(em));
+  if (isExercise) return "exercise";
+
   const isRunning = runningKeywords.some(kw => name.includes(kw)) || runningEmojis.some(em => icon.includes(em));
   if (isRunning) return "running";
 
   const isSleeping = sleepingKeywords.some(kw => name.includes(kw)) || sleepingEmojis.some(em => icon.includes(em));
   if (isSleeping) return "sleeping";
-  
+
   const isTooth = toothKeywords.some(kw => name.includes(kw)) || toothEmojis.some(em => icon.includes(em));
   if (isTooth) return "tooth";
+  
+  const isCapsule = capsuleKeywords.some(kw => name.includes(kw)) || capsuleEmojis.some(em => icon.includes(em));
+  if (isCapsule) return "capsule";
+  
+  const isKids = kidsKeywords.some(kw => name.includes(kw)) || kidsEmojis.some(em => icon.includes(em));
+  if (isKids) return "kids";
+
+  const isStudy = studyKeywords.some(kw => name.includes(kw)) || studyEmojis.some(em => icon.includes(em));
+  if (isStudy) return "study";
   
   return "default";
 };
@@ -224,8 +253,30 @@ export default function TracksyHomeScreen() {
   // Celebration States
   const [celebrationVisible, setCelebrationVisible] = useState(false);
   const [celebrationHabit, setCelebrationHabit] = useState<any>(null);
-  const celebrationScale = useRef(new Animated.Value(0)).current;
-  const celebrationOpacity = useRef(new Animated.Value(0)).current;
+  const [celebrationCount, setCelebrationCount] = useState(0);
+  const [celebrationScale] = useState(new Animated.Value(0));
+  const [celebrationOpacity] = useState(new Animated.Value(0));
+
+  const viewShotRef = useRef<any>(null);
+
+  const captureAndShare = async () => {
+    try {
+      if (viewShotRef.current) {
+        const uri = await viewShotRef.current.capture();
+        const inviteText = `I just completed my habit on Tracksy! 🔥\nJoin me and track your goals: https://play.google.com/store/apps/details?id=com.dineshmahidev.tracksy`;
+        
+        if (Platform.OS === "ios") {
+          await Share.share({ message: inviteText, url: uri });
+        } else {
+          if (await Sharing.isAvailableAsync()) {
+            await Sharing.shareAsync(uri, { dialogTitle: "Share your habit" });
+          }
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   // Pulsing animation for the center fire icon
   const fireScale = useRef(new Animated.Value(1)).current;
@@ -267,8 +318,9 @@ export default function TracksyHomeScreen() {
 
   const weekLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-  const showCelebration = (habit: any) => {
+  const showCelebration = (habit: any, newCount: number) => {
     setCelebrationHabit(habit);
+    setCelebrationCount(newCount);
     setCelebrationVisible(true);
     
     Animated.parallel([
@@ -303,8 +355,6 @@ export default function TracksyHomeScreen() {
       setCelebrationHabit(null);
     });
   };
-
-
 
   const bestStreak = useMemo(() => {
     if (!habits || habits.length === 0) return 0;
@@ -375,7 +425,7 @@ export default function TracksyHomeScreen() {
       updatedLogs.push(today);
       const newCount = todayCount + 1;
       if (newCount === goal) {
-        showCelebration(habit);
+        showCelebration(habit, newCount);
       }
     }
     await updateHabit(habit.id, { logs: updatedLogs });
@@ -614,6 +664,7 @@ export default function TracksyHomeScreen() {
                     </View>
                     <View style={styles.habitInfo}>
                       <Text style={styles.habitName}>{habit.name}</Text>
+                      {habit.reminderTime ? <Text style={styles.habitReminder}>🔔 {habit.reminderTime}</Text> : null}
                       <Text style={styles.habitProgressText}>
                         {todayCount} / {goal} {habit.goalUnit || "done"}
                       </Text>
@@ -675,10 +726,50 @@ export default function TracksyHomeScreen() {
                           />
                         );
                       }
-                      // Show default superhero lottie on home screen habit cards if no specific theme matches
+                      if (theme === "capsule") {
+                        return (
+                          <LottieView
+                            source={require("@/assets/Capsule.json")}
+                            autoPlay
+                            loop
+                            style={{ width: 44, height: 44, marginLeft: 8, alignSelf: "center" }}
+                          />
+                        );
+                      }
+                      if (theme === "exercise") {
+                        return (
+                          <LottieView
+                            source={require("@/assets/Exercising pull ups.json")}
+                            autoPlay
+                            loop
+                            style={{ width: 44, height: 44, marginLeft: 8, alignSelf: "center" }}
+                          />
+                        );
+                      }
+                      if (theme === "kids") {
+                        return (
+                          <LottieView
+                            source={require("@/assets/Kids.json")}
+                            autoPlay
+                            loop
+                            style={{ width: 44, height: 44, marginLeft: 8, alignSelf: "center" }}
+                          />
+                        );
+                      }
+                      if (theme === "study") {
+                        return (
+                          <LottieView
+                            source={require("@/assets/reading book.json")}
+                            autoPlay
+                            loop
+                            style={{ width: 44, height: 44, marginLeft: 8, alignSelf: "center" }}
+                          />
+                        );
+                      }
+                      // Show default lottie on home screen habit cards if no specific theme matches
                       return (
                         <LottieView
-                          source={require("@/assets/Super hero.json")}
+                          source={require("@/assets/Goal Achieved.json")}
                           autoPlay
                           loop
                           style={{ width: 44, height: 44, marginLeft: 8, alignSelf: "center" }}
@@ -712,18 +803,21 @@ export default function TracksyHomeScreen() {
         const goal = celebrationHabit.goal || 1;
         const goalUnit = celebrationHabit.goalUnit || "times";
         const habitLogs = celebrationHabit.logs || [];
-        const todayCount = habitLogs.filter((l: any) => l === today).length;
+        const baseCount = habitLogs.filter((l: any) => l === today).length;
+        const todayCount = Math.max(baseCount, celebrationCount);
         const progressRatio = Math.min(todayCount / goal, 1);
 
         return (
           <Modal
-            visible={celebrationVisible}
-            transparent={true}
-            animationType="none"
-            onRequestClose={hideCelebration}
-          >
-            <Animated.View style={[styles.celebrationContainer, { opacity: celebrationOpacity }]}>
-              <SafeAreaView style={styles.celebrationSafeArea} edges={["top", "bottom"]}>
+          visible={celebrationVisible}
+          animationType="fade"
+          transparent={true}
+          onRequestClose={hideCelebration}
+        >
+          <View style={{ flex: 1, backgroundColor: "#FFFFFF" }}>
+            <ViewShot ref={viewShotRef} options={{ format: "jpg", quality: 0.9 }} style={{ flex: 1, backgroundColor: "#FFFFFF" }}>
+              <Animated.View style={[styles.celebrationContainer, { opacity: celebrationOpacity, paddingBottom: 20, backgroundColor: "#FFFFFF" }]}>
+              <SafeAreaView style={styles.celebrationSafeArea} edges={["top"]}>
                 {/* Top Section: Habit Complete with Habit Name */}
                 <View style={[styles.celebrationTopSection, { marginTop: 10 }]}>
                   <Text style={styles.celebrationTitle}>Habit Completed!</Text>
@@ -806,7 +900,49 @@ export default function TracksyHomeScreen() {
                         />
                       );
                     }
-                    // Default Superhero with Fire Background
+                    if (theme === "capsule") {
+                      return (
+                        /* Capsule (No fire background) */
+                        <LottieView
+                          source={require("@/assets/Capsule.json")}
+                          autoPlay
+                          loop
+                          style={{ width: 210, height: 210 }}
+                        />
+                      );
+                    }
+                    if (theme === "exercise") {
+                      return (
+                        /* Exercise (No fire background) */
+                        <LottieView
+                          source={require("@/assets/Exercising pull ups.json")}
+                          autoPlay
+                          loop
+                          style={{ width: 210, height: 210 }}
+                        />
+                      );
+                    }
+                    if (theme === "kids") {
+                      return (
+                        <LottieView
+                          source={require("@/assets/Kids.json")}
+                          autoPlay
+                          loop
+                          style={{ width: 210, height: 210 }}
+                        />
+                      );
+                    }
+                    if (theme === "study") {
+                      return (
+                        <LottieView
+                          source={require("@/assets/reading book.json")}
+                          autoPlay
+                          loop
+                          style={{ width: 210, height: 210 }}
+                        />
+                      );
+                    }
+                    // Default Goal Achieved with Fire Background
                     return (
                       <>
                         {/* Background Fire Streak Lottie */}
@@ -817,9 +953,9 @@ export default function TracksyHomeScreen() {
                           style={styles.celebrationHeroBackground}
                         />
 
-                        {/* Foreground Superhero Lottie */}
+                        {/* Foreground Goal Achieved Lottie */}
                         <LottieView
-                          source={require("@/assets/Super hero.json")}
+                          source={require("@/assets/Goal Achieved.json")}
                           autoPlay
                           loop
                           style={{ width: 210, height: 210 }}
@@ -896,42 +1032,66 @@ export default function TracksyHomeScreen() {
                   </View>
                 </Animated.View>
 
-                {/* Bottom Section: Action Buttons */}
-                <View style={styles.celebrationBottomSection}>
-                  <TouchableOpacity 
-                    style={[styles.celebrationButton, { backgroundColor: celebrationHabit.color || "#F472B6" }]} 
-                    onPress={hideCelebration}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={styles.celebrationButtonText}>Awesome!</Text>
-                  </TouchableOpacity>
+                {/* Instant Photo Branding Footer */}
+                <View style={{ alignItems: "center", marginTop: 40, marginBottom: 10 }}>
+                  <Image source={require("@/assets/splash_logo.png")} style={{ width: 120, height: 36, resizeMode: "contain" }} />
+                  <Text style={{ fontSize: 13, color: "#9CA3AF", fontWeight: "600", marginTop: 8 }}>Achieved by {settings.userName || "You"}</Text>
                 </View>
               </SafeAreaView>
             </Animated.View>
-          </Modal>
+          </ViewShot>
+
+          {/* Share Button Top Right (Outside ViewShot) */}
+          <TouchableOpacity 
+            style={{ position: "absolute", top: 60, right: 20, zIndex: 50, width: 44, height: 44, borderRadius: 22, backgroundColor: "#FFF", alignItems: "center", justifyContent: "center", shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 2, borderWidth: 1, borderColor: "#F3F4F6" }}
+            onPress={captureAndShare}
+          >
+            <Share2 color={celebrationHabit.color || "#F472B6"} size={20} />
+          </TouchableOpacity>
+
+          {/* Bottom Section: Action Buttons (Outside ViewShot) */}
+          <SafeAreaView edges={["bottom"]} style={{ width: "100%", paddingHorizontal: 24, paddingVertical: 20, backgroundColor: "#FFFFFF", borderTopWidth: 1, borderColor: "#F3F4F6" }}>
+            <TouchableOpacity 
+              style={[styles.celebrationButton, { backgroundColor: celebrationHabit.color || "#F472B6" }]} 
+              onPress={hideCelebration}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.celebrationButtonText}>Awesome!</Text>
+            </TouchableOpacity>
+          </SafeAreaView>
+          </View>
+        </Modal>
         );
       })()}
     </SafeAreaView>
 
     {/* ── VIEW ALL HABITS MODAL ── */}
     <Modal visible={showViewAll} animationType="slide" transparent={false}>
-      <SafeAreaView style={{ flex: 1, backgroundColor: "#F8FAFC" }} edges={["top", "bottom"]}>
-        <View style={[styles.viewAllHeader, { borderBottomColor: `${Colors.primary}20` }]}>
-          <TouchableOpacity onPress={() => setShowViewAll(false)} style={styles.viewAllBack}>
-            <Text style={{ fontSize: 22, color: "#1E293B" }}>✕</Text>
-          </TouchableOpacity>
-          <Text style={styles.viewAllTitle}>All Habits</Text>
-          <TouchableOpacity
-            onPress={() => { setShowViewAll(false); router.push("/add-habit" as any); }}
-            style={[styles.viewAllAddBtn, { backgroundColor: Colors.primary }]}
-          >
-            <Text style={{ color: "#FFF", fontSize: 18, lineHeight: 22 }}>+</Text>
-          </TouchableOpacity>
+      <SafeAreaView style={{ flex: 1, backgroundColor: "#FFFFFF" }} edges={["top", "bottom"]}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, paddingHorizontal: 24, paddingTop: 16 }}>
+          <Text style={{ fontSize: 18, fontWeight: '800', color: '#171717' }}>
+            All Habits
+          </Text>
+          <View style={{ flexDirection: 'row', gap: 12 }}>
+            <TouchableOpacity 
+              onPress={() => { setShowViewAll(false); router.push("/add-habit" as any); }} 
+              style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center' }}
+            >
+              <Text style={{ fontSize: 18, color: '#FFF', fontWeight: '700', lineHeight: 20 }}>+</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              onPress={() => setShowViewAll(false)} 
+              style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center' }}
+            >
+              <Text style={{ fontSize: 14, color: '#6B7280', fontWeight: '700' }}>✕</Text>
+            </TouchableOpacity>
+          </View>
         </View>
+
         <FlatList
           data={habits || []}
           keyExtractor={(h) => h.id}
-          contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 14, paddingBottom: 60 }}
+          contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 60, gap: 16 }}
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={
             <View style={{ alignItems: "center", marginTop: 60 }}>
@@ -945,38 +1105,69 @@ export default function TracksyHomeScreen() {
             const goal = habit.goal || 1;
             const isDone = todayCount >= goal;
             return (
-              <TouchableOpacity
-                style={[styles.viewAllCard, isDone && { borderLeftColor: "#10B981", borderLeftWidth: 3 }, !isDone && { borderLeftColor: Colors.primary, borderLeftWidth: 3 }]}
-                onPress={() => { setShowViewAll(false); router.push(`/habit/${habit.id}` as any); }}
-                activeOpacity={0.8}
-              >
-                <View style={[styles.viewAllIcon, { backgroundColor: `${habit.color || Colors.primary}18` }]}>
-                  <Text style={{ fontSize: 22 }}>{habit.icon || "✨"}</Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.viewAllHabitName}>{habit.name}</Text>
-                  <View style={styles.viewAllProgressRow}>
-                    <View style={styles.viewAllBarBg}>
-                      <View style={[styles.viewAllBarFill, { width: `${Math.min((todayCount / goal) * 100, 100)}%`, backgroundColor: habit.color || Colors.primary }]} />
-                    </View>
-                    <Text style={[styles.viewAllCount, { color: isDone ? "#10B981" : Colors.primary }]}>
-                      {todayCount}/{goal}
+              <View style={styles.habitCard}>
+                <TouchableOpacity 
+                  style={styles.habitCardTop}
+                  activeOpacity={0.7}
+                  onPress={() => { setShowViewAll(false); router.push(`/habit/${habit.id}` as any); }}
+                >
+                  <View style={styles.habitIconContainer}>
+                    <Text style={styles.habitIcon}>{habit.icon || "✨"}</Text>
+                  </View>
+                  <View style={styles.habitInfo}>
+                    <Text style={styles.habitName}>{habit.name}</Text>
+                    {habit.reminderTime ? <Text style={styles.habitReminder}>🔔 {habit.reminderTime}</Text> : null}
+                    <Text style={styles.habitProgressText}>
+                      {todayCount} / {goal} {habit.goalUnit || "done"}
                     </Text>
+                    <View style={styles.progressBarContainer}>
+                      <View style={[styles.progressBarFill, { width: `${Math.min((todayCount / goal) * 100, 100)}%`, backgroundColor: habit.color || "#F472B6" }]} />
+                    </View>
                   </View>
+                  {(() => {
+                    const theme = getHabitLottieTheme(habit);
+                    if (theme === "meditation") {
+                      return <LottieView source={require("@/assets/Meditating Monkey.json")} autoPlay loop style={{ width: 44, height: 44, marginLeft: 8, alignSelf: "center" }} />;
+                    }
+                    if (theme === "drink") {
+                      const habitColor = habit.color || "#F472B6";
+                      return <LottieView source={getModifiedCookieDrinkLottie(habitColor)} autoPlay loop style={{ width: 44, height: 44, marginLeft: 8, alignSelf: "center" }} />;
+                    }
+                    if (theme === "running") {
+                      const habitColor = habit.color || "#F472B6";
+                      return <LottieView source={getModifiedRunningPigeonLottie(habitColor)} autoPlay loop style={{ width: 44, height: 44, marginLeft: 8, alignSelf: "center" }} />;
+                    }
+                    if (theme === "sleeping") {
+                      return <LottieView source={require("@/assets/Panda sleeping waiting lottie animation.json")} autoPlay loop style={{ width: 44, height: 44, marginLeft: 8, alignSelf: "center" }} />;
+                    }
+                    if (theme === "tooth") {
+                      return <LottieView source={require("@/assets/Cartoon Tooth Character.json")} autoPlay loop style={{ width: 44, height: 44, marginLeft: 8, alignSelf: "center" }} />;
+                    }
+                    if (theme === "capsule") {
+                      return <LottieView source={require("@/assets/Capsule.json")} autoPlay loop style={{ width: 44, height: 44, marginLeft: 8, alignSelf: "center" }} />;
+                    }
+                    if (theme === "exercise") {
+                      return <LottieView source={require("@/assets/Exercising pull ups.json")} autoPlay loop style={{ width: 44, height: 44, marginLeft: 8, alignSelf: "center" }} />;
+                    }
+                    if (theme === "kids") {
+                      return <LottieView source={require("@/assets/Kids.json")} autoPlay loop style={{ width: 44, height: 44, marginLeft: 8, alignSelf: "center" }} />;
+                    }
+                    if (theme === "study") {
+                      return <LottieView source={require("@/assets/reading book.json")} autoPlay loop style={{ width: 44, height: 44, marginLeft: 8, alignSelf: "center" }} />;
+                    }
+                    return <LottieView source={require("@/assets/Goal Achieved.json")} autoPlay loop style={{ width: 44, height: 44, marginLeft: 8, alignSelf: "center" }} />;
+                  })()}
+                </TouchableOpacity>
+
+                <View style={styles.habitCardBottom}>
+                  <SlideToComplete
+                    habit={habit}
+                    isDone={isDone}
+                    onComplete={() => toggleHabitDay(habit)}
+                    color={habit.color || "#F472B6"}
+                  />
                 </View>
-                {isDone ? (
-                  <View style={[styles.viewAllBadge, { backgroundColor: "#DCFCE7" }]}>
-                    <Text style={{ fontSize: 10, fontWeight: "800", color: "#10B981" }}>✓ Done</Text>
-                  </View>
-                ) : (
-                  <TouchableOpacity
-                    style={[styles.viewAllCheckBtn, { borderColor: Colors.primary }]}
-                    onPress={() => toggleHabitDay(habit)}
-                  >
-                    <Text style={[styles.viewAllCheckTxt, { color: Colors.primary }]}>Check</Text>
-                  </TouchableOpacity>
-                )}
-              </TouchableOpacity>
+              </View>
             );
           }}
         />
@@ -1018,6 +1209,7 @@ const styles = StyleSheet.create({
   habitIcon: { fontSize: 20 },
   habitInfo: { flex: 1 },
   habitName: { fontSize: 15, fontWeight: "700", color: "#171717", marginBottom: 4 },
+  habitReminder: { fontSize: 11, color: "#6B7280", fontWeight: "700", marginBottom: 2 },
   habitProgressText: { fontSize: 12, color: "#6B7280", marginBottom: 8, fontWeight: "500" },
   progressBarContainer: { height: 6, backgroundColor: "#F3F4F6", borderRadius: 3, overflow: "hidden" },
   progressBarFill: { height: "100%", borderRadius: 3 },

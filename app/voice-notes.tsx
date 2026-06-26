@@ -233,7 +233,7 @@ export default function VoiceNotesScreen() {
     <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+        <TouchableOpacity onPress={() => router.push("/(tabs)/tools")} style={styles.backBtn}>
           <Text style={styles.backArrow}>‹</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>🎙️ Voice Notes</Text>

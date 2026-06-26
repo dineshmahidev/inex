@@ -86,7 +86,6 @@ function AppContent() {
   useEffect(() => {
     async function nativeInit() {
       try {
-        await SystemUI.setBackgroundColorAsync('#ffffff').catch(() => {});
         try {
           await requestNotificationPermissions();
           await initNotifications();
@@ -105,7 +104,13 @@ function AppContent() {
   }, []);
 
   useEffect(() => {
-    const timer = setTimeout(() => setMinSplashDone(true), 4500);
+    if (Colors?.background) {
+      SystemUI.setBackgroundColorAsync(Colors.background).catch(() => {});
+    }
+  }, [Colors?.background]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setMinSplashDone(true), 10000);
     return () => clearTimeout(timer);
   }, []);
 

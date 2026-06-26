@@ -10,11 +10,18 @@ import {
   Dimensions,
   Animated,
   Modal,
+  Image,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useDatabase } from "@/hooks/useDatabase";
 import * as Haptics from "expo-haptics";
+import { Audio } from "expo-av";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import ViewShot from "react-native-view-shot";
+import * as Sharing from "expo-sharing";
+import { Share2 } from "lucide-react-native";
 import LottieView from "lottie-react-native";
 import MrCookieDrinkLottie from "@/assets/Mr. Cookie_ Drink.json";
 import RunningPigeonLottie from "@/assets/running pigeon.json";
@@ -159,7 +166,7 @@ const getModifiedRunningPigeonLottie = (habitColorHex: string) => {
   return cloned;
 };
 
-const getHabitLottieTheme = (habit: any): "meditation" | "drink" | "running" | "sleeping" | "tooth" | "default" => {
+const getHabitLottieTheme = (habit: any): "meditation" | "drink" | "running" | "sleeping" | "tooth" | "capsule" | "exercise" | "kids" | "study" | "default" => {
   if (!habit) return "default";
   const name = (habit.name || "").toLowerCase();
   const icon = habit.icon || "";
@@ -170,7 +177,10 @@ const getHabitLottieTheme = (habit: any): "meditation" | "drink" | "running" | "
   const drinkKeywords = ["drink", "water", "hydrate", "glass", "beverage", "liquid", "hydrat", "h2o"];
   const drinkEmojis = ["🥛", "🥤", "🫗", "💧", "🍹", "☕", "🍵", "🍺", "🥂", "🍷", "🍸", "🍾"];
 
-  const runningKeywords = ["run", "running", "jog", "jogging", "sprint", "cardio", "pace", "walk", "walking", "step", "steps", "exercise", "workout", "gym", "fitness", "athletics"];
+  const exerciseKeywords = ["exercise", "workout", "gym", "fitness", "athletics", "train", "lift", "pull up", "push up"];
+  const exerciseEmojis = ["💪", "🏋️", "🤸", "🧗"];
+
+  const runningKeywords = ["run", "running", "jog", "jogging", "sprint", "cardio", "pace", "walk", "walking", "step", "steps"];
   const runningEmojis = ["🏃", "🏃‍♂️", "🏃‍♀️", "👟", "🧦", "🚶", "🚶‍♂️", "🚶‍♀️", "🥇", "🥈", "🥉", "🏅", "🏆", "🎽"];
 
   const sleepingKeywords = ["sleep", "sleeping", "bed", "nap", "rest", "night", "dream", "snore", "slumber", "bedtime", "relax", "pillow", "blanket"];
@@ -178,12 +188,24 @@ const getHabitLottieTheme = (habit: any): "meditation" | "drink" | "running" | "
 
   const toothKeywords = ["tooth", "teeth", "brush", "brushing", "dental", "dentist", "floss", "flossing", "mouthwash", "hygiene"];
   const toothEmojis = ["🪥", "🦷", "👄", "🦷", "✨"];
+
+  const capsuleKeywords = ["medicine", "pill", "tablet", "capsule", "supplement", "vitamin", "medication", "drug", "prescription"];
+  const capsuleEmojis = ["💊", "💉", "🩸", "⚕️"];
+  
+  const kidsKeywords = ["kid", "child", "baby", "parenting", "play", "school", "son", "daughter"];
+  const kidsEmojis = ["👶", "🧒", "👦", "👧", "🍼", "🧸", "🚸", "🎮", "🪁"];
+
+  const studyKeywords = ["study", "studying", "read", "reading", "learn", "learning", "book", "homework", "exam", "school", "college"];
+  const studyEmojis = ["📚", "📖", "📝", "✏️", "🎒", "🎓", "🤓", "✍️", "💻"];
   
   const isMeditation = meditationKeywords.some(kw => name.includes(kw)) || meditationEmojis.some(em => icon.includes(em));
   if (isMeditation) return "meditation";
   
   const isDrink = drinkKeywords.some(kw => name.includes(kw)) || drinkEmojis.some(em => icon.includes(em));
   if (isDrink) return "drink";
+
+  const isExercise = exerciseKeywords.some(kw => name.includes(kw)) || exerciseEmojis.some(em => icon.includes(em));
+  if (isExercise) return "exercise";
 
   const isRunning = runningKeywords.some(kw => name.includes(kw)) || runningEmojis.some(em => icon.includes(em));
   if (isRunning) return "running";
@@ -193,6 +215,15 @@ const getHabitLottieTheme = (habit: any): "meditation" | "drink" | "running" | "
 
   const isTooth = toothKeywords.some(kw => name.includes(kw)) || toothEmojis.some(em => icon.includes(em));
   if (isTooth) return "tooth";
+
+  const isCapsule = capsuleKeywords.some(kw => name.includes(kw)) || capsuleEmojis.some(em => icon.includes(em));
+  if (isCapsule) return "capsule";
+  
+  const isKids = kidsKeywords.some(kw => name.includes(kw)) || kidsEmojis.some(em => icon.includes(em));
+  if (isKids) return "kids";
+
+  const isStudy = studyKeywords.some(kw => name.includes(kw)) || studyEmojis.some(em => icon.includes(em));
+  if (isStudy) return "study";
   
   return "default";
 };
@@ -209,8 +240,16 @@ const getHabitLottieSource = (theme: string, habitColor: string) => {
       return require("@/assets/Panda sleeping waiting lottie animation.json");
     case "tooth":
       return require("@/assets/Cartoon Tooth Character.json");
+    case "capsule":
+      return require("@/assets/Capsule.json");
+    case "exercise":
+      return require("@/assets/Exercising pull ups.json");
+    case "kids":
+      return require("@/assets/Kids.json");
+    case "study":
+      return require("@/assets/reading book.json");
     default:
-      return require("@/assets/Super hero.json");
+      return require("@/assets/Goal Achieved.json");
   }
 };
 
@@ -221,7 +260,7 @@ const BAR_MAX_HEIGHT = 52;
 export default function HabitDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { habits, deleteHabit, updateHabit } = useDatabase();
+  const { habits, deleteHabit, updateHabit, settings } = useDatabase();
 
   const habit = habits.find((h) => h.id === id);
 
@@ -246,12 +285,137 @@ export default function HabitDetailScreen() {
   const todayLogs = (habit.logs || []).filter((l) => l === todayStr);
   const todayCount = todayLogs.length;
 
+  // Timer States
+  const theme = getHabitLottieTheme(habit);
+  const isTimerEligible = theme === "exercise" || theme === "meditation";
+  const [timerDuration, setTimerDuration] = useState(15 * 60);
+  const [timeRemaining, setTimeRemaining] = useState(0);
+  const [timerRunning, setTimerRunning] = useState(false);
+  const [timerSessionCompleted, setTimerSessionCompleted] = useState(false);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const playTimerSound = async () => {
+    try {
+      const { sound } = await Audio.Sound.createAsync(require('@/assets/mixkit_bell_notification_933.wav'));
+      await sound.playAsync();
+    } catch (e) { console.log(e); }
+  };
+
+  const addTimerProgress = (durationInSeconds: number) => {
+    const isMins = goalUnit.toLowerCase().includes("min");
+    const countToAdd = isMins ? Math.floor(durationInSeconds / 60) : 1;
+    
+    let updated = [...(habit.logs || [])];
+    for (let i = 0; i < countToAdd; i++) {
+      updated.push(todayStr);
+    }
+    
+    const newCount = updated.filter((l) => l === todayStr).length;
+    if (newCount >= goal && todayCount < goal) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      showCelebration(newCount);
+    }
+    
+    updateHabit(habit.id, { logs: updated });
+  };
+
+  useEffect(() => {
+    const loadTimerState = async () => {
+      try {
+        const stored = await AsyncStorage.getItem(`timer_state_${habit.id}`);
+        if (stored) {
+          const { startTime, duration } = JSON.parse(stored);
+          const elapsedSeconds = Math.floor((Date.now() - startTime) / 1000);
+          if (elapsedSeconds < duration) {
+            setTimerDuration(duration);
+            setTimeRemaining(duration - elapsedSeconds);
+            setTimerRunning(true);
+          } else {
+            await AsyncStorage.removeItem(`timer_state_${habit.id}`);
+            setTimerSessionCompleted(true);
+            addTimerProgress(duration);
+            playTimerSound();
+            Alert.alert("Session Complete!", "Great job! Your habit has been tracked.");
+          }
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    };
+    if (isTimerEligible) {
+      loadTimerState();
+    }
+  }, [habit.id, isTimerEligible]);
+
+  useEffect(() => {
+    if (timerRunning && timeRemaining > 0) {
+      timerRef.current = setTimeout(() => {
+        setTimeRemaining(prev => prev - 1);
+      }, 1000);
+    } else if (timerRunning && timeRemaining === 0) {
+      setTimerRunning(false);
+      setTimerSessionCompleted(true);
+      AsyncStorage.removeItem(`timer_state_${habit.id}`);
+      playTimerSound();
+      addTimerProgress(timerDuration);
+      Alert.alert("Session Complete!", "Great job! Your habit has been tracked.");
+    }
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, [timerRunning, timeRemaining]);
+
+  const formatTime = (seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  };
+
+  const startTimer = async () => {
+    setTimerSessionCompleted(false);
+    setTimeRemaining(timerDuration);
+    setTimerRunning(true);
+    await AsyncStorage.setItem(`timer_state_${habit.id}`, JSON.stringify({ startTime: Date.now(), duration: timerDuration }));
+  };
+
+  const stopTimer = async () => {
+    setTimerRunning(false);
+    await AsyncStorage.removeItem(`timer_state_${habit.id}`);
+  };
+
+  const viewShotRef = useRef<ViewShot>(null);
+
+  const captureAndShare = async () => {
+    try {
+      if (viewShotRef.current) {
+        // @ts-ignore
+        const uri = await viewShotRef.current.capture();
+        const inviteText = `I just completed my habit on Tracksy! 🔥\nJoin me and track your goals: https://play.google.com/store/apps/details?id=com.dineshmahidev.tracksy`;
+        
+        if (Platform.OS === "ios") {
+          await Share.share({ message: inviteText, url: uri });
+        } else {
+          if (await Sharing.isAvailableAsync()) {
+            await Sharing.shareAsync(uri, { dialogTitle: "Share your habit" });
+          } else {
+            Alert.alert("Sharing isn't available on this device.");
+          }
+        }
+      }
+    } catch (e) {
+      console.error(e);
+      Alert.alert("Error sharing image");
+    }
+  };
+
   // Celebration States
   const [celebrationVisible, setCelebrationVisible] = useState(false);
+  const [celebrationCount, setCelebrationCount] = useState(0);
   const celebrationScale = useRef(new Animated.Value(0)).current;
   const celebrationOpacity = useRef(new Animated.Value(0)).current;
 
-  const showCelebration = () => {
+  const showCelebration = (achievedCount: number) => {
+    setCelebrationCount(achievedCount);
     setCelebrationVisible(true);
     Animated.parallel([
       Animated.timing(celebrationOpacity, {
@@ -291,7 +455,7 @@ export default function HabitDetailScreen() {
     
     if (newCount === goal) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      showCelebration();
+      showCelebration(newCount);
     }
     
     updateHabit(habit.id, { logs: updated });
@@ -480,6 +644,7 @@ export default function HabitDetailScreen() {
           <View style={{ alignItems: "center", marginBottom: 16 }}>
             <Text style={[styles.heroEmoji, { fontSize: 32 }]}>{habit.icon || "✨"}</Text>
             <Text style={[styles.heroName, { textAlign: "center" }]}>{habit.name}</Text>
+            {habit.reminderTime ? <Text style={styles.heroReminder}>🔔 Reminder: {habit.reminderTime}</Text> : null}
             <Text style={styles.heroSub}>Daily To get</Text>
             <Text style={styles.heroGoal}>{goal} {goalUnit}</Text>
           </View>
@@ -536,10 +701,50 @@ export default function HabitDetailScreen() {
                   />
                 );
               }
+              if (theme === "capsule") {
+                return (
+                  <LottieView
+                    source={require("@/assets/Capsule.json")}
+                    autoPlay
+                    loop
+                    style={{ width: 252, height: 252 }}
+                  />
+                );
+              }
+              if (theme === "exercise") {
+                return (
+                  <LottieView
+                    source={require("@/assets/Exercising pull ups.json")}
+                    autoPlay
+                    loop
+                    style={{ width: 252, height: 252 }}
+                  />
+                );
+              }
+              if (theme === "kids") {
+                return (
+                  <LottieView
+                    source={require("@/assets/Kids.json")}
+                    autoPlay
+                    loop
+                    style={{ width: 252, height: 252 }}
+                  />
+                );
+              }
+              if (theme === "study") {
+                return (
+                  <LottieView
+                    source={require("@/assets/reading book.json")}
+                    autoPlay
+                    loop
+                    style={{ width: 252, height: 252 }}
+                  />
+                );
+              }
               return (
                 <View style={{ width: 252, height: 252, alignItems: "center", justifyContent: "center" }}>
                   <LottieView
-                    source={require("@/assets/Super hero.json")}
+                    source={require("@/assets/Goal Achieved.json")}
                     autoPlay
                     loop
                     style={{ width: 220, height: 220 }}
@@ -549,6 +754,8 @@ export default function HabitDetailScreen() {
             })()}
           </View>
         </View>
+
+
 
         {/* Today Counter */}
         <View style={styles.card}>
@@ -561,7 +768,15 @@ export default function HabitDetailScreen() {
               <Text style={styles.counterValue}>{todayCount}</Text>
               <Text style={styles.counterUnit}>/ {goal} {goalUnit}</Text>
             </View>
-            <TouchableOpacity style={[styles.counterBtn, styles.counterBtnAdd, { backgroundColor: habitColor }]} onPress={incrementToday}>
+            <TouchableOpacity 
+              style={[
+                styles.counterBtn, 
+                styles.counterBtnAdd, 
+                { backgroundColor: todayCount >= goal ? "#D1D5DB" : habitColor }
+              ]} 
+              onPress={incrementToday}
+              disabled={todayCount >= goal}
+            >
               <Text style={[styles.counterBtnText, { color: "#FFF" }]}>＋</Text>
             </TouchableOpacity>
           </View>
@@ -573,8 +788,11 @@ export default function HabitDetailScreen() {
 
           {/* Premium customized visual icons using Lottie animations */}
           <View style={[styles.iconRow, { justifyContent: "center", gap: 10, flexWrap: "wrap", marginVertical: 12 }]}>
-            {Array.from({ length: Math.min(goal, 12) }).map((_, i) => {
-              const isCompletedIncrement = i < todayCount;
+            {Array.from({ length: Math.min(isTimerEligible ? Math.ceil(goal / (timerDuration / 60)) : goal, 12) }).map((_, i) => {
+              const sessionMinutes = timerDuration / 60;
+              const isCompletedIncrement = isTimerEligible 
+                ? i < Math.floor(todayCount / sessionMinutes)
+                : i < todayCount;
               const theme = getHabitLottieTheme(habit);
               const lottieSource = getHabitLottieSource(theme, habitColor);
               
@@ -657,8 +875,13 @@ export default function HabitDetailScreen() {
           animationType="none"
           onRequestClose={hideCelebration}
         >
-          <Animated.View style={[styles.celebrationContainer, { opacity: celebrationOpacity }]}>
-            <SafeAreaView style={styles.celebrationSafeArea} edges={["top", "bottom"]}>
+          <View style={{ flex: 1, backgroundColor: "#FFFFFF" }}>
+            <ViewShot ref={viewShotRef} options={{ format: "png", quality: 0.9 }} style={{ flex: 1, backgroundColor: "#FFFFFF" }}>
+              <Animated.View style={[styles.celebrationContainer, { opacity: celebrationOpacity, paddingBottom: 20, backgroundColor: "#FFFFFF" }]}>
+              <SafeAreaView style={styles.celebrationSafeArea} edges={["top"]}>
+              
+
+
               {/* Top Section: Habit Complete with Habit Name */}
               <View style={[styles.celebrationTopSection, { marginTop: 10 }]}>
                 <Text style={styles.celebrationTitle}>Habit Completed!</Text>
@@ -736,10 +959,50 @@ export default function HabitDetailScreen() {
                       />
                     );
                   }
-                  // Default Superhero
+                  if (theme === "capsule") {
+                    return (
+                      <LottieView
+                        source={require("@/assets/Capsule.json")}
+                        autoPlay
+                        loop
+                        style={{ width: 210, height: 210 }}
+                      />
+                    );
+                  }
+                  if (theme === "exercise") {
+                    return (
+                      <LottieView
+                        source={require("@/assets/Exercising pull ups.json")}
+                        autoPlay
+                        loop
+                        style={{ width: 210, height: 210 }}
+                      />
+                    );
+                  }
+                  if (theme === "kids") {
+                    return (
+                      <LottieView
+                        source={require("@/assets/Kids.json")}
+                        autoPlay
+                        loop
+                        style={{ width: 210, height: 210 }}
+                      />
+                    );
+                  }
+                  if (theme === "study") {
+                    return (
+                      <LottieView
+                        source={require("@/assets/reading book.json")}
+                        autoPlay
+                        loop
+                        style={{ width: 210, height: 210 }}
+                      />
+                    );
+                  }
+                  // Default Goal Achieved
                   return (
                     <LottieView
-                      source={require("@/assets/Super hero.json")}
+                      source={require("@/assets/Goal Achieved.json")}
                       autoPlay
                       loop
                       style={{ width: 210, height: 210 }}
@@ -774,7 +1037,7 @@ export default function HabitDetailScreen() {
                 {/* Right Column of the Streak Card */}
                 <View style={styles.streakRightCol}>
                   <Text style={styles.streakProgressFraction}>
-                    {todayCount}<Text style={{ fontSize: 13, color: "#9CA3AF", fontWeight: "600" }}>/{goal} {goalUnit}</Text>
+                    {Math.max(todayCount, celebrationCount)}<Text style={{ fontSize: 13, color: "#9CA3AF", fontWeight: "600" }}>/{goal} {goalUnit}</Text>
                   </Text>
 
                   {/* Horizontal progress bar */}
@@ -783,7 +1046,7 @@ export default function HabitDetailScreen() {
                       style={[
                         styles.streakProgressBarFill, 
                         { 
-                          width: `${Math.min((todayCount / goal) * 100, 100)}%`, 
+                          width: `${Math.min((Math.max(todayCount, celebrationCount) / goal) * 100, 100)}%`, 
                           backgroundColor: habitColor 
                         }
                       ]} 
@@ -811,20 +1074,38 @@ export default function HabitDetailScreen() {
                       );
                     })}
                   </View>
+
+
                 </View>
               </Animated.View>
+                {/* Instant Photo Branding Footer */}
+                <View style={{ alignItems: "center", marginTop: 40, marginBottom: 10 }}>
+                  <Image source={require("@/assets/splash_logo.png")} style={{ width: 120, height: 36, resizeMode: "contain" }} />
+                  <Text style={{ fontSize: 13, color: "#9CA3AF", fontWeight: "600", marginTop: 8 }}>Achieved by {settings.userName || "You"}</Text>
+                </View>
+              </SafeAreaView>
+            </Animated.View>
+          </ViewShot>
 
-              {/* Bottom Section: Action Buttons */}
-              <View style={styles.celebrationBottomSection}>
-                <TouchableOpacity 
-                  style={[styles.celebrationButton, { backgroundColor: habitColor }]} 
-                  onPress={hideCelebration}
-                >
-                  <Text style={styles.celebrationButtonText}>Awesome!</Text>
-                </TouchableOpacity>
-              </View>
-            </SafeAreaView>
-          </Animated.View>
+          {/* Share Button Top Right (Outside ViewShot) */}
+          <TouchableOpacity 
+            style={{ position: "absolute", top: 60, right: 20, zIndex: 50, width: 44, height: 44, borderRadius: 22, backgroundColor: "#FFF", alignItems: "center", justifyContent: "center", shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 2, borderWidth: 1, borderColor: "#F3F4F6" }}
+            onPress={captureAndShare}
+          >
+            <Share2 color={habitColor} size={20} />
+          </TouchableOpacity>
+
+          {/* Bottom Section: Action Buttons (Outside ViewShot) */}
+          <SafeAreaView edges={["bottom"]} style={{ width: "100%", paddingHorizontal: 24, paddingVertical: 20, backgroundColor: "#FFFFFF", borderTopWidth: 1, borderColor: "#F3F4F6" }}>
+            <TouchableOpacity 
+              style={[styles.celebrationButton, { backgroundColor: habitColor }]} 
+              onPress={hideCelebration}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.celebrationButtonText}>Awesome!</Text>
+            </TouchableOpacity>
+          </SafeAreaView>
+          </View>
         </Modal>
       )}
     </SafeAreaView>
@@ -867,6 +1148,7 @@ const styles = StyleSheet.create({
   heroEmoji: { fontSize: 28, marginBottom: 8 },
   heroName: { fontSize: 22, fontWeight: "900", color: "#FFF", marginBottom: 8 },
   heroSub: { fontSize: 12, color: "rgba(255,255,255,0.8)" },
+  heroReminder: { fontSize: 13, color: "rgba(255,255,255,0.9)", fontWeight: "700", marginBottom: 6 },
   heroGoal: { fontSize: 20, fontWeight: "800", color: "#FFF" },
   heroRight: { alignItems: "center" },
   heroLargeIconBg: {

@@ -194,7 +194,7 @@ function CustomTabBar({
         {
           bottom: insets.bottom + 12,
           backgroundColor: Colors.card || "#FFF",
-          borderColor: "rgba(243, 244, 246, 0.8)",
+          borderColor: Colors.border || "transparent",
           transform: [{ translateY }],
         },
       ]}

@@ -17,6 +17,7 @@ import { captureRef } from "react-native-view-shot";
 import * as Sharing from "expo-sharing";
 import { LinearGradient } from "expo-linear-gradient";
 import { FontAwesome } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 
 const { width } = Dimensions.get("window");
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -39,6 +40,7 @@ const getDaysInMonth = (year: number, month: number) => {
 };
 
 export default function ProgressScreen() {
+  const router = useRouter();
   const { habits, updateHabit, settings, Colors } = useDatabase();
   const [activeTab, setActiveTab] = useState<"Overview" | "Calendar" | "Stats">("Overview");
   
@@ -441,14 +443,6 @@ export default function ProgressScreen() {
           </View>
         </View>
         <Text style={styles.calendarCaption}>💡 Tap any calendar day to toggle completion (✓ Done / ✕ Missed)</Text>
-        
-        <TouchableOpacity 
-          style={[styles.shareMonthBtn, { backgroundColor: currentHabit.color || Colors.primary, shadowColor: currentHabit.color || Colors.primary }]} 
-          onPress={shareMonthlyProgressAsImage}
-          activeOpacity={0.85}
-        >
-          <Text style={styles.shareMonthBtnText}>📤 Share Monthly Calendar Image</Text>
-        </TouchableOpacity>
       </View>
     );
   };
@@ -522,11 +516,6 @@ export default function ProgressScreen() {
           </View>
         </View>
 
-        {activeTab === "Overview" && (
-          <TouchableOpacity style={[styles.shareHeaderBtn, { backgroundColor: `${Colors.primary}15` }]} onPress={handleSharePress}>
-            <Text style={[styles.shareHeaderTxt, { color: Colors.primary }]}>📤 Share</Text>
-          </TouchableOpacity>
-        )}
       </View>
 
       {/* Tab Switcher */}
@@ -574,16 +563,7 @@ export default function ProgressScreen() {
               ))}
             </View>
 
-            {/* Share CTA Card */}
-            <View style={[styles.shareCardCTA, { backgroundColor: `${Colors.primary}12`, borderColor: `${Colors.primary}30` }]}>
-              <View style={{ flex: 1, marginRight: 8 }}>
-                <Text style={[styles.shareCTATitle, { color: Colors.primary }]}>📢 Share Today's Check-in</Text>
-                <Text style={[styles.shareCTADesc, { color: Colors.primary, opacity: 0.9 }]}>Generate an attractive habits checklist report or a beautiful image card to share with friends!</Text>
-              </View>
-              <TouchableOpacity style={[styles.shareCTAButton, { backgroundColor: Colors.primary }]} onPress={handleSharePress}>
-                <Text style={styles.shareCTAButtonTxt}>Share</Text>
-              </TouchableOpacity>
-            </View>
+
 
             {/* Habit Performance */}
             <Text style={styles.sectionTitle}>Habit Performance</Text>
@@ -595,13 +575,14 @@ export default function ProgressScreen() {
               </View>
             ) : (
               habitStats.map((h) => (
-                <View key={h.id} style={styles.habitRow}>
+                <TouchableOpacity key={h.id} style={styles.habitRow} activeOpacity={0.7} onPress={() => router.push(`/habit/${h.id}`)}>
                   <View style={styles.habitRowLeft}>
                     <View style={[styles.habitIconWrap, { backgroundColor: (h.color || Colors.primary) + "15" }]}>
                       <Text style={styles.habitEmoji}>{h.icon || "✨"}</Text>
                     </View>
                     <View style={styles.habitMeta}>
                       <Text style={styles.habitName}>{h.name}</Text>
+                      {h.reminderTime ? <Text style={styles.habitReminder}>🔔 {h.reminderTime}</Text> : null}
                       <Text style={styles.habitSub}>
                         {h.weekLogs} / 7 days
                       </Text>
@@ -621,7 +602,7 @@ export default function ProgressScreen() {
                   <Text style={[styles.pctText, { color: h.color || Colors.primary }]}>
                     {h.pct}%
                   </Text>
-                </View>
+                </TouchableOpacity>
               ))
             )}
 
@@ -1019,6 +1000,7 @@ const styles = StyleSheet.create({
   habitEmoji: { fontSize: 20 },
   habitMeta: { flex: 1 },
   habitName: { fontSize: 14, fontWeight: "800", color: "#1E293B", marginBottom: 2 },
+  habitReminder: { fontSize: 11, color: "#64748B", fontWeight: "700", marginBottom: 2 },
   habitSub: { fontSize: 12, color: "#64748B", marginBottom: 8, fontWeight: "600" },
   barBg: { height: 6, backgroundColor: "#F1F5F9", borderRadius: 3, overflow: "hidden" },
   barFill: { height: "100%", borderRadius: 3 },

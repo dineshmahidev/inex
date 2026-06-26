@@ -7,6 +7,7 @@ import {
 import DateTimePicker from "@react-native-community/datetimepicker";
 import * as Haptics from "expo-haptics";
 import { interstitialAdManager } from "@/utils/ads";
+import { useRouter } from "expo-router";
 import React, { useMemo, useRef, useState, useEffect } from "react";
 import {
   Alert,
@@ -56,6 +57,7 @@ interface Todo {
 }
 
 export default function TodoScreen() {
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const isFocused = useIsFocused();
   const { todos, addTodo: addTodoDB, updateTodo, saveTodos, Colors } = useDatabase();
@@ -78,6 +80,7 @@ export default function TodoScreen() {
   });
   const [showDate, setShowDate]       = useState(false);
   const [showTime, setShowTime]       = useState(false);
+  const [showDueSection, setShowDueSection] = useState(false);
 
   // FAB listener
   useEffect(() => {
@@ -104,6 +107,7 @@ export default function TodoScreen() {
     setCat(todo.category);
     setIsStarred(todo.starred);
     setDueDate(todo.reminderDate ? new Date(todo.reminderDate) : new Date());
+    setShowDueSection(!!todo.reminderDate);
     setIsSubmitting(false);
     setShowModal(true);
   };
@@ -112,34 +116,37 @@ export default function TodoScreen() {
     if (isSubmitting || !task.trim()) return;
     setIsSubmitting(true);
     try {
+      const reminderDateStr = showDueSection ? dueDate.toISOString() : undefined;
       if (editingId) {
         await updateTodo(editingId, {
           text: task,
-          date: dueDate.toLocaleDateString(),
-          time: dueDate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          date: showDueSection ? dueDate.toLocaleDateString() : undefined,
+          time: showDueSection ? dueDate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : undefined,
           category: cat,
           starred: isStarred,
-          reminderDate: dueDate.toISOString(),
+          reminderDate: reminderDateStr,
         });
-        const ok = await requestNotificationPermissions();
-        if (ok) {
-          await cancelReminderNotification(editingId);
-          if (dueDate.getTime() > Date.now())
+        await cancelReminderNotification(editingId);
+        if (reminderDateStr && dueDate.getTime() > Date.now()) {
+          const ok = await requestNotificationPermissions();
+          if (ok)
             await scheduleTodoNotification(editingId, task, dueDate);
         }
       } else {
         const id = await addTodoDB({
           text: task,
-          date: dueDate.toLocaleDateString(),
-          time: dueDate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          date: showDueSection ? dueDate.toLocaleDateString() : undefined,
+          time: showDueSection ? dueDate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : undefined,
           category: cat,
           starred: isStarred,
           completed: false,
-          reminderDate: dueDate.toISOString(),
+          reminderDate: reminderDateStr,
         });
-        const ok = await requestNotificationPermissions();
-        if (ok && dueDate.getTime() > Date.now())
-          await scheduleTodoNotification(id, task, dueDate);
+        if (reminderDateStr && dueDate.getTime() > Date.now()) {
+          const ok = await requestNotificationPermissions();
+          if (ok)
+            await scheduleTodoNotification(id, task, dueDate);
+        }
         interstitialAdManager.showAd();
       }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -205,7 +212,10 @@ export default function TodoScreen() {
     <SafeAreaView style={styles.container} edges={["top"]}>
       {/* ── HEADER ── */}
       <View style={styles.header}>
-        <View>
+        <TouchableOpacity onPress={() => router.push("/(tabs)/tools")} style={styles.backBtn}>
+          <Text style={styles.backArrow}>‹</Text>
+        </TouchableOpacity>
+        <View style={{ flex: 1 }}>
           <Text style={styles.headerTitle}>My Tasks</Text>
           <Text style={styles.headerSub}>{doneCount}/{totalCount} done today 🎯</Text>
         </View>
@@ -385,32 +395,45 @@ export default function TodoScreen() {
                 </View>
               </ScrollView>
 
-              {/* Date / Time */}
-              <Text style={styles.formLabel}>⏰ Due Date & Time</Text>
-              <View style={styles.dateRow}>
-                <TouchableOpacity style={styles.datePill} onPress={() => setShowDate(true)}>
-                  <Text style={styles.datePillText}>📅 {dueDate.toLocaleDateString()}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.datePill} onPress={() => setShowTime(true)}>
-                  <Text style={styles.datePillText}>🕐 {dueDate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</Text>
-                </TouchableOpacity>
-              </View>
+              {/* Date / Time (collapsible) */}
+              <TouchableOpacity
+                style={[styles.starRow, showDueSection && { backgroundColor: "#F0FDF4", borderColor: "#86EFAC", borderWidth: 1.5 }]}
+                onPress={() => setShowDueSection(!showDueSection)}
+              >
+                <Text style={styles.starEmoji}>{showDueSection ? "📅" : "⏰"}</Text>
+                <Text style={[styles.starText, showDueSection && { color: "#16A34A" }]}>
+                  {showDueSection ? "Hide due date & time" : "Set due date & time"}
+                </Text>
+              </TouchableOpacity>
 
-              {showDate && (
-                <DateTimePicker
-                  value={dueDate}
-                  mode="date"
-                  display={Platform.OS === "ios" ? "inline" : "default"}
-                  onChange={(_, d) => { setShowDate(false); if (d) setDueDate(d); }}
-                />
-              )}
-              {showTime && (
-                <DateTimePicker
-                  value={dueDate}
-                  mode="time"
-                  display={Platform.OS === "ios" ? "inline" : "default"}
-                  onChange={(_, d) => { setShowTime(false); if (d) setDueDate(d); }}
-                />
+              {showDueSection && (
+                <>
+                  <View style={styles.dateRow}>
+                    <TouchableOpacity style={styles.datePill} onPress={() => setShowDate(true)}>
+                      <Text style={styles.datePillText}>📅 {dueDate.toLocaleDateString()}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.datePill} onPress={() => setShowTime(true)}>
+                      <Text style={styles.datePillText}>🕐 {dueDate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {showDate && (
+                    <DateTimePicker
+                      value={dueDate}
+                      mode="date"
+                      display={Platform.OS === "ios" ? "inline" : "default"}
+                      onChange={(_, d) => { setShowDate(false); if (d) setDueDate(d); }}
+                    />
+                  )}
+                  {showTime && (
+                    <DateTimePicker
+                      value={dueDate}
+                      mode="time"
+                      display={Platform.OS === "ios" ? "inline" : "default"}
+                      onChange={(_, d) => { setShowTime(false); if (d) setDueDate(d); }}
+                    />
+                  )}
+                </>
               )}
 
               {/* Star */}
@@ -458,6 +481,7 @@ function TodoCard({ todo, onPress, onToggle, overdue }: {
 }) {
   const color = CAT_COLOR[todo.category] || "#F472B6";
   const scale = useRef(new Animated.Value(1)).current;
+  const catInfo = CATEGORIES.find(c => c.id === todo.category);
 
   const handleToggle = () => {
     Animated.sequence([
@@ -473,40 +497,37 @@ function TodoCard({ todo, onPress, onToggle, overdue }: {
         style={[styles.card, todo.completed && styles.cardDone, overdue && styles.cardOverdue]}
         onPress={onPress}
         onLongPress={handleToggle}
-        activeOpacity={0.8}
+        activeOpacity={0.75}
       >
-        {/* Left color bar */}
-        <View style={[styles.cardBar, { backgroundColor: todo.completed ? "#D1D5DB" : color }]} />
-
-        {/* Check button */}
-        <TouchableOpacity style={[styles.checkBtn, todo.completed && { borderColor: "#D1D5DB" }]} onPress={handleToggle}>
-          {todo.completed ? (
-            <Text style={styles.checkMark}>✓</Text>
-          ) : (
-            <View style={[styles.checkEmpty, { borderColor: color }]} />
-          )}
+        {/* Icon circle */}
+        <TouchableOpacity
+          style={[styles.txIcon, { backgroundColor: todo.completed ? "#E5E7EB" : `${color}20` }]}
+          onPress={handleToggle}
+        >
+          <Text style={styles.txIconText}>{todo.completed ? "✅" : (catInfo?.emoji || "📋")}</Text>
         </TouchableOpacity>
 
         {/* Content */}
-        <View style={styles.cardContent}>
-          <View style={styles.cardTopRow}>
-            <Text style={[styles.cardText, todo.completed && styles.cardTextDone]} numberOfLines={2}>
-              {todo.text}
-            </Text>
-            {todo.starred && <Text style={styles.starIcon}>⭐</Text>}
-          </View>
-          <View style={styles.cardMeta}>
-            <View style={[styles.catTag, { backgroundColor: color + "18" }]}>
-              <Text style={[styles.catTagText, { color }]}>
-                {CATEGORIES.find(c => c.id === todo.category)?.emoji} {todo.category}
-              </Text>
-            </View>
-            {todo.time && (
-              <Text style={[styles.timeText, overdue && styles.timeTextOverdue]}>
-                {overdue ? "⚠️ " : "🕐 "}{todo.time}
-              </Text>
+        <View style={styles.txInfo}>
+          <Text style={[styles.txNote, todo.completed && { color: "#9CA3AF", textDecorationLine: "line-through" }]} numberOfLines={1}>
+            {todo.text} {todo.starred ? "⭐" : ""}
+          </Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            <Text style={styles.txCat}>{catInfo?.label || todo.category}</Text>
+            {todo.date && (
+              <Text style={[styles.txTime, overdue && { color: "#EF4444" }]}>📅 {todo.date}</Text>
             )}
+            {todo.reminderDate && <Text style={{ fontSize: 10 }}>🔔</Text>}
           </View>
+        </View>
+
+        {/* Right: time */}
+        <View style={styles.txRight}>
+          {todo.time && (
+            <Text style={[styles.txAmount, { color: overdue ? "#EF4444" : "#171717" }]}>
+              {overdue ? "⚠️ " : ""}{todo.time}
+            </Text>
+          )}
         </View>
       </TouchableOpacity>
     </Animated.View>
@@ -521,6 +542,8 @@ const styles = StyleSheet.create({
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
     paddingHorizontal: 20, paddingTop: 12, paddingBottom: 10,
   },
+  backBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: "#F1F5F9", alignItems: "center", justifyContent: "center", marginRight: 10 },
+  backArrow: { fontSize: 24, color: "#1E293B", fontWeight: "300", lineHeight: 28 },
   headerTitle: { fontSize: 26, fontWeight: "900", color: "#171717", letterSpacing: -0.5 },
   headerSub: { fontSize: 13, color: "#9CA3AF", marginTop: 2 },
   addBtn: {
@@ -579,28 +602,25 @@ const styles = StyleSheet.create({
   emptyTitle: { fontSize: 20, fontWeight: "800", color: "#171717", marginBottom: 6 },
   emptySubtitle: { fontSize: 13, color: "#9CA3AF" },
 
-  // Todo Card
+  // Todo Card (income/expense style)
   card: {
-    backgroundColor: "#FFF", borderRadius: 18, marginBottom: 10,
-    flexDirection: "row", alignItems: "center", overflow: "hidden",
-    shadowColor: "#000", shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 2,
+    backgroundColor: "#FFF", borderRadius: 18, padding: 14,
+    flexDirection: "row", alignItems: "center", marginBottom: 8,
+    shadowColor: "#000", shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.04, shadowRadius: 10, elevation: 2,
   },
-  cardDone: { opacity: 0.65 },
+  cardDone: { opacity: 0.6 },
   cardOverdue: { borderWidth: 1.5, borderColor: "#FEE2E2" },
-  cardBar: { width: 4, alignSelf: "stretch" },
-  checkBtn: { padding: 14 },
-  checkMark: { fontSize: 18, color: "#10B981", fontWeight: "900" },
-  checkEmpty: { width: 22, height: 22, borderRadius: 11, borderWidth: 2 },
-  cardContent: { flex: 1, paddingVertical: 14, paddingRight: 14 },
-  cardTopRow: { flexDirection: "row", alignItems: "flex-start", gap: 6, marginBottom: 6 },
-  cardText: { flex: 1, fontSize: 15, fontWeight: "700", color: "#171717", lineHeight: 20 },
-  cardTextDone: { textDecorationLine: "line-through", color: "#9CA3AF" },
-  starIcon: { fontSize: 14 },
-  cardMeta: { flexDirection: "row", alignItems: "center", gap: 8 },
-  catTag: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
-  catTagText: { fontSize: 11, fontWeight: "700", textTransform: "capitalize" },
-  timeText: { fontSize: 11, color: "#9CA3AF", fontWeight: "600" },
-  timeTextOverdue: { color: "#EF4444" },
+  txIcon: {
+    width: 46, height: 46, borderRadius: 23,
+    alignItems: "center", justifyContent: "center", marginRight: 12,
+  },
+  txIconText: { fontSize: 22 },
+  txInfo: { flex: 1 },
+  txNote: { fontSize: 14, fontWeight: "700", color: "#171717", marginBottom: 3 },
+  txCat: { fontSize: 11, color: "#9CA3AF", fontWeight: "500" },
+  txRight: { alignItems: "flex-end" },
+  txAmount: { fontSize: 13, fontWeight: "700", color: "#171717" },
+  txTime: { fontSize: 10, color: "#D1D5DB", marginTop: 1 },
 
   // FAB
   fab: {

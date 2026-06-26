@@ -11,8 +11,8 @@ const PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=com.dinesh
 const APP_STORE_URL = 'https://apps.apple.com/app/com.dineshmahidev.tracksy'; // Fallback
 
 // Local version coordinates matching app.json
-export const CURRENT_VERSION = '1.0.4';
-export const CURRENT_VERSION_CODE = 8;
+export const CURRENT_VERSION = '1.0.5';
+export const CURRENT_VERSION_CODE = 9;
 
 /**
  * Checks if a newer version of the app exists.

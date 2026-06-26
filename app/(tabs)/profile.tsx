@@ -22,7 +22,7 @@ const isImageUri = (str?: string | null) => {
   return str.startsWith("http") || str.startsWith("file://") || str.startsWith("content://") || str.includes("/");
 };
 
-import { Edit2, Shield, DollarSign, Database, Trash2, Check, Award, Flame, Calendar, Activity, Shirt } from "lucide-react-native";
+import { Edit2, Shield, DollarSign, Database, Trash2, Check, Award, Flame, Calendar, Activity, Shirt, Camera } from "lucide-react-native";
 
 const { width } = Dimensions.get("window");
 
@@ -277,7 +277,7 @@ export default function ProfileScreen() {
                   onPress={pickImageFromGallery}
                   activeOpacity={0.75}
                 >
-                  <Text style={styles.avatarPickerText}>🖼️</Text>
+                  <Camera size={20} color="#475569" />
                 </TouchableOpacity>
               </View>
               <TouchableOpacity style={[styles.saveProfileBtn, { backgroundColor: Colors.primary, shadowColor: Colors.primary }]} onPress={handleSaveProfile}>

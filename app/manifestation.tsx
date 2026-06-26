@@ -7,27 +7,23 @@ import {
   ScrollView,
   TextInput,
   Alert,
-  Image,
   Dimensions,
   Animated,
   Modal,
   StatusBar,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useFocusEffect } from "@react-navigation/native";
 import { useRouter } from "expo-router";
+import { useDatabase } from "@/hooks/useDatabase";
 import { Audio } from "expo-av";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import { useDatabase } from "@/hooks/useDatabase";
+import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import LottieView from "lottie-react-native";
 
-const { width, height } = Dimensions.get("window");
+const { width } = Dimensions.get("window");
 const STORAGE_KEY = "@tracksy_manifestations";
-
-const isImageUri = (str?: string | null) => {
-  if (!str) return false;
-  return str.startsWith("http") || str.startsWith("file://") || str.startsWith("content://") || str.includes("/");
-};
 
 interface Manifestation {
   id: string;
@@ -47,12 +43,7 @@ const INSIGHTS = [
 
 export default function ManifestationScreen() {
   const router = useRouter();
-  const { settings, Colors } = useDatabase();
-
-  const userName = settings?.userName || "Manifestor";
-  const userImage = settings?.userImage;
-  const userInitials = userName.charAt(0).toUpperCase();
-
+  const { Colors } = useDatabase();
   const [manifestations, setManifestations] = useState<Manifestation[]>([]);
   const [insightIndex, setInsightIndex] = useState(0);
   const [showWriteModal, setShowWriteModal] = useState(false);
@@ -68,10 +59,14 @@ export default function ManifestationScreen() {
   const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const insightAnim = useRef(new Animated.Value(1)).current;
-  const slideUpAnim = useRef(new Animated.Value(0)).current;
+
+  useFocusEffect(
+    React.useCallback(() => {
+      loadManifestations();
+    }, [])
+  );
 
   useEffect(() => {
-    loadManifestations();
     const insightTimer = setInterval(() => {
       Animated.sequence([
         Animated.timing(insightAnim, { toValue: 0, duration: 300, useNativeDriver: true }),
@@ -84,10 +79,6 @@ export default function ManifestationScreen() {
       if (soundRef.current) soundRef.current.unloadAsync();
       if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
     };
-  }, []);
-
-  useEffect(() => {
-    Animated.spring(slideUpAnim, { toValue: 1, useNativeDriver: true, tension: 60, friction: 8 }).start();
   }, []);
 
   useEffect(() => {
@@ -209,114 +200,83 @@ export default function ManifestationScreen() {
 
   const formatDuration = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
   const formatDate = (iso: string) => new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-  const formatTime = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
-  const textManifestations = manifestations.filter((m) => m.type === "text");
-  const voiceManifestations = manifestations.filter((m) => m.type === "voice");
-
-  const primary = Colors.primary;
-  const primaryLight = `${primary}18`;
-  const primaryMid = `${primary}30`;
+  const textCount = manifestations.filter((m) => m.type === "text").length;
+  const voiceCount = manifestations.filter((m) => m.type === "voice").length;
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
-      <StatusBar backgroundColor={Colors.primary} barStyle="light-content" />
+    <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
+      <StatusBar backgroundColor="#FAFAFA" barStyle="dark-content" />
 
       {/* ── HEADER ── */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} activeOpacity={0.7}>
-          <Ionicons name="chevron-back" size={24} color="#1E293B" />
+        <TouchableOpacity onPress={() => router.push("/(tabs)/tools")} style={styles.backBtn}>
+          <Text style={styles.backArrow}>‹</Text>
         </TouchableOpacity>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.headerTitle}>✨ Manifestation</Text>
-          <Text style={[styles.headerSub, { color: primary }]}>Speak your dreams into reality</Text>
-        </View>
-        <View style={[styles.avatarContainer, { borderColor: primary }]}>
-          {isImageUri(userImage) ? (
-            <Image source={{ uri: userImage! }} style={styles.avatar} />
-          ) : (
-            <View style={[styles.avatarPlaceholder, { backgroundColor: primary }]}>
-              <Text style={styles.avatarInitials}>{userInitials}</Text>
-            </View>
-          )}
-        </View>
+        <Text style={styles.headerTitle}>✨ Manifestation</Text>
+        <TouchableOpacity style={[styles.addBtn]} onPress={() => setShowWriteModal(true)}>
+          <Text style={styles.addBtnText}>＋</Text>
+        </TouchableOpacity>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
 
         {/* ── INSIGHT BANNER ── */}
-        <Animated.View style={[styles.insightCard, { backgroundColor: primaryLight, borderColor: primaryMid }, { opacity: insightAnim }]}>
+        <Animated.View style={[styles.insightCard, { opacity: insightAnim }]}>
           <Text style={styles.insightEmoji}>{INSIGHTS[insightIndex].icon}</Text>
           <View style={{ flex: 1 }}>
-            <Text style={[styles.insightLabel, { color: primary }]}>Daily Wisdom</Text>
+            <Text style={[styles.insightLabel, { color: Colors.primary }]}>Daily Wisdom</Text>
             <Text style={styles.insightQuote}>{INSIGHTS[insightIndex].quote}</Text>
           </View>
         </Animated.View>
 
-        {/* ── ACTION BUTTONS ── */}
-        <View style={styles.actionRow}>
-          <TouchableOpacity
-            style={[styles.actionCard, { backgroundColor: primary, shadowColor: primary }]}
-            onPress={() => setShowWriteModal(true)}
-            activeOpacity={0.85}
-          >
-            <View style={styles.actionIconBg}>
-              <Ionicons name="pencil" size={26} color="#FFF" />
-            </View>
-            <Text style={styles.actionTitle}>Write</Text>
-            <Text style={styles.actionSub}>Text affirmation</Text>
-            <Text style={styles.actionCount}>{textManifestations.length} saved</Text>
-          </TouchableOpacity>
+        {/* ── ACTION CARDS ── */}
+        <View style={styles.actionGroupCard}>
+          <LottieView
+            source={require("@/assets/Goal Achieved.json")}
+            autoPlay
+            loop
+            style={styles.actionLottie}
+          />
+          <View style={styles.actionRow}>
+            <TouchableOpacity
+              style={[styles.actionCard, { backgroundColor: Colors.primary }]}
+              onPress={() => setShowWriteModal(true)}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.actionIcon}>✍️</Text>
+              <Text style={styles.actionTitle}>Write</Text>
+              <Text style={styles.actionSub}>Text affirmation</Text>
+              <Text style={styles.actionCount}>{textCount} saved</Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.actionCard, { backgroundColor: "#1E293B", shadowColor: "#1E293B" }]}
-            onPress={() => setShowVoiceModal(true)}
-            activeOpacity={0.85}
-          >
-            <View style={styles.actionIconBg}>
-              <Ionicons name="mic" size={26} color="#FFF" />
-            </View>
-            <Text style={styles.actionTitle}>Speak</Text>
-            <Text style={styles.actionSub}>Voice manifestation</Text>
-            <Text style={styles.actionCount}>{voiceManifestations.length} recorded</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* ── STATS ROW ── */}
-        <View style={styles.statsRow}>
-          <View style={[styles.statCard, { borderColor: primaryMid }]}>
-            <Text style={[styles.statNum, { color: primary }]}>{manifestations.length}</Text>
-            <Text style={styles.statLabel}>Total</Text>
-          </View>
-          <View style={[styles.statCard, { borderColor: primaryMid }]}>
-            <Text style={[styles.statNum, { color: primary }]}>{textManifestations.length}</Text>
-            <Text style={styles.statLabel}>Written</Text>
-          </View>
-          <View style={[styles.statCard, { borderColor: primaryMid }]}>
-            <Text style={[styles.statNum, { color: primary }]}>{voiceManifestations.length}</Text>
-            <Text style={styles.statLabel}>Spoken</Text>
+            <TouchableOpacity
+              style={[styles.actionCard, { backgroundColor: Colors.primary }]}
+              onPress={() => setShowVoiceModal(true)}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.actionIcon}>🎙️</Text>
+              <Text style={styles.actionTitle}>Speak</Text>
+              <Text style={styles.actionSub}>Voice manifestation</Text>
+              <Text style={styles.actionCount}>{voiceCount} recorded</Text>
+            </TouchableOpacity>
           </View>
         </View>
 
-        {/* ── RECENT MANIFESTATIONS ── */}
-        {manifestations.length > 0 && (
-          <View style={{ marginTop: 4 }}>
+        {/* ── MANIFESTATIONS ── */}
+        {manifestations.length > 0 ? (
+          <View>
             <Text style={styles.sectionTitle}>Your Manifestations</Text>
             {manifestations.map((m) => (
-              <View key={m.id} style={[styles.manifestCard, { borderLeftColor: primary }]}>
+              <View key={m.id} style={styles.manifestCard}>
                 <View style={styles.manifestCardHeader}>
-                  <View style={[styles.manifestTypePill, { backgroundColor: m.type === "text" ? primaryLight : "#1E293B18" }]}>
-                    <Text style={{ fontSize: 12 }}>{m.type === "text" ? "✍️" : "🎙️"}</Text>
-                    <Text style={[styles.manifestTypeText, { color: m.type === "text" ? primary : "#1E293B" }]}>
-                      {m.type === "text" ? "Written" : "Spoken"}
-                    </Text>
+                  <View style={styles.manifestTypePill}>
+                    <Text style={{ fontSize: 11 }}>{m.type === "text" ? "✍️" : "🎙️"}</Text>
+                    <Text style={styles.manifestTypeText}>{m.type === "text" ? "Written" : "Spoken"}</Text>
                   </View>
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                    <Text style={styles.manifestDate}>{formatDate(m.createdAt)} · {formatTime(m.createdAt)}</Text>
-                    <TouchableOpacity onPress={() => handleDelete(m.id)} style={styles.deleteBtn}>
-                      <Ionicons name="trash-outline" size={14} color="#94A3B8" />
-                    </TouchableOpacity>
-                  </View>
+                  <TouchableOpacity onPress={() => handleDelete(m.id)}>
+                    <Text style={styles.deleteIcon}>🗑</Text>
+                  </TouchableOpacity>
                 </View>
 
                 {m.type === "text" ? (
@@ -324,13 +284,13 @@ export default function ManifestationScreen() {
                 ) : (
                   <View style={styles.audioRow}>
                     <TouchableOpacity
-                      style={[styles.playBtn, { backgroundColor: playingId === m.id ? primary : primaryLight }]}
+                      style={[styles.playBtn, playingId === m.id && styles.playBtnActive]}
                       onPress={() => playVoice(m)}
                     >
                       <Ionicons
                         name={playingId === m.id ? "pause" : "play"}
-                        size={18}
-                        color={playingId === m.id ? "#FFF" : primary}
+                        size={16}
+                        color={playingId === m.id ? "#FFF" : "#1E293B"}
                       />
                     </TouchableOpacity>
                     <View style={styles.waveRow}>
@@ -341,7 +301,7 @@ export default function ManifestationScreen() {
                             styles.waveBar,
                             {
                               height: 4 + Math.abs(Math.sin(i * 0.8)) * 14,
-                              backgroundColor: playingId === m.id ? primary : `${primary}40`,
+                              backgroundColor: playingId === m.id ? "#1E293B" : "#CBD5E1",
                             },
                           ]}
                         />
@@ -350,12 +310,11 @@ export default function ManifestationScreen() {
                     <Text style={styles.durationText}>{formatDuration(m.duration || 0)}</Text>
                   </View>
                 )}
+                <Text style={styles.manifestDate}>{formatDate(m.createdAt)}</Text>
               </View>
             ))}
           </View>
-        )}
-
-        {manifestations.length === 0 && (
+        ) : (
           <View style={styles.emptyState}>
             <Text style={styles.emptyEmoji}>🌌</Text>
             <Text style={styles.emptyTitle}>Begin your journey</Text>
@@ -363,23 +322,23 @@ export default function ManifestationScreen() {
           </View>
         )}
 
-        <View style={{ height: 120 }} />
+        <View style={{ height: 100 }} />
       </ScrollView>
 
-      {/* ── WRITE MODAL (Full Screen) ── */}
+      {/* ── WRITE MODAL ── */}
       <Modal visible={showWriteModal} animationType="slide" transparent={false}>
         <SafeAreaView style={styles.fullModal} edges={["top", "bottom"]}>
           <View style={styles.fullModalHeader}>
-            <TouchableOpacity onPress={() => setShowWriteModal(false)} style={styles.closeBtn}>
-              <Ionicons name="close" size={22} color="#1E293B" />
+            <TouchableOpacity onPress={() => setShowWriteModal(false)} style={styles.sheetClose}>
+              <Text style={styles.sheetCloseText}>✕</Text>
             </TouchableOpacity>
             <Text style={styles.fullModalTitle}>✍️ Write Affirmation</Text>
-            <View style={{ width: 40 }} />
+            <View style={{ width: 36 }} />
           </View>
 
-          <View style={[styles.writeBanner, { backgroundColor: primaryLight }]}>
+          <View style={styles.writeBanner}>
             <Text style={styles.writeBannerEmoji}>💫</Text>
-            <Text style={[styles.writeBannerText, { color: primary }]}>
+            <Text style={[styles.writeBannerText, { color: Colors.primary }]}>
               Write in present tense — "I am", "I have", "I attract"
             </Text>
           </View>
@@ -387,8 +346,8 @@ export default function ManifestationScreen() {
           <View style={styles.writeInputContainer}>
             <TextInput
               style={styles.writeInput}
-              placeholder={'I am so grateful now that...\nI attract abundance because...\nI have everything I need...'}
-              placeholderTextColor="#94A3B8"
+              placeholder={'I am so grateful now that...\nI attract abundance because...'}
+              placeholderTextColor="#9CA3AF"
               multiline
               autoFocus
               value={textInput}
@@ -404,7 +363,7 @@ export default function ManifestationScreen() {
               <Text style={styles.cancelBtnText}>Cancel</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.submitBtn, { backgroundColor: primary, shadowColor: primary }, !textInput.trim() && { opacity: 0.5 }]}
+              style={[styles.submitBtn, { backgroundColor: Colors.primary, shadowColor: Colors.primary }, !textInput.trim() && { opacity: 0.5 }]}
               onPress={handleTextSubmit}
               disabled={!textInput.trim()}
             >
@@ -415,29 +374,28 @@ export default function ManifestationScreen() {
         </SafeAreaView>
       </Modal>
 
-      {/* ── VOICE MODAL (Full Screen) ── */}
+      {/* ── VOICE MODAL ── */}
       <Modal visible={showVoiceModal} animationType="slide" transparent={false}>
         <SafeAreaView style={[styles.fullModal, { backgroundColor: "#0F172A" }]} edges={["top", "bottom"]}>
           <View style={[styles.fullModalHeader, { borderBottomColor: "#1E293B" }]}>
             <TouchableOpacity
               onPress={() => { if (isRecording) stopRecording(); else setShowVoiceModal(false); }}
-              style={[styles.closeBtn, { backgroundColor: "#1E293B" }]}
+              style={[styles.sheetClose, { backgroundColor: "#1E293B" }]}
             >
-              <Ionicons name="close" size={22} color="#94A3B8" />
+              <Text style={[styles.sheetCloseText, { color: "#94A3B8" }]}>✕</Text>
             </TouchableOpacity>
             <Text style={[styles.fullModalTitle, { color: "#F1F5F9" }]}>🎙️ Speak Manifestation</Text>
-            <View style={{ width: 40 }} />
+            <View style={{ width: 36 }} />
           </View>
 
           <View style={styles.voiceBody}>
-            {/* Universe visual */}
             <View style={styles.universeRing}>
               <Animated.View style={[
                 styles.outerPulse,
-                { borderColor: isRecording ? "#EF4444" : primary, transform: [{ scale: isRecording ? pulseAnim : new Animated.Value(1) }] }
+                { borderColor: isRecording ? "#EF4444" : Colors.primary, transform: [{ scale: isRecording ? pulseAnim : new Animated.Value(1) }] }
               ]} />
               <TouchableOpacity
-                style={[styles.micButton, { backgroundColor: isRecording ? "#EF4444" : primary, shadowColor: isRecording ? "#EF4444" : primary }]}
+                style={[styles.micButton, { backgroundColor: isRecording ? "#EF4444" : Colors.primary }]}
                 onPress={isRecording ? stopRecording : startRecording}
                 activeOpacity={0.85}
               >
@@ -454,21 +412,21 @@ export default function ManifestationScreen() {
             {isRecording && (
               <View style={styles.liveRow}>
                 <View style={styles.liveDot} />
-                <Text style={[styles.liveText, { color: "#EF4444" }]}>LIVE • UNIVERSE IS LISTENING</Text>
+                <Text style={{ color: "#EF4444", fontSize: 10, fontWeight: "800", letterSpacing: 0.5 }}>LIVE • UNIVERSE IS LISTENING</Text>
               </View>
             )}
 
-            {!isRecording && voiceManifestations.length > 0 && (
+            {!isRecording && voiceCount > 0 && (
               <View style={styles.voiceRecentContainer}>
                 <Text style={styles.voiceRecentTitle}>Recent Recordings</Text>
-                {voiceManifestations.slice(0, 3).map((m) => (
+                {manifestations.filter(m => m.type === "voice").slice(0, 3).map((m) => (
                   <TouchableOpacity
                     key={m.id}
                     style={styles.voiceRecentItem}
                     onPress={() => playVoice(m)}
                     activeOpacity={0.8}
                   >
-                    <View style={[styles.smallPlayBtn, { backgroundColor: playingId === m.id ? primary : "#1E293B" }]}>
+                    <View style={[styles.smallPlayBtn, { backgroundColor: playingId === m.id ? Colors.primary : "#1E293B" }]}>
                       <Ionicons name={playingId === m.id ? "pause" : "play"} size={14} color="#FFF" />
                     </View>
                     <View style={{ flex: 1 }}>
@@ -477,7 +435,7 @@ export default function ManifestationScreen() {
                     </View>
                     <View style={styles.miniWave}>
                       {Array.from({ length: 8 }).map((_, i) => (
-                        <View key={i} style={[styles.miniBar, { height: 4 + Math.abs(Math.sin(i)) * 10, backgroundColor: `${primary}60` }]} />
+                        <View key={i} style={[styles.miniBar, { height: 4 + Math.abs(Math.sin(i)) * 10, backgroundColor: Colors.primary + "60" }]} />
                       ))}
                     </View>
                   </TouchableOpacity>
@@ -488,97 +446,100 @@ export default function ManifestationScreen() {
 
           {!isRecording && (
             <TouchableOpacity
-              style={[styles.doneBtn, { borderColor: primary }]}
+              style={[styles.doneBtn, { borderColor: Colors.primary }]}
               onPress={() => setShowVoiceModal(false)}
             >
-              <Text style={[styles.doneBtnText, { color: primary }]}>Done</Text>
+              <Text style={[styles.doneBtnText, { color: Colors.primary }]}>Done</Text>
             </TouchableOpacity>
           )}
         </SafeAreaView>
       </Modal>
+
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F8FAFC" },
+  container: { flex: 1, backgroundColor: "#FAFAFA" },
 
+  // ── HEADER ──
   header: {
-    flexDirection: "row", alignItems: "center",
-    paddingHorizontal: 20, paddingVertical: 14,
-    backgroundColor: "#FFF",
-    borderBottomWidth: 1, borderBottomColor: "#F1F5F9",
-    gap: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingVertical: 16,
   },
-  backBtn: {
-    width: 38, height: 38, borderRadius: 19,
+  backBtn: { padding: 4 },
+  backArrow: { fontSize: 32, color: "#171717", lineHeight: 36 },
+  headerTitle: { fontSize: 20, fontWeight: "800", color: "#171717" },
+  addBtn: {
+    width: 36, height: 36, borderRadius: 18,
     backgroundColor: "#F1F5F9", alignItems: "center", justifyContent: "center",
   },
-  headerTitle: { fontSize: 18, fontWeight: "900", color: "#1E293B", letterSpacing: -0.3 },
-  headerSub: { fontSize: 12, fontWeight: "600", marginTop: 1 },
-  avatarContainer: { width: 38, height: 38, borderRadius: 19, borderWidth: 2, overflow: "hidden" },
-  avatar: { width: "100%", height: "100%" },
-  avatarPlaceholder: { width: "100%", height: "100%", alignItems: "center", justifyContent: "center" },
-  avatarInitials: { fontSize: 14, fontWeight: "800", color: "#FFF" },
+  addBtnText: { fontSize: 20, color: "#171717", lineHeight: 24 },
 
-  scroll: { paddingHorizontal: 20, paddingTop: 18 },
+  // ── SCROLL ──
+  scroll: { paddingHorizontal: 16, paddingTop: 8 },
 
+  // ── INSIGHT ──
   insightCard: {
     flexDirection: "row", alignItems: "center", gap: 12,
-    borderRadius: 20, padding: 16, marginBottom: 20,
-    borderWidth: 1,
+    backgroundColor: "#FFF", borderRadius: 20, padding: 16, marginBottom: 14,
+    shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 8, elevation: 2,
   },
   insightEmoji: { fontSize: 28 },
   insightLabel: { fontSize: 10, fontWeight: "800", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 2 },
-  insightQuote: { fontSize: 13, color: "#334155", fontWeight: "600", lineHeight: 18 },
+  insightQuote: { fontSize: 13, color: "#374151", fontWeight: "600", lineHeight: 18 },
 
-  actionRow: { flexDirection: "row", gap: 14, marginBottom: 20 },
+  // ── ACTION GROUP CARD ──
+  actionGroupCard: {
+    backgroundColor: "#FFF", borderRadius: 24, padding: 20, marginBottom: 20,
+    alignItems: "center",
+    shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.06, shadowRadius: 12, elevation: 3,
+  },
+  actionLottie: { width: 100, height: 100, marginBottom: 16 },
+  actionRow: { flexDirection: "row", gap: 12, width: "100%" },
   actionCard: {
-    flex: 1, borderRadius: 24, padding: 20,
-    alignItems: "flex-start",
-    shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.25, shadowRadius: 16, elevation: 8,
+    flex: 1, borderRadius: 18, padding: 16, alignItems: "center",
   },
-  actionIconBg: { marginBottom: 12 },
-  actionTitle: { fontSize: 22, fontWeight: "900", color: "#FFF", marginBottom: 2 },
-  actionSub: { fontSize: 12, color: "rgba(255,255,255,0.7)", fontWeight: "600" },
-  actionCount: { fontSize: 11, color: "rgba(255,255,255,0.6)", marginTop: 12, fontWeight: "700" },
+  actionIcon: { fontSize: 28, marginBottom: 8 },
+  actionTitle: { fontSize: 18, fontWeight: "900", color: "#FFF", marginBottom: 2 },
+  actionSub: { fontSize: 11, color: "rgba(255,255,255,0.7)", fontWeight: "600" },
+  actionCount: { fontSize: 10, color: "rgba(255,255,255,0.5)", marginTop: 8, fontWeight: "700" },
 
-  statsRow: { flexDirection: "row", gap: 10, marginBottom: 24 },
-  statCard: {
-    flex: 1, backgroundColor: "#FFF", borderRadius: 16, padding: 14,
-    alignItems: "center", borderWidth: 1.5,
-    shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 8, elevation: 2,
-  },
-  statNum: { fontSize: 24, fontWeight: "900", letterSpacing: -0.5 },
-  statLabel: { fontSize: 11, color: "#94A3B8", fontWeight: "600", marginTop: 2 },
+  // ── SECTION ──
+  sectionTitle: { fontSize: 16, fontWeight: "800", color: "#171717", marginBottom: 12 },
 
-  sectionTitle: { fontSize: 16, fontWeight: "800", color: "#1E293B", marginBottom: 12, letterSpacing: -0.2 },
-
+  // ── MANIFESTATION CARD ──
   manifestCard: {
-    backgroundColor: "#FFF", borderRadius: 18, padding: 16, marginBottom: 12,
-    borderLeftWidth: 4,
+    backgroundColor: "#FFF", borderRadius: 20, padding: 16, marginBottom: 12,
     shadowColor: "#000", shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 2,
   },
   manifestCardHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 },
-  manifestTypePill: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10 },
-  manifestTypeText: { fontSize: 11, fontWeight: "700" },
-  manifestDate: { fontSize: 10, color: "#94A3B8", fontWeight: "600" },
-  deleteBtn: { padding: 4 },
-  manifestText: { fontSize: 14, color: "#334155", lineHeight: 20, fontWeight: "600" },
+  manifestTypePill: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "#F1F5F9", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10 },
+  manifestTypeText: { fontSize: 11, fontWeight: "700", color: "#64748B" },
+  deleteIcon: { fontSize: 14 },
+  manifestText: { fontSize: 14, color: "#374151", lineHeight: 20, fontWeight: "600" },
+  manifestDate: { fontSize: 10, color: "#9CA3AF", fontWeight: "600", marginTop: 8 },
 
+  // ── AUDIO ROW ──
   audioRow: { flexDirection: "row", alignItems: "center", gap: 10 },
   playBtn: {
-    width: 36, height: 36, borderRadius: 18,
+    width: 34, height: 34, borderRadius: 17,
+    backgroundColor: "#F1F5F9",
     alignItems: "center", justifyContent: "center",
   },
+  playBtnActive: { backgroundColor: "#1E293B" },
   waveRow: { flex: 1, flexDirection: "row", alignItems: "center", gap: 2 },
   waveBar: { width: 3, borderRadius: 2 },
   durationText: { fontSize: 11, color: "#64748B", fontWeight: "700" },
 
-  emptyState: { alignItems: "center", paddingTop: 40, paddingBottom: 20 },
+  // ── EMPTY STATE ──
+  emptyState: { alignItems: "center", marginTop: 40 },
   emptyEmoji: { fontSize: 56, marginBottom: 14 },
-  emptyTitle: { fontSize: 20, fontWeight: "800", color: "#1E293B", marginBottom: 8 },
-  emptySubtitle: { fontSize: 14, color: "#64748B", textAlign: "center", lineHeight: 20, paddingHorizontal: 20 },
+  emptyTitle: { fontSize: 20, fontWeight: "800", color: "#171717", marginBottom: 8 },
+  emptySubtitle: { fontSize: 14, color: "#6B7280", textAlign: "center", lineHeight: 20, paddingHorizontal: 20 },
 
   // ── WRITE MODAL ──
   fullModal: { flex: 1, backgroundColor: "#FFF" },
@@ -587,35 +548,30 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20, paddingVertical: 14,
     borderBottomWidth: 1, borderBottomColor: "#F1F5F9",
   },
-  closeBtn: {
-    width: 40, height: 40, borderRadius: 20,
-    backgroundColor: "#F1F5F9", alignItems: "center", justifyContent: "center",
-  },
-  fullModalTitle: { fontSize: 17, fontWeight: "900", color: "#1E293B" },
+  sheetClose: { width: 36, height: 36, borderRadius: 18, backgroundColor: "#F1F5F9", alignItems: "center", justifyContent: "center" },
+  sheetCloseText: { fontSize: 14, color: "#6B7280", fontWeight: "700" },
+  fullModalTitle: { fontSize: 17, fontWeight: "900", color: "#171717" },
 
   writeBanner: {
     flexDirection: "row", alignItems: "center", gap: 10,
     marginHorizontal: 20, marginTop: 16, marginBottom: 12,
-    borderRadius: 14, paddingHorizontal: 14, paddingVertical: 10,
+    backgroundColor: "#EEF2FF", borderRadius: 14, paddingHorizontal: 14, paddingVertical: 10,
   },
   writeBannerEmoji: { fontSize: 18 },
   writeBannerText: { fontSize: 12, fontWeight: "700", flex: 1 },
 
   writeInputContainer: {
-    flex: 1, marginHorizontal: 20, backgroundColor: "#F8FAFC",
-    borderRadius: 20, borderWidth: 1, borderColor: "#E2E8F0",
+    flex: 1, marginHorizontal: 20, backgroundColor: "#F9FAFB",
+    borderRadius: 20, borderWidth: 1, borderColor: "#E5E7EB",
     padding: 16, marginBottom: 16,
   },
   writeInput: {
-    flex: 1, fontSize: 16, color: "#1E293B", fontWeight: "600",
+    flex: 1, fontSize: 16, color: "#171717", fontWeight: "600",
     lineHeight: 26, textAlignVertical: "top",
   },
   charCount: { fontSize: 11, color: "#CBD5E1", textAlign: "right", marginTop: 8 },
 
-  writeActions: {
-    flexDirection: "row", gap: 12,
-    paddingHorizontal: 20, paddingBottom: 16,
-  },
+  writeActions: { flexDirection: "row", gap: 12, paddingHorizontal: 20, paddingBottom: 16 },
   cancelBtn: {
     flex: 1, paddingVertical: 16, borderRadius: 18, alignItems: "center",
     backgroundColor: "#F1F5F9",
@@ -633,8 +589,7 @@ const styles = StyleSheet.create({
   voiceBody: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 24 },
   universeRing: { alignItems: "center", justifyContent: "center", marginBottom: 32 },
   outerPulse: {
-    position: "absolute",
-    width: 140, height: 140, borderRadius: 70,
+    position: "absolute", width: 140, height: 140, borderRadius: 70,
     borderWidth: 2, opacity: 0.4,
   },
   micButton: {
@@ -652,7 +607,6 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   liveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#EF4444" },
-  liveText: { fontSize: 10, fontWeight: "800", letterSpacing: 0.5 },
 
   voiceRecentContainer: { width: "100%", marginTop: 16 },
   voiceRecentTitle: { fontSize: 13, fontWeight: "800", color: "#475569", marginBottom: 10 },
@@ -669,7 +623,7 @@ const styles = StyleSheet.create({
   doneBtn: {
     marginHorizontal: 24, marginBottom: 16, paddingVertical: 16,
     borderRadius: 18, alignItems: "center",
-    borderWidth: 1.5, backgroundColor: "transparent",
+    borderWidth: 1.5,
   },
   doneBtnText: { fontSize: 15, fontWeight: "800" },
 });

@@ -10,12 +10,17 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  Dimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect } from "@react-navigation/native";
 import { useDatabase } from "@/hooks/useDatabase";
+
+const { width } = Dimensions.get("window");
+const CARD_MARGIN = 10;
+const CARD_WIDTH = (width - 32 - CARD_MARGIN) / 2;
 
 interface Note {
   id: string;
@@ -29,6 +34,8 @@ const NOTE_COLORS = [
   "#FFF9C4", "#FCE4EC", "#E8F5E9", "#E3F2FD",
   "#F3E5F5", "#FFF3E0", "#E0F7FA", "#F1F8E9",
 ];
+
+const ROTATIONS = ["-3deg", "2deg", "-1deg", "4deg", "-2deg", "3deg", "-4deg", "1deg"];
 
 const STORAGE_KEY = "@tracksy_notes";
 
@@ -120,10 +127,10 @@ export default function NotesScreen() {
     <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+        <TouchableOpacity onPress={() => router.push("/(tabs)/tools")} style={styles.backBtn}>
           <Text style={styles.backArrow}>‹</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>📝 Notes</Text>
+        <Text style={styles.headerTitle}>📌 Sticky Notes</Text>
         <TouchableOpacity style={[styles.addBtn, { backgroundColor: Colors.primary }]} onPress={openNew}>
           <Text style={styles.addBtnText}>＋</Text>
         </TouchableOpacity>
@@ -132,40 +139,47 @@ export default function NotesScreen() {
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {notes.length === 0 ? (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyEmoji}>📝</Text>
-            <Text style={styles.emptyTitle}>No notes yet</Text>
-            <Text style={styles.emptySubtitle}>Tap + to write your first note</Text>
+            <Text style={styles.emptyEmoji}>📌</Text>
+            <Text style={styles.emptyTitle}>No sticky notes yet</Text>
+            <Text style={styles.emptySubtitle}>Tap + to pin your first note</Text>
             <TouchableOpacity style={[styles.emptyButton, { backgroundColor: Colors.primary }]} onPress={openNew}>
-              <Text style={styles.emptyButtonText}>Create Note</Text>
+              <Text style={styles.emptyButtonText}>Pin a Note</Text>
             </TouchableOpacity>
           </View>
         ) : (
           <View style={styles.grid}>
-            {notes.map((note) => (
-              <TouchableOpacity
-                key={note.id}
-                style={[styles.noteCard, { backgroundColor: note.color }]}
-                onPress={() => openEdit(note)}
-                activeOpacity={0.8}
-              >
-                {!!note.title && (
-                  <Text style={styles.noteTitle} numberOfLines={2}>
-                    {note.title}
-                  </Text>
-                )}
-                {!!note.body && (
-                  <Text style={styles.noteBody} numberOfLines={5}>
-                    {note.body}
-                  </Text>
-                )}
-                <View style={styles.noteFooter}>
-                  <Text style={styles.noteDate}>{formatDate(note.createdAt)}</Text>
-                  <TouchableOpacity onPress={() => handleDelete(note.id)}>
-                    <Text style={styles.deleteIcon}>🗑</Text>
-                  </TouchableOpacity>
-                </View>
-              </TouchableOpacity>
-            ))}
+            {notes.map((note, idx) => {
+              const rotation = ROTATIONS[idx % ROTATIONS.length];
+              return (
+                <TouchableOpacity
+                  key={note.id}
+                  style={[
+                    styles.noteCard,
+                    { backgroundColor: note.color, transform: [{ rotate: rotation as any }] },
+                  ]}
+                  onPress={() => openEdit(note)}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.pinIcon}>📌</Text>
+                  {!!note.title && (
+                    <Text style={styles.noteTitle} numberOfLines={2}>
+                      {note.title}
+                    </Text>
+                  )}
+                  {!!note.body && (
+                    <Text style={styles.noteBody} numberOfLines={5}>
+                      {note.body}
+                    </Text>
+                  )}
+                  <View style={styles.noteFooter}>
+                    <Text style={styles.noteDate}>{formatDate(note.createdAt)}</Text>
+                    <TouchableOpacity onPress={() => handleDelete(note.id)}>
+                      <Text style={styles.deleteIcon}>🗑</Text>
+                    </TouchableOpacity>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
           </View>
         )}
         <View style={{ height: 100 }} />
@@ -185,7 +199,7 @@ export default function NotesScreen() {
             >
               <View style={styles.sheetTitleRow}>
                 <Text style={styles.sheetTitle}>
-                  {editNote ? "✏️ Edit Note" : "📝 New Note"}
+                  {editNote ? "✏️ Edit Note" : "📌 New Sticky"}
                 </Text>
                 <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.sheetClose}>
                   <Text style={styles.sheetCloseTxt}>✕</Text>
@@ -228,7 +242,7 @@ export default function NotesScreen() {
               {/* Save Button */}
               <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
                 <Text style={styles.saveBtnTxt}>
-                  {editNote ? "Save Changes" : "Create Note"}
+                  {editNote ? "Save Changes" : "Pin It"}
                 </Text>
               </TouchableOpacity>
             </ScrollView>
@@ -241,6 +255,7 @@ export default function NotesScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#FAFAFA" },
+
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -252,34 +267,59 @@ const styles = StyleSheet.create({
   backArrow: { fontSize: 32, color: "#171717", lineHeight: 36 },
   headerTitle: { fontSize: 20, fontWeight: "800", color: "#171717" },
   addBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: "center",
-    justifyContent: "center",
+    width: 36, height: 36, borderRadius: 18,
+    alignItems: "center", justifyContent: "center",
   },
   addBtnText: { fontSize: 20, color: "#FFF", lineHeight: 24 },
 
-  scrollContent: { paddingHorizontal: 16 },
-  grid: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
-  noteCard: {
-    width: "47%",
-    borderRadius: 20,
-    padding: 16,
-    minHeight: 140,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    elevation: 3,
+  scrollContent: { paddingHorizontal: 16, paddingTop: 12 },
+  grid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
   },
-  noteTitle: { fontSize: 15, fontWeight: "700", color: "#171717", marginBottom: 6 },
-  noteBody: { fontSize: 13, color: "#374151", lineHeight: 18, flex: 1 },
-  noteFooter: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 12 },
-  noteDate: { fontSize: 11, color: "#6B7280" },
+  noteCard: {
+    width: CARD_WIDTH,
+    borderRadius: 4,
+    padding: 14,
+    paddingTop: 20,
+    minHeight: 150,
+    marginBottom: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 6,
+    position: "relative",
+  },
+  pinIcon: {
+    position: "absolute",
+    top: -8,
+    alignSelf: "center",
+    fontSize: 18,
+  },
+  noteTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#171717",
+    marginBottom: 4,
+  },
+  noteBody: {
+    fontSize: 12,
+    color: "#374151",
+    lineHeight: 17,
+    flex: 1,
+  },
+  noteFooter: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 12,
+  },
+  noteDate: { fontSize: 10, color: "#8B7355" },
   deleteIcon: { fontSize: 14 },
 
-  emptyState: { alignItems: "center", marginTop: 80 },
+  emptyState: { alignItems: "center", marginTop: 100 },
   emptyEmoji: { fontSize: 60, marginBottom: 16 },
   emptyTitle: { fontSize: 20, fontWeight: "800", color: "#171717", marginBottom: 8 },
   emptySubtitle: { fontSize: 14, color: "#6B7280", marginBottom: 24 },
@@ -290,19 +330,9 @@ const styles = StyleSheet.create({
   },
   emptyButtonText: { color: "#FFF", fontWeight: "700", fontSize: 15 },
 
-  // Modal (Now Full Screen)
+  // Modal
   fullScreenContainer: { flex: 1 },
   fullScreenContent: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 34, flexGrow: 1 },
-  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.45)", justifyContent: "flex-end" },
-  modalSheet: {
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
-    paddingHorizontal: 24,
-    paddingTop: 8,
-    paddingBottom: Platform.OS === "ios" ? 40 : 24,
-    maxHeight: "92%",
-  },
-  sheetHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: "rgba(0,0,0,0.12)", alignSelf: "center", marginTop: 12, marginBottom: 12 },
   sheetTitleRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 18 },
   sheetTitle: { fontSize: 18, fontWeight: "800", color: "#171717" },
   sheetClose: { width: 32, height: 32, borderRadius: 16, backgroundColor: "rgba(0,0,0,0.06)", alignItems: "center", justifyContent: "center" },

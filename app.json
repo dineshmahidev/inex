@@ -2,7 +2,7 @@
   "expo": {
     "name": "Tracksy",
     "slug": "flow-ledger",
-    "version": "1.0.4",
+    "version": "1.0.5",
     "orientation": "portrait",
     "icon": "./assets/tracksy_logo.png",
     "notification": {
@@ -23,9 +23,8 @@
     },
     "android": {
       "package": "com.dineshmahidev.tracksy",
-      "versionCode": 8,
+      "versionCode": 9,
       "allowBackup": true,
-      "fullBackupOnly": false,
       "splash": {
         "image": "./assets/splash_logo.png",
         "resizeMode": "contain",
